@@ -12,6 +12,7 @@ const Register = () => {
         name: "",
         cp_number: "",
         password: "",
+        location: "",
     });
     const [error, setError] = useState("");
     const [loading, setIsLoading] = useState(false);
@@ -37,7 +38,6 @@ const Register = () => {
 
         try {
             const response = await axiosClient.post("/register", form);
-            console.log(form);
             setIsLoading(false);
             navigate("/guest/login");
         } catch (error) {
@@ -108,6 +108,31 @@ const Register = () => {
                               <input name='email' value={form.email} onChange={handleChange}
                                type="text" placeholder='Email' className=' outline-none px-3 py-3 placeholder:text-[#504E4E] placeholder:text-center' />
                           </div>
+
+                          <div className="flex justify-between items-center rounded-full px-3 py-3 h-[40px] border border-black"
+                            style={{ boxShadow: "4px 4px 3px rgba(0,0,0,0.5)" }}
+                            >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 48 48">
+                                <path fill="none" stroke="#000" strokeLinecap="round" strokeLinejoin="round" strokeWidth={4}
+                                d="M24 44s14-10.435 14-24A14 14 0 1 0 10 20c0 13.565 14 24 14 24z" />
+                                <circle cx="24" cy="20" r="4" fill="#000"></circle>
+                            </svg>
+
+                            <select
+                                name="location"
+                                value={form.location}
+                                onChange={handleChange}
+                                className="w-full bg-transparent outline-none px-3 py-3 text-[#504E4E] text-center"
+                            >
+                                <option value="">Select Location</option>
+                                <option value="Manila">Manila</option>
+                                <option value="Caloocan">Caloocan</option>
+                                <option value="Cebu">Cebu</option>
+                                <option value="Davao">Davao</option>
+                                <option value="Iloilo">Iloilo</option>
+                                <option value="Baguio">Baguio</option>
+                            </select>
+                            </div>
 
                           <div className='flex justify-between items-center rounded-full px-3 py-3 h-[40px] border border-black' style={{ boxShadow: "4px 4px 3px rgba(0,0,0,0.5)" }}>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 48 48"><path fill="none" stroke="#000" strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M24 20a7 7 0 1 0 0-14a7 7 0 0 0 0 14M6 40.8V42h36v-1.2c0-4.48 0-6.72-.872-8.432a8 8 0 0 0-3.496-3.496C35.92 28 33.68 28 29.2 28H18.8c-4.48 0-6.72 0-8.432.872a8 8 0 0 0-3.496 3.496C6 34.08 6 36.32 6 40.8"></path></svg>

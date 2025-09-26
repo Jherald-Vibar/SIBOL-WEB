@@ -30,10 +30,12 @@ const Login = () => {
         const role = data.role;
         const token = data.token;
         const name = data.user.name;
+        const location = data.user.location;
 
         localStorage.setItem("authToken", token);
         localStorage.setItem("role", role);
         localStorage.setItem("username", name);
+        localStorage.setItem("location", location);
 
         if(role != "user") {
             setIsLoading(false);

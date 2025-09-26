@@ -16,6 +16,7 @@ class UserController extends Controller
             "email" => "required|unique:users,email",
             "cp_number" => "required",
             "password" => "required|string|min:8",
+            "location" => 'required',
         ]);
 
         if($validator->fails()) {
@@ -33,6 +34,7 @@ class UserController extends Controller
                 'email' => $validated['email'],
                 'cp_number' => $validated['cp_number'],
                 'password' => $validated['password'],
+                'location' => $validated['location'],
             ]);
 
             return response()->json([
