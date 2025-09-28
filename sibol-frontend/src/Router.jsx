@@ -7,6 +7,7 @@ import AdminLayout from "./components/AdminLayout.jsx";
 import UserLayout from "./components/UserLayout.jsx";
 import Register from "./Views/Register.jsx";
 import UserDashboard from "./Views/UserDashboard.jsx";
+import Cropcare from "./Views/Cropcare.jsx";
 
 const router = createBrowserRouter ([
 
@@ -46,6 +47,10 @@ const router = createBrowserRouter ([
                     {
                         path: "/user/dashboard",
                         element: <UserDashboard/>
+                    },
+                    {
+                        path: "/user/crop-care",
+                        element: <Cropcare/>
                     }
                 ],
             }
