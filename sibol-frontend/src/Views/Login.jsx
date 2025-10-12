@@ -37,12 +37,17 @@ const Login = () => {
         localStorage.setItem("username", name);
         localStorage.setItem("location", location);
 
+        if(role == "admin") {
+             console.log('Admin');
+             navigate("/admin/crop-profile");
+        }
+
         if(role != "user") {
+            console.log('gumagana di ka user');
             setIsLoading(false);
             setError("You're not a user!");
             return;
         }
-
          navigate("/user/dashboard");
     } catch (error) {
         setIsLoading(false);

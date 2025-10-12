@@ -11,12 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('users', function (Blueprint $table) {
+        Schema::create('crops', function (Blueprint $table) {
             $table->id();
-            $table->string('email')->unique();
-            $table->string('name');
-            $table->string('cp_number');
-            $table->string('password');
+            $table->foreignId('garden_id')->constrained()->onDelete('cascade');
+            $table->string('name'); // e.g. Tomato, Chili, Ginger
+            $table->string('variety')->nullable();
+            $table->date('planted_at')->nullable();
             $table->timestamps();
         });
     }
@@ -26,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('users');
+        Schema::dropIfExists('crops');
     }
 };

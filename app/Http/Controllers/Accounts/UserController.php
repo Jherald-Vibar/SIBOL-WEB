@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
@@ -16,7 +17,6 @@ class UserController extends Controller
             "email" => "required|unique:users,email",
             "cp_number" => "required",
             "password" => "required|string|min:8",
-            "location" => 'required',
         ]);
 
         if($validator->fails()) {
@@ -34,7 +34,6 @@ class UserController extends Controller
                 'email' => $validated['email'],
                 'cp_number' => $validated['cp_number'],
                 'password' => $validated['password'],
-                'location' => $validated['location'],
             ]);
 
             return response()->json([
@@ -60,7 +59,7 @@ class UserController extends Controller
             return response()->json([
                 "Message" => $validator->errors(),
                 "Status" => "Failed",
-            ], 404);
+            ], 422);
         }
 
         $validated = $validator->validated();
@@ -77,6 +76,17 @@ class UserController extends Controller
                 ]);
             }
 
+            if(Auth::guard('web')->attempt(['email' => $validated['email'], 'password' => $validated['password']])) {
+                $user = Auth::guard('web')->user();
+                $token = $user->createToken('admin')->plainTextToken;
+
+                return response()->json([
+                    'token' => $token,
+                    'role' => 'admin',
+                    "user" => $user,
+                ]);
+            }
+
             return response()->json([
                 'Message' => 'Login Failed! Check your Credentials!',
                 'Status' => "Failed!",
@@ -88,6 +98,37 @@ class UserController extends Controller
                 'Status' => 'Failed',
             ], 404);
         }
+    }
+
+    public function changePassword(Request $request) {
+
+        $user = $request->user();
+
+        $validator = Validator::make($request->all(), [
+            'current_password' => 'required',
+            'new_password' => 'required|min:8',
+        ]);
+
+        if($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors()
+            ], 422);
+        }
+
+        $validated = $validator->validated();
+
+        if(!Hash::check($validated['current_password'], $user->password)) {
+            return response()->json([
+                'message' => 'Your current password is incorrect.'
+            ], 400);
+        }
+
+        $user->password = Hash::make($validated['new_password']);
+        $user->save();
+
+        return response()->json([
+            'message' => 'Password changed successfully.'
+        ], 200);
     }
 
     public function userLogout(Request $request) {

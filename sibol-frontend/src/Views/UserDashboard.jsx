@@ -3,6 +3,7 @@ import UserSidebar from "./parts/UserSidebar";
 import UserNavbar from "./parts/UserNavbar";
 import axios from "axios";
 import image from "../assets/first_image.png";
+import axiosClient from "./axios";
 import { Card, CardContent, Typography } from "@mui/material";
 import {
   LineChart,
@@ -17,21 +18,40 @@ import {
 
 const UserDashboard = () => {
   const name = localStorage.getItem("username");
-  const location = localStorage.getItem("location");
   const apikey = import.meta.env.VITE_WEATHER_APIKEY;
+  const [location, setLocation] = useState(null);
   const [weather, setWeather] = useState(null);
   const [unit, setUnit] = useState("C");
   const [date, setDate] = useState(new Date());
+  const [data, setData] = useState([]);
+  const [error, setError] = useState("");
 
-  const data = [
-  { name: "Mon", temp: 28, humidity: 70 },
-  { name: "Tue", temp: 30, humidity: 65 },
-  { name: "Wed", temp: 27, humidity: 80 },
-  { name: "Thu", temp: 29, humidity: 75 },
-  { name: "Fri", temp: 31, humidity: 60 },
-  { name: "Sat", temp: 33, humidity: 68 },
-  { name: "Sun", temp: 32, humidity: 72 },
-];
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axiosClient.get("/getAirHumidity");
+
+        // Ensure the response is an array
+        if (Array.isArray(response.data)) {
+          setData(response.data);
+        } else {
+          setData([]);
+        }
+
+        setError(null);
+      } catch (err) {
+        console.error(err);
+        setError("Failed to fetch Data!");
+      }
+    };
+
+    fetchData(); // initial fetch
+
+    const interval = setInterval(fetchData, 5000); // fetch every 5s
+    return () => clearInterval(interval); // cleanup on unmount
+  }, []);
+
 
   const [selectedCrop, setSelectedCrop] = useState("");
 
@@ -41,6 +61,28 @@ const UserDashboard = () => {
     { name: "Carrot", planted: true },
     { name: "Ginger", planted: false },
   ];
+
+   useEffect(() => {
+    const fetchLocation = async () => {
+      try {
+        const response = await axiosClient.get("/getLocation");
+        const locations = response.data.locations;
+
+        if (locations && locations.length > 0) {
+          const firstLocation = locations[0];
+          setLocation(firstLocation);
+          localStorage.setItem("location", firstLocation);
+          console.log("Fetched garden location:", firstLocation);
+        } else {
+          console.warn("No garden locations found for this user.");
+        }
+      } catch (error) {
+        console.error("Error fetching garden locations:", error);
+      }
+    };
+
+    fetchLocation();
+  }, []);
 
   useEffect(() => {
     const fetchWeather = async () => {
@@ -59,8 +101,10 @@ const UserDashboard = () => {
         console.error("Weather API error:", error);
       }
     };
-    if (location) fetchWeather();
+        if (location) fetchWeather();
   }, [location, apikey]);
+
+
 
   useEffect(() => {
     const timer = setInterval(() => setDate(new Date()), 60000);
@@ -119,7 +163,7 @@ const UserDashboard = () => {
                       <circle cx="24" cy="20" r="4" fill="#fff"></circle>
                     </svg>
                     <h1 className="text-white font-sans font-semibold ml-3 text-sm sm:text-base">
-                      {location} City
+                      {location}
                     </h1>
                   </div>
 
@@ -196,42 +240,36 @@ const UserDashboard = () => {
 
             {/* Chart Section */}
             <div className="w-full">
-               <Card sx={{ maxWidth: 600, margin: "auto", boxShadow: 3 }}>
-                    <CardContent>
-                        <Typography variant="h6" gutterBottom>
-                        Environmental Condition
-                        </Typography>
-                        <ResponsiveContainer width="100%" height={300}>
+                <Card sx={{ maxWidth: 600, margin: "auto", boxShadow: 3 }}>
+                <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                    Environmental Condition
+                    </Typography>
+                    {error && <Typography color="error">{error}</Typography>}
+                    {data.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
                         <LineChart data={data}>
-                            <CartesianGrid stroke="#ccc" />
-                            <XAxis dataKey="name" />
-                            <YAxis yAxisId="left" label={{ value: "Temperature (°C)", angle: 90, position: "insideLeft" }} />
-                            <YAxis
+                        <CartesianGrid stroke="#ccc" />
+                        <XAxis dataKey="name" />
+                        <YAxis
+                            yAxisId="left"
+                            label={{ value: "Temperature (°C)", angle: 90, position: "insideLeft" }}
+                        />
+                        <YAxis
                             yAxisId="right"
                             orientation="right"
                             label={{ value: "Humidity (%)", angle: -90, position: "insideRight" }}
-                            />
-                            <Tooltip />
-                            <Legend />
-                            <Line
-                            yAxisId="left"
-                            type="monotone"
-                            dataKey="temp"
-                            stroke="red"
-                            strokeWidth={2}
-                            dot={false}
-                            />
-                            <Line
-                            yAxisId="right"
-                            type="monotone"
-                            dataKey="humidity"
-                            stroke="green"
-                            strokeWidth={2}
-                            dot={false}
-                            />
+                        />
+                        <Tooltip />
+                        <Legend />
+                        <Line yAxisId="left" type="monotone" dataKey="temp" stroke="red" dot={false} />
+                        <Line yAxisId="right" type="monotone" dataKey="humidity" stroke="green" dot={false} />
                         </LineChart>
-                        </ResponsiveContainer>
-                    </CardContent>
+                    </ResponsiveContainer>
+                    ) : (
+                    <Typography>Loading data...</Typography>
+                    )}
+                </CardContent>
                 </Card>
             </div>
           </div>

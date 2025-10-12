@@ -11,11 +11,16 @@ class User extends Authenticatable
 
     use HasApiTokens, Notifiable;
 
-    protected $fillable = ['name', 'email', 'password', 'cp_number', 'location'];
+    protected $fillable = ['name', 'email', 'password', 'cp_number'];
 
     protected $hidden = [
         'password',
     ];
+
+    public function gardens()
+    {
+        return $this->hasMany(Garden::class);
+    }
 
      protected function casts(): array
     {

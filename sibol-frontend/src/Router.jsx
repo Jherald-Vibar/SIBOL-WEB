@@ -8,6 +8,12 @@ import UserLayout from "./components/UserLayout.jsx";
 import Register from "./Views/Register.jsx";
 import UserDashboard from "./Views/UserDashboard.jsx";
 import Cropcare from "./Views/Cropcare.jsx";
+import Reports from "./Views/Reports.jsx";
+import DailyReport from "./Views/DailyReport.jsx";
+import CropProfile from "./Views/CropProfile.jsx";
+import AccountSettings from "./Views/AccountSettings.jsx";
+import AdminCropProfile from "./Views/AdminCropProfile.jsx";
+import AdminAccountSettings from "./Views/AdminAccountSettings.jsx";
 
 const router = createBrowserRouter ([
 
@@ -37,7 +43,14 @@ const router = createBrowserRouter ([
                 path: "/admin",
                 element: <AdminLayout/>,
                 children: [
-
+                    {
+                        path: "/admin/crop-profile",
+                        element: <AdminCropProfile/>
+                    },
+                    {
+                        path: "/admin/account-settings",
+                        element: <AdminAccountSettings/>
+                    }
                 ],
             },
             {
@@ -51,6 +64,22 @@ const router = createBrowserRouter ([
                     {
                         path: "/user/crop-care",
                         element: <Cropcare/>
+                    },
+                    {
+                        path: "/user/report",
+                        element: <Reports/>
+                    },
+                    {
+                        path: "/user/report/daily-report/:year/:month/:day",
+                        element: <DailyReport/>
+                    },
+                    {
+                        path: "/user/crop-profile",
+                        element: <CropProfile/>
+                    },
+                    {
+                        path: "/user/account-settings",
+                        element: <AccountSettings/>
                     }
                 ],
             }

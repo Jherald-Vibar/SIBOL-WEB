@@ -11,7 +11,7 @@ const AuthenticatedLayout = () => {
       .then(() => {
         axiosClient.get("auth/check")
           .then((res) => {
-            console.log("Auth Check Response:", res.data);
+            {/*console.log("Auth Check Response:", res.data);*/}
             if (res.data.authenticated) {
               setIsAuthenticated(true);
               localStorage.setItem("role", res.data.role);
