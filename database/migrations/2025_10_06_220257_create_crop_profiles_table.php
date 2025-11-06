@@ -13,11 +13,11 @@ return new class extends Migration
     {
        Schema::create('crop_profiles', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('crop_id')->constrained()->onDelete('cascade');
+            $table->string('name');
             $table->float('soil_moisture_min')->nullable();
             $table->float('soil_moisture_max')->nullable();
-            $table->float('soil_temperature_min')->nullable();
-            $table->float('soil_temperature_max')->nullable();
+            $table->float('soil_temp_min')->nullable();
+            $table->float('soil_temp_max')->nullable();
             $table->float('electrical_conductivity_min')->nullable();
             $table->float('electrical_conductivity_max')->nullable();
             $table->float('ph_min')->nullable();

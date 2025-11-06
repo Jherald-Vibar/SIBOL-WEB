@@ -14,6 +14,8 @@ import CropProfile from "./Views/CropProfile.jsx";
 import AccountSettings from "./Views/AccountSettings.jsx";
 import AdminCropProfile from "./Views/AdminCropProfile.jsx";
 import AdminAccountSettings from "./Views/AdminAccountSettings.jsx";
+import CropCareConfig from "./Views/CropCareConfig.jsx";
+import CropCarePlant from "./Views/CropCarePlant.jsx";
 
 const router = createBrowserRouter ([
 
@@ -64,6 +66,14 @@ const router = createBrowserRouter ([
                     {
                         path: "/user/crop-care",
                         element: <Cropcare/>
+                    },
+                    {
+                        path: "/user/crop-care/:garden_id",
+                        element: <CropCareConfig/>
+                    },
+                    {
+                        path: "/user/crop-care/:garden_id/:crop_name",
+                        element: <CropCarePlant/>
                     },
                     {
                         path: "/user/report",

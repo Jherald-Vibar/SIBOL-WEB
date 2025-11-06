@@ -42,7 +42,7 @@ const GuestLayout = () => {
   if (isAuthenticated) {
     const role = localStorage.getItem("role");
     if (role === "user") return <Navigate to="/user/dashboard" replace />;
-    if (role === "admin") return <Navigate to="/admin" replace />;
+    if (role === "admin") return <Navigate to="/admin/crop-profile" replace />;
     return <Navigate to="/" replace />;
   }
 

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Esp extends Model
 {
     protected $fillable = [
-        'crop_id','serial_number','user_id','status','last_seen_at'
+        'crop_id', 'garden_id', 'serial_number','user_id','status','last_seen_at'
     ];
 
     public function crop() {

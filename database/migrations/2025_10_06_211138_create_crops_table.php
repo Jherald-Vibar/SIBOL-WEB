@@ -13,9 +13,11 @@ return new class extends Migration
     {
         Schema::create('crops', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('garden_id')->constrained()->onDelete('cascade');
-            $table->string('name'); // e.g. Tomato, Chili, Ginger
+            $table->string('name');
             $table->string('variety')->nullable();
+            $table->string('image')->nullable();
             $table->date('planted_at')->nullable();
             $table->timestamps();
         });

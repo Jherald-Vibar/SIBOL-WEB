@@ -83,7 +83,9 @@ const Login = () => {
             }}
           >
             <div className="flex flex-col items-center justify-start text-center">
-              <img src={Logo} alt="" className="w-[180px] mb-6" />
+              <a href="/">
+                <img src={Logo} alt="" className="w-[180px] mb-6" />
+              </a>
               <span className="font-serif text-2xl">
                 <span className="text-amber-300 text-5xl">S</span>mart Farming starts
               </span>
@@ -96,73 +98,149 @@ const Login = () => {
 
         <div className="flex flex-1 items-center justify-center min-h-screen w-full">
           <div className='w-full max-w-md  px-2 py-2 rounded-lg border border-green-800 bg-[#FEFADFAA] flex items-center justify-center'>
-            <form onSubmit={handleLogin} className='w-full md:w-[99%] px-3 py-3 flex flex-col justify-center items-center rounded-lg bg-[#FEFADF1A] border border-green-800'>
-                <div className='flex items-center'>
-                    <img src={Logo} alt="logo" className='w-30 md:w-10'/>
-                </div>
-                <div className='mt-2 md:mt-3 text-center'>
-                    <h1 className='text-2xl md:text-3xl font-serif font-semibold text-green-950 mb-3'>LOGIN</h1>
-                </div>
-                {error ? <div class="flex items-center p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400" role="alert">
-                <svg class="shrink-0 inline w-4 h-4 me-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z"/>
-                </svg>
-                <span class="sr-only">Info</span>
-                <div>
-                    <span class="font-medium">Danger alert!</span> {error}
-                </div>
-                </div> : <div></div>}
-                                <div className='flex flex-col gap-3'>
-                    <div className='flex justify-between items-center rounded-full px-3 py-3 h-[40px] border border-black' style={{ boxShadow: "4px 4px 3px rgba(0,0,0,0.5)" }}>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 48 48"><path fill="none" stroke="#000" strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M24 20a7 7 0 1 0 0-14a7 7 0 0 0 0 14M6 40.8V42h36v-1.2c0-4.48 0-6.72-.872-8.432a8 8 0 0 0-3.496-3.496C35.92 28 33.68 28 29.2 28H18.8c-4.48 0-6.72 0-8.432.872a8 8 0 0 0-3.496 3.496C6 34.08 6 36.32 6 40.8"></path></svg>
-                        <input name='email' onChange={(e) => setEmail(e.target.value)}
-                         type="text" placeholder='Email' className=' outline-none px-3 py-3 placeholder:text-[#504E4E] placeholder:text-center' />
-                    </div>
+            <form
+              onSubmit={handleLogin}
+              className="w-full md:w-[99%] px-6 py-6 flex flex-col justify-center items-center rounded-lg bg-[#FEFADF1A] border border-green-800"
+            >
+              {/* Logo */}
+              <div className="flex items-center justify-center mb-2">
+                <img src={Logo} alt="logo" className="w-14 md:w-16" />
+              </div>
 
-                    <div className='flex justify-between items-center rounded-full px-3 py-3 h-[40px] border border-black' style={{ boxShadow: "4px 4px 3px rgba(0,0,0,0.5)" }}>
-                         <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24"><path fill="#000" d="M12 17a2 2 0 0 0 2-2a2 2 0 0 0-2-2a2 2 0 0 0-2 2a2 2 0 0 0 2 2m6-9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h1V6a5 5 0 0 1 5-5a5 5 0 0 1 5 5v2zm-6-5a3 3 0 0 0-3 3v2h6V6a3 3 0 0 0-3-3"></path></svg>
-                        <input name='password' onChange={(e) => setPassword(e.target.value)}
-                         type="password" placeholder='Password' className=' outline-none px-3 py-3 placeholder:text-[#504E4E] placeholder:text-center'/>
-                    </div>
-                    <div className='flex items-center justify-center px-2 py-2 mb-3'>
-                       <button
-                        type="submit"
-                        disabled={loading}
-                        className="bg-green-950 text-[0.9rem] md:text-xl font-serif px-1 py-1 rounded-lg w-[120px] h-[35px] text-white cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-                        >
-                        {loading ? (
-                            <>
-                            <svg
-                                className="animate-spin h-5 w-5 text-white"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                            >
-                                <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                                ></circle>
-                                <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                                ></path>
-                            </svg>
-                            Loading...
-                            </>
-                        ) : (
-                            "LOGIN"
-                        )}
-                        </button>
-                    </div>
-                    <div className='flex justify-center items-center px-3 py-3'>
-                        <a href='' className='text-[1rem] font-serif text-green-800 underline'>Forgot password?</a>
-                    </div>
+              {/* Title */}
+              <div className="text-center mb-4">
+                <h1 className="text-2xl md:text-3xl font-serif font-semibold text-green-950">
+                  LOGIN
+                </h1>
+              </div>
+
+              {/* Error Alert */}
+              {error && (
+                <div
+                  className="flex items-center p-3 mb-4 text-sm text-red-800 rounded-lg bg-red-50 w-full md:w-[90%]"
+                  role="alert"
+                >
+                  <svg
+                    className="w-4 h-4 mr-2"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z" />
+                  </svg>
+                  <span className="font-medium">Error:</span>&nbsp;{error}
                 </div>
+              )}
+
+              {/* Inputs */}
+              <div className="flex flex-col gap-4 w-full md:w-[90%]">
+                {/* Email Input */}
+                <div
+                  className="flex items-center gap-2 rounded-full px-4 py-2 h-[45px] border border-black "
+                  style={{ boxShadow: "4px 4px 3px rgba(0,0,0,0.4)" }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="22"
+                    height="22"
+                    viewBox="0 0 48 48"
+                  >
+                    <path
+                      fill="none"
+                      stroke="#000"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={4}
+                      d="M24 20a7 7 0 1 0 0-14a7 7 0 0 0 0 14M6 40.8V42h36v-1.2c0-4.48 0-6.72-.872-8.432a8 8 0 0 0-3.496-3.496C35.92 28 33.68 28 29.2 28H18.8c-4.48 0-6.72 0-8.432.872a8 8 0 0 0-3.496 3.496C6 34.08 6 36.32 6 40.8"
+                    />
+                  </svg>
+                  <input
+                    name="email"
+                    onChange={(e) => setEmail(e.target.value)}
+                    type="text"
+                    placeholder="Email"
+                    className="w-full outline-none px-2 placeholder:text-[#504E4E] placeholder:text-sm bg-transparent"
+                  />
+                </div>
+
+                {/* Password Input */}
+                <div
+                  className="flex items-center gap-2 rounded-full px-4 py-2 h-[45px] border border-black"
+                  style={{ boxShadow: "4px 4px 3px rgba(0,0,0,0.4)" }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      fill="#000"
+                      d="M12 17a2 2 0 0 0 2-2a2 2 0 0 0-2-2a2 2 0 0 0-2 2a2 2 0 0 0 2 2m6-9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h1V6a5 5 0 0 1 5-5a5 5 0 0 1 5 5v2zm-6-5a3 3 0 0 0-3 3v2h6V6a3 3 0 0 0-3-3"
+                    />
+                  </svg>
+                  <input
+                    name="password"
+                    onChange={(e) => setPassword(e.target.value)}
+                    type="password"
+                    placeholder="Password"
+                    className="w-full outline-none px-2 placeholder:text-[#504E4E] placeholder:text-sm bg-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* Button */}
+              <div className="flex justify-center mt-5">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="bg-green-950 text-white font-serif text-lg px-6 py-2 rounded-lg w-[130px] flex justify-center items-center gap-2 hover:bg-green-900 transition disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <svg
+                        className="animate-spin h-5 w-5 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                        ></path>
+                      </svg>
+                      Loading...
+                    </>
+                  ) : (
+                    "LOGIN"
+                  )}
+                </button>
+              </div>
+
+              {/* Links */}
+              <div className="flex justify-center items-center gap-4 mt-4">
+                <a
+                  href="#"
+                  className="text-[1rem] font-serif text-green-800 underline hover:text-green-950"
+                >
+                  Forgot password?
+                </a>
+                <a
+                  href="/guest/sign_up"
+                  className="text-[1rem] font-serif text-green-800 underline hover:text-green-950"
+                >
+                  Don't have an account?
+                </a>
+              </div>
             </form>
           </div>
         </div>

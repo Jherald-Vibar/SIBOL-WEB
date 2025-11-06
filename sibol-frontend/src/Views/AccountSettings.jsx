@@ -61,115 +61,170 @@ const AccountSettings = () => {
             setIsLoading(false);
         }
     }
+
     return (
-        <div className='bg-[#F4F0E5] flex min-h-screen relative'>
-            <div className='hidden md:block w-64 bg-white fixed top-0 left-0 h-screen shadow-md'>
+        <div className='bg-[#F4F0E5] min-h-screen flex flex-col'>
+            {/* Desktop Sidebar */}
+            <div className='hidden md:block w-64 bg-white fixed top-0 left-0 h-screen shadow-md z-40'>
                 <UserSidebar/>
             </div>
 
-            <div className='flex-1 flex flex-col'>
-                <div className="shadow-md bg-white md:ml-64">
+            {/* Main Content */}
+            <div className='flex-1 flex flex-col md:ml-64 pb-20 md:pb-0'>
+                {/* Navbar */}
+                <div className="shadow-md bg-white sticky top-0 z-30">
                     <UserNavbar/>
                 </div>
 
-                    <div className='flex-1 flex flex-col md:ml-64 px-3 sm:px-6 lg:px-10 py-3 rounded-md'>
-                        <div className='flex flex-col items-start justify-center mb-6'>
-                            <h1 className='font-bold text-2xl md:text-4xl font-sans text-black'>Account Settings</h1>
-                        </div>
+                {/* Content Area */}
+                <div className='flex-1 px-4 sm:px-6 lg:px-10 py-4 sm:py-6'>
+                    {/* Page Header */}
+                    <div className='mb-6'>
+                        <h1 className='font-bold text-2xl sm:text-3xl md:text-4xl font-sans text-gray-800'>
+                            Account Settings
+                        </h1>
+                    </div>
 
-                        <div className='flex flex-col items-center justify-center px-3 py-3'>
-                            <div className='w-full max-w-[600px] flex flex-col items-center rounded-lg bg-white justify-center shadow-md'>
-                                <div className='flex flex-col items-start justify-center px-5 py-5 w-full border-b border-[#0000007a]'>
-                                    <h1 className='text-sm md:text-base font-sans font-semibold'>Change Password</h1>
-                                </div>
+                    {/* Settings Card */}
+                    <div className='flex justify-center'>
+                        <div className='w-full max-w-2xl bg-white rounded-lg shadow-md overflow-hidden'>
+                            {/* Card Header */}
+                            <div className='px-4 sm:px-6 py-4 border-b border-gray-200 bg-gray-50'>
+                                <h2 className='text-base sm:text-lg font-sans font-semibold text-gray-800'>
+                                    Change Password
+                                </h2>
+                            </div>
 
-                                {/* Error Alert */}
+                            {/* Alerts */}
+                            <div className='px-4 sm:px-6'>
                                 {error && (
-                                    <div className="w-full px-5 py-3">
-                                        <div className="flex items-center p-4 text-sm text-red-800 rounded-lg bg-red-50" role="alert">
-                                            <svg className="flex-shrink-0 inline w-4 h-4 me-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                                    <div className="mt-4">
+                                        <div className="flex items-start p-3 sm:p-4 text-sm text-red-800 rounded-lg bg-red-50 border border-red-200" role="alert">
+                                            <svg className="flex-shrink-0 w-5 h-5 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
                                                 <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z"/>
                                             </svg>
-                                            <span className="sr-only">Error</span>
                                             <div>
-                                                <span className="font-medium">Error!</span> {error}
+                                                <span className="font-semibold">Error!</span> {error}
                                             </div>
                                         </div>
                                     </div>
                                 )}
 
-                                {/* Success Alert */}
                                 {success && (
-                                    <div className="w-full px-5 py-3">
-                                        <div className="flex items-center p-4 text-sm text-green-800 rounded-lg bg-green-50" role="alert">
-                                            <svg className="flex-shrink-0 inline w-4 h-4 me-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                                    <div className="mt-4">
+                                        <div className="flex items-start p-3 sm:p-4 text-sm text-green-800 rounded-lg bg-green-50 border border-green-200" role="alert">
+                                            <svg className="flex-shrink-0 w-5 h-5 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
                                                 <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 8.207-4 4a1 1 0 0 1-1.414 0l-2-2a1 1 0 0 1 1.414-1.414L9 10.586l3.293-3.293a1 1 0 0 1 1.414 1.414Z"/>
                                             </svg>
-                                            <span className="sr-only">Success</span>
                                             <div>
-                                                <span className="font-medium">Success!</span> {success}
+                                                <span className="font-semibold">Success!</span> {success}
                                             </div>
                                         </div>
                                     </div>
                                 )}
+                            </div>
 
-                                <form onSubmit={handleChangePass} className='flex flex-col items-center justify-center bg-white px-3 py-3 gap-2 w-full'>
-                                    <div className='flex flex-col w-full max-w-[500px] items-start justify-center bg-[#D9D9D961] px-3 py-3 rounded-md'>
+                            {/* Form */}
+                            <form onSubmit={handleChangePass} className='px-4 sm:px-6 py-6'>
+                                <div className='space-y-4'>
+                                    {/* Current Password */}
+                                    <div>
+                                        <label htmlFor="current_password" className='block text-sm font-medium text-gray-700 mb-2'>
+                                            Current Password
+                                        </label>
                                         <input
+                                            id="current_password"
                                             type="password"
                                             value={form.current_password}
                                             onChange={handleChange}
                                             name="current_password"
-                                            placeholder='Current Password'
-                                            className='px-3 py-3 w-full placeholder:text-start bg-transparent outline-none'
+                                            placeholder='Enter current password'
+                                            className='w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all'
                                         />
                                     </div>
-                                    <div className='flex flex-col w-full max-w-[500px] items-start justify-center bg-[#D9D9D961] px-3 py-3 rounded-md'>
+
+                                    {/* New Password */}
+                                    <div>
+                                        <label htmlFor="new_password" className='block text-sm font-medium text-gray-700 mb-2'>
+                                            New Password
+                                        </label>
                                         <input
+                                            id="new_password"
                                             type="password"
                                             value={form.new_password}
                                             onChange={handleChange}
                                             name="new_password"
-                                            placeholder='New Password'
-                                            className='px-3 py-3 w-full placeholder:text-start bg-transparent outline-none'
+                                            placeholder='Enter new password'
+                                            className='w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all'
                                         />
+                                        <p className='mt-1 text-xs text-gray-500'>
+                                            Must be at least 8 characters
+                                        </p>
                                     </div>
-                                    <div className={`flex flex-col w-full max-w-[500px] items-start justify-center bg-[#D9D9D961] px-3 py-3 rounded-md ${!passwordsMatch ? 'border-2 border-red-500' : ''}`}>
+
+                                    {/* Confirm Password */}
+                                    <div>
+                                        <label htmlFor="confirm_password" className='block text-sm font-medium text-gray-700 mb-2'>
+                                            Confirm New Password
+                                        </label>
                                         <input
+                                            id="confirm_password"
                                             type="password"
                                             value={form.confirm_password}
                                             onChange={handleChange}
                                             name="confirm_password"
-                                            placeholder='Re-type new password'
-                                            className='px-3 py-3 w-full placeholder:text-start bg-transparent outline-none'
+                                            placeholder='Re-enter new password'
+                                            className={`w-full px-4 py-3 bg-gray-50 border rounded-lg focus:outline-none focus:ring-2 transition-all ${
+                                                !passwordsMatch
+                                                    ? 'border-red-500 focus:ring-red-500'
+                                                    : 'border-gray-200 focus:ring-green-500 focus:border-transparent'
+                                            }`}
                                         />
+                                        {!passwordsMatch && form.confirm_password && (
+                                            <p className='mt-1 text-xs text-red-600 flex items-center gap-1'>
+                                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                                                </svg>
+                                                Passwords do not match
+                                            </p>
+                                        )}
                                     </div>
-                                    {!passwordsMatch && form.confirm_password && (
-                                        <p className='text-red-500 text-xs w-full max-w-[500px] px-1'>Passwords do not match</p>
-                                    )}
+                                </div>
 
-                                    {/**Button Section*/}
-                                    <div className='w-full flex flex-col sm:flex-row items-center justify-between px-3 py-3 gap-3'>
-                                        <div className='flex flex-col items-start justify-center'>
-                                            <h1 className='font-sans font-semibold text-[#287500] text-xs md:text-sm cursor-pointer hover:underline'>
-                                                Forgot your password?
-                                            </h1>
-                                        </div>
+                                {/* Form Actions */}
+                                <div className='mt-6 pt-6 border-t border-gray-200 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-4'>
+                                    <button
+                                        type='button'
+                                        className='text-green-700 hover:text-green-800 font-semibold text-sm transition-colors text-center sm:text-left'
+                                    >
+                                        Forgot your password?
+                                    </button>
 
-                                        <div className='flex flex-col items-end justify-center'>
-                                            <button
-                                                type='submit'
-                                                disabled={loading}
-                                                className='bg-green-900 hover:bg-green-800 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md px-6 py-2 text-center text-white font-sans text-sm font-semibold transition-colors'
-                                            >
-                                                {loading ? "Saving..." : "Save"}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </form>
-                            </div>
+                                    <button
+                                        type='submit'
+                                        disabled={loading || !passwordsMatch}
+                                        className='w-full sm:w-auto bg-green-900 hover:bg-green-800 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-lg px-6 py-3 text-white font-semibold text-sm transition-colors shadow-sm hover:shadow-md'
+                                    >
+                                        {loading ? (
+                                            <span className='flex items-center justify-center gap-2'>
+                                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                                                </svg>
+                                                Saving...
+                                            </span>
+                                        ) : 'Save Changes'}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            {/* Mobile Footer Navigation */}
+            <div className='md:hidden fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t border-gray-200 z-40'>
+                <UserSidebar/>
             </div>
         </div>
     )

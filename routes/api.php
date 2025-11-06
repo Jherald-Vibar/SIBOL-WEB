@@ -11,7 +11,8 @@ Route::get('/test', function () {
     return ['message' => 'API IS WORKING!'];
 });
 
-   Route::post('/send', [IotController::class, 'getEspData']);
+
+Route::post('/send', [IotController::class, 'getEspData']);
 
 
 Route::post('/register', [UserController::class, 'userRegister']);
@@ -39,6 +40,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get("/getDataByDay/{year}/{month}/{day}", [IotController::class, "getDataByDay"]);
     Route::put('/changePassword', [UserController::class, 'changePassword']);
     Route::post('/logout', [UserController::class, 'userLogout']);
+    Route::post('/addCrop/{garden_id}', [GardenController::class, 'addCrop']);
+    Route::get('/getCropData/{garden_id}', [GardenController::class, 'getCropData']);
+    Route::post("/addDevice/{gardenId}", [GardenController::class, "generateEsp"]);
+    Route::get("/getEsp/{garden_id}", [GardenController::class, 'getEsp']);
+    Route::get("/getCrops", [GardenController::class, 'getCrops']);
+    Route::get('/monthly-report/{year}/{month}', [IotController::class, 'downloadMonthlyReport']);
+    Route::get('/user/crop-profile', [GardenController::class, 'getUserCropProfile']);
+    Route::get('/getSensorDataCrop/{garden_id}/{crop}', [GardenController::class, 'getSensorDataCrop']);
+
+    //Admin Routes
+    Route::post("/addAdminCrop", [GardenController::class, 'addAdminCrop']);
+    Route::get("/getCropProfile", [GardenController::class, "showCropsProfile"]);
 });
 
 

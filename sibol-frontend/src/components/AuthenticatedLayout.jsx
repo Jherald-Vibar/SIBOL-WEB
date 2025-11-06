@@ -45,7 +45,7 @@ const AuthenticatedLayout = () => {
 }
 
 
-  if (!isAuthenticated) return <Navigate to="/guest/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/" replace />;
 
   return <Outlet />;
 };

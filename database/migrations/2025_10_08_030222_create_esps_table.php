@@ -14,9 +14,10 @@ return new class extends Migration
         Schema::create('esps', function (Blueprint $table) {
             $table->id();
             $table->foreignId('crop_id')->nullable()->constrained()->cascadeOnDelete();
-            $table->foreignId("user_id")->nullable()->constrained()->cascadeOnDelete();
+            $table->foreignId("user_id")->constrained()->cascadeOnDelete();
+            $table->foreignId('garden_id')->nullable()->constrained()->cascadeOnDelete();
             $table->string('serial_number')->unique();
-            $table->enum('status', ['online','offline'])->default('offline');
+            $table->enum('status', ['active','inactive'])->default('inactive');
             $table->timestamp('last_seen_at')->nullable();
             $table->timestamps();
         });
