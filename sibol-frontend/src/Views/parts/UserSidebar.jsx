@@ -27,6 +27,8 @@ const UserSidebar = () => {
       showDenyButton: true,
       confirmButtonText: "Yes",
       denyButtonText: `No`,
+      confirmButtonColor: '#dc2626',
+      denyButtonColor: '#6b7280',
     }).then((result) => {
       if (result.isConfirmed) {
         const token = localStorage.getItem('authToken');
@@ -71,16 +73,18 @@ const UserSidebar = () => {
                 <NavLink
                   to={menu.path}
                   className={({ isActive }) =>
-                    `relative flex items-center px-6 py-4 text-[15px] font-semibold rounded-lg transition-all duration-300 group ${isActive
-                      ? "text-green-600 bg-[#00640066] rounded-md shadow-inner"
-                      : "text-gray-400 hover:text-white hover:bg-gray-800"
+                    `relative flex items-center px-6 py-4 text-[15px] font-semibold rounded-lg transition-all duration-300 group ${
+                      isActive
+                        ? "text-green-600 bg-[#00640066] rounded-md shadow-inner"
+                        : "text-gray-400 hover:text-white hover:bg-gray-800"
                     }`
                   }
                 >
                   {({ isActive }) => (
                     <>
-                      <div className={`absolute left-0 top-0 bottom-0 w-2 rounded-md transition-all duration-300 ${isActive ? "bg-green-900" : "bg-transparent group-hover:bg-gray-600"
-                        }`}></div>
+                      <div className={`absolute left-0 top-0 bottom-0 w-2 rounded-md transition-all duration-300 ${
+                        isActive ? "bg-green-900" : "bg-transparent group-hover:bg-gray-600"
+                      }`}></div>
                       <img src={menu.image} alt={menu.name} className='mr-3' />
                       <span className="tracking-wide relative z-10">{menu.name}</span>
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -92,15 +96,16 @@ const UserSidebar = () => {
           </ul>
         </nav>
 
-        {/* Logout Section */}
-        <div className="mt-auto pt-6 border-gray-800">
+        {/* Logout Section - Matching Design */}
+        <div className="mt-auto pt-6">
           <button
             onClick={handleLogout}
-            className="w-full py-3 px-4 bg-gray-800 text-gray-300 rounded-lg
-                     hover:bg-gray-700 hover:text-white transition-all duration-200
-                     font-semibold tracking-wide hover:shadow-lg transform hover:-translate-y-0.5"
+            className="relative flex items-center px-6 py-4 text-[15px] font-semibold rounded-lg transition-all duration-300 group w-full text-red-500 hover:text-white hover:bg-red-600"
           >
-            Logout
+            <div className="absolute left-0 top-0 bottom-0 w-2 rounded-md bg-transparent group-hover:bg-red-800 transition-all duration-300"></div>
+            <LogOut className="mr-3 w-5 h-5" />
+            <span className="tracking-wide relative z-10">Logout</span>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           </button>
         </div>
       </div>
@@ -113,9 +118,10 @@ const UserSidebar = () => {
               key={i}
               to={menu.path}
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center px-3 py-2 rounded-lg transition-all duration-300 relative ${isActive
-                  ? "text-green-600 bg-[#00640066]"
-                  : "text-gray-400 hover:text-gray-800 hover:bg-gray-100"
+                `flex flex-col items-center justify-center px-3 py-2 rounded-lg transition-all duration-300 relative ${
+                  isActive
+                    ? "text-green-600 bg-[#00640066]"
+                    : "text-gray-400 hover:text-gray-800 hover:bg-gray-100"
                 }`
               }
             >

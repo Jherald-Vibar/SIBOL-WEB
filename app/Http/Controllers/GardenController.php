@@ -106,6 +106,7 @@ class GardenController extends Controller
                 $crop = Crop::create([
                     'user_id' => $user->id ?? null,
                     'garden_id' => $garden->id ?? null,
+                    'crop_profile_id' => $existInCropProfile->id ?? null,
                     'name' => $validated['name'],
                     'variety' => $validated['variety'],
                     'image' => $validated['image'],
@@ -503,4 +504,221 @@ class GardenController extends Controller
             ]
         ], 200);
     }
+
+    public function userGardenDelete(Request $request, $garden_id) {
+      $user = $request->user();
+
+      $garden = Garden::where('user_id', $user->id)->find($garden_id);
+
+      if (!$garden) {
+          return response()->json([
+              'message' => 'Garden not found or you do not have permission to delete it'
+          ], 404);
+      }
+      $garden->delete();
+      return response()->json([
+          'message' => 'Garden deleted successfully'
+      ], 200);
+    }
+
+
+    public function updateCrop(Request $request, $crop_id)
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'variety' => 'required|string|max:255',
+            'planted_date' => 'required|date',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $user = $request->user();
+
+            $crop = Crop::whereHas('garden', function($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })->find($crop_id);
+
+            if (!$crop) {
+                return response()->json([
+                    'message' => 'Crop not found or unauthorized'
+                ], 404);
+            }
+
+
+            if ($request->hasFile('image')) {
+                if ($crop->image && file_exists(public_path('crops_image/' . $crop->image))) {
+                    unlink(public_path('crops_image/' . $crop->image));
+                }
+
+                $image = $request->file('image');
+                $imageName = time() . '_' . $image->getClientOriginalName();
+                $image->move(public_path('crops_image'), $imageName);
+                $crop->image = $imageName;
+            }
+
+            $crop->name = $request->name;
+            $crop->variety = $request->variety;
+            $crop->planted_at = $request->planted_date;
+            $crop->save();
+
+            return response()->json([
+                'message' => 'Crop updated successfully',
+                'data' => $crop
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to update crop',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+    public function deleteCrop(Request $request, $crop_id)
+    {
+        try {
+            $user = $request->user();
+
+            $crop = Crop::whereHas('garden', function($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })->find($crop_id);
+
+            if (!$crop) {
+                return response()->json([
+                    'message' => 'Crop not found or unauthorized'
+                ], 404);
+            }
+
+            if ($crop->image && file_exists(public_path('crops_image/' . $crop->image))) {
+                unlink(public_path('crops_image/' . $crop->image));
+            }
+
+            $crop->delete();
+
+            return response()->json([
+                'message' => 'Crop deleted successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to delete crop',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function updateAdminCrop(Request $request, $id)
+    {
+        $crop = CropProfile::find($id);
+
+        if (!$crop) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Crop not found'
+            ], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255|unique:crops,name,' . $id,
+            'soil_temp_min' => 'required|numeric',
+            'soil_temp_max' => 'required|numeric|gte:soil_temp_min',
+            'soil_moisture_min' => 'required|numeric|min:0|max:100',
+            'soil_moisture_max' => 'required|numeric|gte:soil_moisture_min|max:100',
+            'ph_min' => 'required|numeric|min:0|max:14',
+            'ph_max' => 'required|numeric|gte:ph_min|max:14',
+            'electrical_conductivity_min' => 'required|numeric|min:0',
+            'electrical_conductivity_max' => 'required|numeric|gte:electrical_conductivity_min',
+            'nitrogen_min' => 'required|numeric|min:0',
+            'nitrogen_max' => 'required|numeric|gte:nitrogen_min',
+            'phosphorus_min' => 'required|numeric|min:0',
+            'phosphorus_max' => 'required|numeric|gte:phosphorus_min',
+            'potassium_min' => 'required|numeric|min:0',
+            'potassium_max' => 'required|numeric|gte:potassium_min',
+            'air_temperature_min' => 'required|numeric',
+            'air_temperature_max' => 'required|numeric|gte:air_temperature_min',
+            'air_humidity_min' => 'required|numeric|min:0|max:100',
+            'air_humidity_max' => 'required|numeric|gte:air_humidity_min|max:100',
+        ], [
+            'name.unique' => 'This crop name is already taken',
+            '*.gte' => 'Maximum value must be greater than or equal to minimum value',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $crop->update([
+                'name' => $request->name,
+                'soil_temp_min' => $request->soil_temp_min,
+                'soil_temp_max' => $request->soil_temp_max,
+                'soil_moisture_min' => $request->soil_moisture_min,
+                'soil_moisture_max' => $request->soil_moisture_max,
+                'ph_min' => $request->ph_min,
+                'ph_max' => $request->ph_max,
+                'electrical_conductivity_min' => $request->electrical_conductivity_min,
+                'electrical_conductivity_max' => $request->electrical_conductivity_max,
+                'nitrogen_min' => $request->nitrogen_min,
+                'nitrogen_max' => $request->nitrogen_max,
+                'phosphorus_min' => $request->phosphorus_min,
+                'phosphorus_max' => $request->phosphorus_max,
+                'potassium_min' => $request->potassium_min,
+                'potassium_max' => $request->potassium_max,
+                'air_temperature_min' => $request->air_temperature_min,
+                'air_temperature_max' => $request->air_temperature_max,
+                'air_humidity_min' => $request->air_humidity_min,
+                'air_humidity_max' => $request->air_humidity_max,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Crop updated successfully',
+                'data' => $crop
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update crop',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function deleteAdminCrop($id)
+    {
+        try {
+            $crop = CropProfile::find($id);
+
+            if (!$crop) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Crop not found'
+                ], 404);
+            }
+
+            $crop->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Crop '{$crop->name}' deleted successfully"
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete crop',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
 }

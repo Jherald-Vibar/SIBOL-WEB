@@ -386,7 +386,7 @@ const UserDashboard = () => {
                 <img
                   src={
                     activeCrop?.image
-                      ? `${import.meta.env.VITE_API_BASE_URL}/crops_image/${activeCrop.image}`
+                      ? `${import.meta.env.VITE_API_BASE_URL}/sensor_images/${activeCrop.image}`
                       : image
                   }
                   alt={activeCrop?.name || "Crop Background"}

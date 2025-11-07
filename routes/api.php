@@ -48,10 +48,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/monthly-report/{year}/{month}', [IotController::class, 'downloadMonthlyReport']);
     Route::get('/user/crop-profile', [GardenController::class, 'getUserCropProfile']);
     Route::get('/getSensorDataCrop/{garden_id}/{crop}', [GardenController::class, 'getSensorDataCrop']);
+    Route::delete("/deleteGarden/{garden_id}", [GardenController::class, 'userGardenDelete']);
+    Route::put('/updateCrop/{crop_id}', [GardenController::class, 'updateCrop']);
+    Route::delete('/deleteCrop/{crop_id}', [GardenController::class, 'deleteCrop']);
+
 
     //Admin Routes
     Route::post("/addAdminCrop", [GardenController::class, 'addAdminCrop']);
     Route::get("/getCropProfile", [GardenController::class, "showCropsProfile"]);
+    Route::put('/updateAdminCrop/{id}', [GardenController::class, 'updateAdminCrop']);
+    Route::delete('/deleteAdminCrop/{id}', [GardenController::class, 'deleteAdminCrop']);
 });
 
 

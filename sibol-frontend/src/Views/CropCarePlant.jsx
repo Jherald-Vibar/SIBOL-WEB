@@ -104,7 +104,7 @@ const CropCarePlant = () => {
       soilTemp: parseFloat(item.soil_temperature) || 0,
       airTemp: parseFloat(item.air_temperature) || 0,
       soilMoisture: parseFloat(item.soil_moisture) || 0,
-      humidity: parseFloat(item.humidity) || 0
+      humidity: parseFloat(item.air_humidity) || 0
     }))
   }
 
@@ -269,7 +269,7 @@ const CropCarePlant = () => {
                   <div className="flex flex-col">
                     <span className="text-gray-500 text-xs">Humidity</span>
                     <span className="font-semibold text-gray-800">
-                      {sensorData?.humidity ? `${sensorData.humidity}%` : '—'}
+                      {sensorData?.air_humidity ? `${sensorData.air_humidity}%` : '—'}
                     </span>
                   </div>
                   <div className="flex flex-col">

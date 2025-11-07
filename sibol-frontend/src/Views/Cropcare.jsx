@@ -7,8 +7,11 @@ import { useNavigate } from 'react-router-dom';
 
 const Cropcare = () => {
   const [isModalOpen, setModalOpen] = useState(false);
+  const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [gardenToDelete, setGardenToDelete] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [garden, setGarden] = useState([]);
   const navigate = useNavigate();
   const [form, setForm] = useState({
@@ -26,6 +29,17 @@ const Cropcare = () => {
   const handleModal = () => setModalOpen(true);
   const closeModal = () => {
     setModalOpen(false);
+    setError(null);
+  };
+
+  const openDeleteModal = (gardenId, gardenName) => {
+    setGardenToDelete({ id: gardenId, name: gardenName });
+    setDeleteModalOpen(true);
+  };
+
+  const closeDeleteModal = () => {
+    setDeleteModalOpen(false);
+    setGardenToDelete(null);
     setError(null);
   };
 
@@ -65,6 +79,21 @@ const Cropcare = () => {
       setError(error.response?.data?.message || "Failed to add garden");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const deleteGarden = async () => {
+    if (!gardenToDelete) return;
+
+    setDeleteLoading(true);
+    try {
+      await axiosClient.delete(`/deleteGarden/${gardenToDelete.id}`);
+      closeDeleteModal();
+      fetchGarden();
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to delete garden");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -132,6 +161,7 @@ const Cropcare = () => {
                       </svg>
                     </button>
                     <button
+                      onClick={() => openDeleteModal(gard.id, gard.name)}
                       className='hover:bg-red-50 p-2 rounded transition-colors'
                       aria-label="Delete garden"
                     >
@@ -152,7 +182,7 @@ const Cropcare = () => {
         <UserSidebar />
       </div>
 
-      {/* Modal */}
+      {/* Add Garden Modal */}
       {isModalOpen && (
         <div className='fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50 p-4 animate-fadeIn'>
           <div className='flex flex-col bg-white rounded-lg shadow-xl w-full max-w-md transform transition-all'>
@@ -252,6 +282,107 @@ const Cropcare = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50 p-4 animate-fadeIn'>
+          <div className='flex flex-col bg-white rounded-lg shadow-xl w-full max-w-md transform transition-all'>
+            {/* Modal Header */}
+            <div className='flex items-center justify-between px-6 py-4 border-b border-red-200 bg-red-50'>
+              <h2 className='text-xl md:text-2xl font-bold text-red-700'>Delete Garden</h2>
+              <button
+                onClick={closeDeleteModal}
+                className='hover:bg-red-100 p-2 rounded-full transition-colors'
+                aria-label="Close modal"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32">
+                  <path fill="#dc2626" d="M16 2C8.2 2 2 8.2 2 16s6.2 14 14 14s14-6.2 14-14S23.8 2 16 2m0 26C9.4 28 4 22.6 4 16S9.4 4 16 4s12 5.4 12 12s-5.4 12-12 12" />
+                  <path fill="#dc2626" d="M21.4 23L16 17.6L10.6 23L9 21.4l5.4-5.4L9 10.6L10.6 9l5.4 5.4L21.4 9l1.6 1.6l-5.4 5.4l5.4 5.4z" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Error Alert */}
+            {error && (
+              <div className="flex items-center p-4 mx-6 mt-4 text-sm text-red-800 rounded-lg bg-red-50" role="alert">
+                <svg className="shrink-0 inline w-4 h-4 me-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z" />
+                </svg>
+                <div>
+                  <span className="font-medium">Error!</span> {error}
+                </div>
+              </div>
+            )}
+
+            {/* Modal Content */}
+            <div className='px-6 py-6'>
+              <div className='flex items-center justify-center mb-4'>
+                <div className='bg-red-100 rounded-full p-3'>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24">
+                    <path fill="#dc2626" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2m0 11c-.55 0-1-.45-1-1V8c0-.55.45-1 1-1s1 .45 1 1v4c0 .55-.45 1-1 1m1 4h-2v-2h2z" />
+                  </svg>
+                </div>
+              </div>
+
+              <p className='text-center text-gray-700 mb-2'>
+                Are you sure you want to delete
+              </p>
+              <p className='text-center font-bold text-lg text-gray-900 mb-4'>
+                "{gardenToDelete?.name}"?
+              </p>
+              <p className='text-center text-sm text-gray-600'>
+                This action cannot be undone. All data associated with this garden will be permanently deleted.
+              </p>
+            </div>
+
+            {/* Modal Actions */}
+            <div className='flex justify-end gap-3 px-6 py-4 border-t'>
+              <button
+                type='button'
+                onClick={closeDeleteModal}
+                disabled={deleteLoading}
+                className='px-4 py-2 border-2 border-gray-300 rounded-md font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50'
+              >
+                Cancel
+              </button>
+              <button
+                type='button'
+                onClick={deleteGarden}
+                disabled={deleteLoading}
+                className='bg-red-600 hover:bg-red-700 transition-colors px-6 py-2 rounded-md font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2'
+              >
+                {deleteLoading ? (
+                  <>
+                    <svg
+                      className="animate-spin h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                      />
+                    </svg>
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete Garden"
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
