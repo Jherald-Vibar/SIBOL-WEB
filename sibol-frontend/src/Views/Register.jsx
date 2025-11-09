@@ -90,7 +90,9 @@ const Register = () => {
                         <form onSubmit={handleRegister} className='w-full px-3 py-3 flex flex-col items-center rounded-lg bg-[#FEFADF1A] border border-green-800'>
                             {/* Logo */}
                             <div className='flex items-center mb-2'>
+                              <a href="/">
                                 <img src={Logo} alt="logo" className='w-10 md:w-12'/>
+                              </a>
                             </div>
 
                             {/* Title */}
