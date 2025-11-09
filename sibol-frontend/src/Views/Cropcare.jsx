@@ -9,7 +9,7 @@ const Cropcare = () => {
   const [isModalOpen, setModalOpen] = useState(false);
   const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
   const [gardenToDelete, setGardenToDelete] = useState(null);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [garden, setGarden] = useState([]);
@@ -29,7 +29,7 @@ const Cropcare = () => {
   const handleModal = () => setModalOpen(true);
   const closeModal = () => {
     setModalOpen(false);
-    setError(null);
+    setError("");
   };
 
   const openDeleteModal = (gardenId, gardenName) => {
@@ -40,15 +40,17 @@ const Cropcare = () => {
   const closeDeleteModal = () => {
     setDeleteModalOpen(false);
     setGardenToDelete(null);
-    setError(null);
+    setError("");
   };
 
   const fetchGarden = async () => {
     setLoading(true);
     try {
       const response = await axiosClient.get("/getGardenData");
-      setGarden(response.data);
+      console.log("Garden data:", response.data); // Debug log
+      setGarden(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
+      console.error("Fetch error:", error);
       setError("Failed to fetch data!");
     } finally {
       setLoading(false);
@@ -63,6 +65,7 @@ const Cropcare = () => {
 
   const addGarden = async (e) => {
     e.preventDefault();
+    setError("");
 
     if (!form.garden_name || !form.location) {
       setError("All fields are required!");
@@ -76,7 +79,8 @@ const Cropcare = () => {
       setModalOpen(false);
       fetchGarden();
     } catch (error) {
-      setError(error.response?.data?.message || "Failed to add garden");
+      const errorMessage = error.response?.data?.message || error.message || "Failed to add garden";
+      setError(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
     } finally {
       setLoading(false);
     }
@@ -86,12 +90,14 @@ const Cropcare = () => {
     if (!gardenToDelete) return;
 
     setDeleteLoading(true);
+    setError("");
     try {
       await axiosClient.delete(`/deleteGarden/${gardenToDelete.id}`);
       closeDeleteModal();
       fetchGarden();
     } catch (error) {
-      setError(error.response?.data?.message || "Failed to delete garden");
+      const errorMessage = error.response?.data?.message || error.message || "Failed to delete garden";
+      setError(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
     } finally {
       setDeleteLoading(false);
     }
@@ -140,12 +146,12 @@ const Cropcare = () => {
             {garden.map((gard) => (
               <div key={gard.id} className='flex flex-col bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow'>
                 <div className='w-full h-48 overflow-hidden'>
-                  <img src={Pic} alt={gard.name} className='w-full h-full object-cover' />
+                  <img src={Pic} alt={gard.name || gard.garden_name || 'Garden'} className='w-full h-full object-cover' />
                 </div>
                 <div className='flex flex-row'>
                   <div className='flex-1 px-4 py-3 border-r-2 border-gray-200'>
                     <h2 className='font-serif text-lg md:text-xl font-semibold truncate'>
-                      {gard.name}
+                      {gard.name || gard.garden_name || 'Unnamed Garden'}
                     </h2>
                   </div>
                   <div className='flex items-center justify-evenly px-3 py-3 gap-2'>
@@ -161,7 +167,7 @@ const Cropcare = () => {
                       </svg>
                     </button>
                     <button
-                      onClick={() => openDeleteModal(gard.id, gard.name)}
+                      onClick={() => openDeleteModal(gard.id, gard.name || gard.garden_name || 'Unnamed Garden')}
                       className='hover:bg-red-50 p-2 rounded transition-colors'
                       aria-label="Delete garden"
                     >
@@ -331,7 +337,7 @@ const Cropcare = () => {
                 Are you sure you want to delete
               </p>
               <p className='text-center font-bold text-lg text-gray-900 mb-4'>
-                "{gardenToDelete?.name}"?
+                "{gardenToDelete?.name || 'this garden'}"?
               </p>
               <p className='text-center text-sm text-gray-600'>
                 This action cannot be undone. All data associated with this garden will be permanently deleted.

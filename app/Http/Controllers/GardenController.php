@@ -16,7 +16,7 @@ class GardenController extends Controller
     public function addGarden(Request $request) {
         $user = $request->user();
         $validator = Validator::make($request->all(), [
-            'garden_name' => 'required|unique:gardens,name',
+            'garden_name' => 'required',
             'location' => 'required',
         ]);
 
