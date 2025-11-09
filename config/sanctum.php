@@ -14,9 +14,7 @@ return [
     | and production domains which access your API via a frontend SPA.
     |
     */
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS',
-        'localhost,localhost:5173,127.0.0.1:5173'
-    )),
+    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', 'localhost')),
     /*
     |--------------------------------------------------------------------------
     | Sanctum Guards
