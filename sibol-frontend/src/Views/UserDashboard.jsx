@@ -149,16 +149,12 @@ const UserDashboard = () => {
             WELCOME, {name}
           </h1>
 
-          {/* Top Section: Weather & Chart */}
           <div className="flex flex-col lg:flex-row gap-5 mb-5">
-            {/* Left Column: Weather & Advisory */}
             <div className="flex flex-col gap-4 w-full lg:w-80 xl:w-96">
-              {/* Weather Card */}
               <div
                 className="w-full bg-white rounded-md shadow-xl p-4"
                 style={{ boxShadow: "4px 4px 3px rgba(0,0,0,0.5)" }}
               >
-                {/* Location & Unit Toggle */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-4">
                   <div className="flex items-center px-3 py-2 rounded-full bg-green-800 w-full sm:w-auto justify-center">
                     <svg
@@ -188,17 +184,13 @@ const UserDashboard = () => {
                     onClick={() => setUnit(unit === "C" ? "F" : "C")}
                   >
                     <div
-                      className={`absolute w-1/2 h-full rounded-full flex items-center justify-center font-bold transition-all duration-300 ${
-                        unit === "C"
-                          ? "left-0 bg-green-900 text-white"
-                          : "left-1/2 bg-green-900 text-white"
+                      className={`absolute w-1/2 h-full rounded-full bg-green-900 transition-all duration-300 ${
+                        unit === "C" ? "left-0" : "left-1/2"
                       }`}
-                    >
-                      {unit}
-                    </div>
-                    <div className="flex w-full justify-between text-sm font-bold text-gray-600 px-2 relative z-10 pointer-events-none">
-                      <span className={unit === "C" ? "text-white" : ""}>C</span>
-                      <span className={unit === "F" ? "text-white" : ""}>F</span>
+                    />
+                    <div className="flex w-full justify-between text-sm font-bold px-2 relative z-10 pointer-events-none">
+                      <span className={unit === "C" ? "text-white" : "text-gray-600"}>C</span>
+                      <span className={unit === "F" ? "text-white" : "text-gray-600"}>F</span>
                     </div>
                   </div>
                 </div>
