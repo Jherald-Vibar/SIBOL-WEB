@@ -22,16 +22,16 @@ const AboutUs = () => {
   ]
 
   return (
-    <div className='bg-gradient-to-br from-slate-50 via-green-50 to-emerald-50 min-h-screen flex flex-col'>
+    <div className="bg-[#F4F0E5] min-h-screen flex flex-col">
       {/* Desktop Sidebar */}
-      <div className='hidden md:block w-64 bg-white fixed top-0 left-0 h-screen shadow-xl z-40 border-r border-gray-100'>
+      <div className="hidden md:block w-64 bg-white fixed top-0 left-0 h-screen shadow-md z-40">
         <UserSidebar />
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col md:ml-64 pb-20 md:pb-0">
+      {/* Main Content Wrapper */}
+      <div className="flex-1 flex flex-col md:ml-64">
         {/* Navbar */}
-        <div className="shadow-sm bg-white/80 backdrop-blur-lg sticky top-0 z-30 border-b border-gray-100">
+        <div className="shadow-md bg-white sticky top-0 z-30">
           <UserNavbar />
         </div>
 
