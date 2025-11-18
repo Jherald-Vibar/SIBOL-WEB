@@ -183,7 +183,13 @@ const UserDashboard = () => {
           <div className="flex flex-col lg:flex-row gap-6 mb-6">
             <div className="flex flex-col gap-5 w-full lg:w-80 xl:w-96">
               {/* Modern Weather Card - Softer Green */}
-              <div className="relative overflow-hidden bg-gradient-to-br from-green-400 via-emerald-500 to-teal-600 rounded-3xl shadow-2xl p-6">
+              <div className="relative overflow-hidden rounded-3xl shadow-2xl p-6"
+                 style={{
+                  background: 'linear-gradient(135deg, rgba(144, 174, 137, 0.7) 0%, rgba(120, 150, 113, 0.75) 30%, rgba(178, 167, 124, 0.7) 70%, rgba(196, 179, 127, 0.75) 100%)',
+                  backdropFilter: 'blur(16px)',
+                  boxShadow: '0 8px 32px 0 rgba(91, 120, 95, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)'
+                }}
+              >
                 {/* Decorative Elements */}
                 <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
                 <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
@@ -293,10 +299,10 @@ const UserDashboard = () => {
             <div className="flex-1 w-full">
               <div
                 className="relative overflow-hidden rounded-3xl h-full p-8"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.75) 0%, rgba(5, 150, 105, 0.8) 50%, rgba(4, 120, 87, 0.85) 100%)',
+                 style={{
+                  background: 'linear-gradient(135deg, rgba(144, 174, 137, 0.7) 0%, rgba(120, 150, 113, 0.75) 30%, rgba(178, 167, 124, 0.7) 70%, rgba(196, 179, 127, 0.75) 100%)',
                   backdropFilter: 'blur(16px)',
-                  boxShadow: '0 8px 32px 0 rgba(5, 150, 105, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)'
+                  boxShadow: '0 8px 32px 0 rgba(91, 120, 95, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)'
                 }}
               >
                 {/* Decorative background elements - More subtle */}

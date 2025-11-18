@@ -127,10 +127,10 @@ const UserNavbar = () => {
             {showNotifications && (
               <>
                 {/* Mobile: Full Screen Overlay */}
-                <div className="md:hidden fixed inset-0 bg-black/50 z-40" onClick={() => setShowNotifications(false)} />
+               <div className="md:hidden fixed inset-0 bg-black/50 z-40" onClick={() => setShowNotifications(false)} />
 
                 {/* Notification Panel */}
-                <div className="fixed md:absolute left-0 right-0 md:left-auto md:right-0 bottom-0 md:bottom-auto md:top-full md:mt-2 w-full md:w-96 bg-white md:rounded-xl rounded-t-3xl md:rounded-b-xl shadow-2xl border-t md:border border-gray-200 z-50 max-h-[85vh] md:max-h-[500px] flex flex-col animate-in slide-in-from-bottom md:slide-in-from-top-2 duration-300">
+               <div className="fixed md:absolute left-0 right-0 md:left-auto md:right-0 top-0 md:top-full md:mt-2 w-full md:w-96 bg-white rounded-b-2xl md:rounded-xl shadow-2xl border md:border border-gray-200 z-50 max-h-[90vh] md:max-h-[500px] flex flex-col animate-in slide-in-from-top duration-300">
                   {/* Header */}
                   <div className="px-4 py-4 border-b border-gray-200 flex-shrink-0">
                     <div className="flex items-center justify-between">
