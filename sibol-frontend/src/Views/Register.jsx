@@ -16,6 +16,8 @@ const Register = () => {
     const [error, setError] = useState("");
     const [loading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [agreedToTerms, setAgreedToTerms] = useState(false);
+    const [showTermsModal, setShowTermsModal] = useState(false);
     const navigate = useNavigate();
 
     const handleChange = (e) => {
@@ -25,6 +27,24 @@ const Register = () => {
         });
     }
 
+    const handleCheckboxChange = (e) => {
+        if (e.target.checked) {
+            setShowTermsModal(true);
+        } else {
+            setAgreedToTerms(false);
+        }
+    };
+
+    const handleAcceptTerms = () => {
+        setAgreedToTerms(true);
+        setShowTermsModal(false);
+    };
+
+    const handleDeclineTerms = () => {
+        setAgreedToTerms(false);
+        setShowTermsModal(false);
+    };
+
     const handleRegister = async (e) => {
         e.preventDefault();
         setIsLoading(true);
@@ -32,6 +52,12 @@ const Register = () => {
         if(!form.email || !form.name || !form.cp_number || !form.password) {
             setIsLoading(false);
             setError("All fields are required!");
+            return;
+        }
+
+        if (!agreedToTerms) {
+            setIsLoading(false);
+            setError("You must agree to the Terms and Agreement to continue!");
             return;
         }
 
@@ -207,6 +233,38 @@ const Register = () => {
                 .logo-hover:hover {
                     transform: scale(1.1) rotate(5deg);
                 }
+
+                .custom-checkbox {
+                    appearance: none;
+                    width: 20px;
+                    height: 20px;
+                    border: 2px solid #166534;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    position: relative;
+                    transition: all 0.3s ease;
+                }
+
+                .custom-checkbox:checked {
+                    background-color: #166534;
+                    border-color: #166534;
+                }
+
+                .custom-checkbox:checked::after {
+                    content: '✓';
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    color: white;
+                    font-size: 14px;
+                    font-weight: bold;
+                }
+
+                .custom-checkbox:hover {
+                    border-color: #059669;
+                    box-shadow: 0 0 8px rgba(5, 150, 105, 0.3);
+                }
             `}</style>
 
             <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-4 overflow-hidden min-h-screen">
@@ -346,11 +404,32 @@ const Register = () => {
                                     </button>
                                 </div>
 
+                                {/* Terms & Agreement Checkbox */}
+                                <div className='flex items-start gap-3 mt-2 animate-fadeInUp' style={{ animationDelay: '0.65s' }}>
+                                    <input
+                                        type="checkbox"
+                                        id="terms"
+                                        checked={agreedToTerms}
+                                        onChange={handleCheckboxChange}
+                                        className="custom-checkbox mt-1 flex-shrink-0"
+                                    />
+                                    <label htmlFor="terms" className="text-sm text-green-900 font-medium cursor-pointer">
+                                        I agree to the{' '}
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowTermsModal(true)}
+                                            className="text-green-700 font-bold underline hover:text-green-500 transition-colors"
+                                        >
+                                            Terms and Agreement
+                                        </button>
+                                    </label>
+                                </div>
+
                                 {/* Submit Button */}
                                 <div className='flex items-center justify-center mt-2 animate-fadeInUp' style={{ animationDelay: '0.7s' }}>
                                     <button
                                         type="submit"
-                                        disabled={loading}
+                                        disabled={loading || !agreedToTerms}
                                         className="submit-button bg-gradient-to-r from-green-900 to-green-700 text-lg font-serif font-bold px-8 py-3 rounded-full min-w-[140px] h-[50px] text-white flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed relative z-10"
                                     >
                                         {loading ? (
@@ -397,6 +476,100 @@ const Register = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Terms & Agreement Modal */}
+            {showTermsModal && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-50 p-4 animate-scaleIn">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden border-4 border-green-700">
+                        {/* Modal Header */}
+                        <div className="bg-gradient-to-r from-green-900 to-green-700 px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" className="text-amber-300">
+                                    <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm4 18H6V4h7v5h5z"/>
+                                </svg>
+                                <h2 className="text-2xl font-bold text-white font-serif">Terms & Agreement</h2>
+                            </div>
+                            <button
+                                onClick={handleDeclineTerms}
+                                className="text-white hover:text-amber-300 transition-colors p-2 rounded-full hover:bg-white/10"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                                    <path fill="currentColor" d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="p-6 overflow-y-auto max-h-[50vh] bg-gradient-to-b from-green-50/30 to-white">
+                            <div className="prose prose-green max-w-none">
+                                <p className="text-green-900 text-base leading-relaxed mb-4">
+                                    By accessing or using the <strong>SIBOL Crop Management Website</strong>, you agree to comply with these Terms and Agreement. If you do not agree, you must discontinue use of the platform immediately.
+                                </p>
+
+                                <h3 className="text-green-800 font-bold text-lg mt-6 mb-3">1. Acceptance of Terms</h3>
+                                <p className="text-green-900 text-sm leading-relaxed">
+                                    By creating an account and using our services, you acknowledge that you have read, understood, and agree to be bound by these terms and conditions.
+                                </p>
+
+                                <h3 className="text-green-800 font-bold text-lg mt-6 mb-3">2. User Responsibilities</h3>
+                                <ul className="list-disc list-inside text-green-900 text-sm space-y-2">
+                                    <li>Provide accurate and complete information during registration</li>
+                                    <li>Maintain the confidentiality of your account credentials</li>
+                                    <li>Use the platform for lawful purposes only</li>
+                                    <li>Comply with all applicable laws and regulations</li>
+                                </ul>
+
+                                <h3 className="text-green-800 font-bold text-lg mt-6 mb-3">3. Privacy and Data Protection</h3>
+                                <p className="text-green-900 text-sm leading-relaxed">
+                                    We collect and process your personal data in accordance with our Privacy Policy. Your information will be used to improve our services and provide you with a better user experience.
+                                </p>
+
+                                <h3 className="text-green-800 font-bold text-lg mt-6 mb-3">4. Intellectual Property</h3>
+                                <p className="text-green-900 text-sm leading-relaxed">
+                                    All content, features, and functionality on this platform are the exclusive property of SIBOL and are protected by copyright and other intellectual property laws.
+                                </p>
+
+                                <h3 className="text-green-800 font-bold text-lg mt-6 mb-3">5. Limitation of Liability</h3>
+                                <p className="text-green-900 text-sm leading-relaxed">
+                                    SIBOL shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the platform or inability to access our services.
+                                </p>
+
+                                <h3 className="text-green-800 font-bold text-lg mt-6 mb-3">6. Termination</h3>
+                                <p className="text-green-900 text-sm leading-relaxed">
+                                    We reserve the right to suspend or terminate your account at any time if you violate these terms or engage in any activity that may harm the platform or other users.
+                                </p>
+
+                                <h3 className="text-green-800 font-bold text-lg mt-6 mb-3">7. Changes to Terms</h3>
+                                <p className="text-green-900 text-sm leading-relaxed">
+                                    We may update these terms from time to time. Continued use of the platform after changes constitutes acceptance of the modified terms.
+                                </p>
+
+                                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mt-6 rounded-r-lg">
+                                    <p className="text-amber-900 text-sm font-semibold">
+                                        ⚠️ Important: By clicking "I Agree", you confirm that you have read and accepted all terms and conditions outlined above.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="bg-gray-50 px-6 py-4 flex flex-col sm:flex-row gap-3 justify-end border-t-2 border-green-200">
+                            <button
+                                onClick={handleDeclineTerms}
+                                className="px-6 py-3 bg-gray-300 text-gray-800 rounded-lg font-semibold hover:bg-gray-400 transition-all transform hover:scale-105 active:scale-95"
+                            >
+                                Decline
+                            </button>
+                            <button
+                                onClick={handleAcceptTerms}
+                                className="px-6 py-3 bg-gradient-to-r from-green-900 to-green-700 text-white rounded-lg font-semibold hover:from-green-800 hover:to-green-600 transition-all transform hover:scale-105 active:scale-95 shadow-lg"
+                            >
+                                I Agree
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

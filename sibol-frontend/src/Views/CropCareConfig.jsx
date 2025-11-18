@@ -61,7 +61,11 @@ const CropCareConfig = () => {
       const formData = new FormData();
       formData.append("name", form.name);
       formData.append("variety", form.variety);
-      formData.append("planted_date", form.planted_date);
+
+      // Ensure date is in YYYY-MM-DD format
+      const formattedDate = new Date(form.planted_date).toISOString().split('T')[0];
+      formData.append("planted_date", formattedDate);
+
       if (form.image) formData.append("image", form.image);
 
       const response = await axiosClient.post(`/addCrop/${garden_id}`, formData, {
@@ -75,30 +79,45 @@ const CropCareConfig = () => {
       setImagePreview(null);
       setCrop((prev) => [...prev, response.data.data]);
     } catch (error) {
-      setError(error.response?.data?.message || "Something went wrong!");
+      // Better error handling to show specific validation errors
+      if (error.response?.data?.errors) {
+        const errorMessages = Object.values(error.response.data.errors).flat().join(', ');
+        setError(errorMessages);
+      } else {
+        setError(error.response?.data?.message || "Something went wrong!");
+      }
+      console.error("Add crop error:", error.response?.data);
     } finally {
       setIsLoading(false);
     }
   };
 
   const editCrop = (crop) => {
-  setEditingCrop(crop.id);
+    setEditingCrop(crop.id);
 
-  // ✅ Format planted_at to "YYYY-MM-DD" for <input type="date" />
-  const formattedDate = crop.planted_at
-    ? new Date(crop.planted_at).toISOString().split("T")[0]
-    : "";
+    // ✅ Ensure date is in correct format
+    let formattedDate = "";
+    if (crop.planted_at) {
+      try {
+        const date = new Date(crop.planted_at);
+        if (!isNaN(date.getTime())) {
+          formattedDate = date.toISOString().split("T")[0];
+        }
+      } catch (error) {
+        console.error("Date formatting error:", error);
+      }
+    }
 
-  setForm({
-    name: crop.name,
-    variety: crop.variety,
-    planted_date: formattedDate,
-    image: null,
-  });
+    setForm({
+      name: crop.name || "",
+      variety: crop.variety || "",
+      planted_date: formattedDate,
+      image: null,
+    });
 
-  setImagePreview(`${import.meta.env.VITE_API_BASE_URL}/crops_image/${crop.image}`);
-  setModalOpen(true);
-};
+    setImagePreview(`${import.meta.env.VITE_API_BASE_URL}/crops_image/${crop.image}`);
+    setModalOpen(true);
+  };
 
   const updateCrop = async (e) => {
     e.preventDefault();
@@ -113,12 +132,29 @@ const CropCareConfig = () => {
 
     try {
       const formData = new FormData();
+      formData.append("_method", "PUT"); // ✅ Laravel method spoofing
       formData.append("name", form.name);
       formData.append("variety", form.variety);
-      formData.append("planted_date", form.planted_date);
-      if (form.image) formData.append("image", form.image);
 
-      const response = await axiosClient.put(`/updateCrop/${editingCrop}`, formData, {
+      // Ensure date is in YYYY-MM-DD format
+      const formattedDate = new Date(form.planted_date).toISOString().split('T')[0];
+      formData.append("planted_date", formattedDate);
+
+      // Only append image if a new one was selected
+      if (form.image instanceof File) {
+        formData.append("image", form.image);
+      }
+
+      // Debug: Log what you're sending
+      console.log("Sending data:", {
+        name: formData.get('name'),
+        variety: formData.get('variety'),
+        planted_date: formData.get('planted_date'),
+        image: formData.get('image')
+      });
+
+      // ✅ Use POST instead of PUT for multipart/form-data
+      const response = await axiosClient.post(`/updateCrop/${editingCrop}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -129,7 +165,14 @@ const CropCareConfig = () => {
       );
       closeModal();
     } catch (error) {
-      setError(error.response?.data?.message || "Something went wrong!");
+      // Better error handling to show specific validation errors
+      if (error.response?.data?.errors) {
+        const errorMessages = Object.values(error.response.data.errors).flat().join(', ');
+        setError(errorMessages);
+      } else {
+        setError(error.response?.data?.message || "Something went wrong!");
+      }
+      console.error("Update error:", error.response?.data);
     } finally {
       setIsLoading(false);
     }
@@ -144,7 +187,12 @@ const CropCareConfig = () => {
       setCrop((prev) => prev.filter((crop) => crop.id !== cropId));
       setDeleteConfirm(null);
     } catch (error) {
-      setError(error.response?.data?.message || "Something went wrong!");
+      if (error.response?.data?.errors) {
+        const errorMessages = Object.values(error.response.data.errors).flat().join(', ');
+        setError(errorMessages);
+      } else {
+        setError(error.response?.data?.message || "Something went wrong!");
+      }
     } finally {
       setIsLoading(false);
     }
