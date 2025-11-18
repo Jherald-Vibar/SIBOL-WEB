@@ -5,6 +5,7 @@ import axios from "axios";
 import image from "../assets/first_image.png";
 import axiosClient from "./axios";
 import { Card, CardContent, Typography } from "@mui/material";
+import { Cloud, CloudRain, Sun, CloudSnow, Wind } from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -21,6 +22,7 @@ const UserDashboard = () => {
   const apikey = import.meta.env.VITE_WEATHER_APIKEY;
   const [location, setLocation] = useState(null);
   const [weather, setWeather] = useState(null);
+  const [forecastData, setForecastData] = useState(null);
   const [unit, setUnit] = useState("C");
   const [date, setDate] = useState(new Date());
   const [data, setData] = useState([]);
@@ -74,20 +76,22 @@ const UserDashboard = () => {
     fetchLocation();
   }, []);
 
-  // Fetch weather
+  // Fetch weather and forecast
   useEffect(() => {
     const fetchWeather = async () => {
       try {
         const response = await axios.get(
-          "https://api.weatherapi.com/v1/current.json",
+          "https://api.weatherapi.com/v1/forecast.json",
           {
             params: {
               key: apikey,
               q: location,
+              days: 3,
             },
           }
         );
         setWeather(response.data);
+        setForecastData(response.data.forecast.forecastday);
       } catch (error) {
         console.error("Weather API error:", error);
       }
@@ -125,8 +129,35 @@ const UserDashboard = () => {
     .replace(/\//g, " / ");
 
   const handleMoreDetails = (crop) => {
-    // Add navigation or modal logic here
     console.log("View details for:", crop);
+  };
+
+  const getWeatherIcon = (condition, size = "default") => {
+    const conditionLower = condition.toLowerCase();
+    const sizeClasses = size === "large" ? "w-16 h-16" : "w-12 h-12";
+
+    if (conditionLower.includes('sun') || conditionLower.includes('clear')) {
+      return <Sun className={`${sizeClasses} text-amber-400`} fill="currentColor" />;
+    } else if (conditionLower.includes('rain') || conditionLower.includes('drizzle')) {
+      return <CloudRain className={`${sizeClasses} text-blue-400`} fill="currentColor" />;
+    } else if (conditionLower.includes('cloud') || conditionLower.includes('overcast')) {
+      return <Cloud className={`${sizeClasses} text-slate-400`} fill="currentColor" />;
+    } else if (conditionLower.includes('snow')) {
+      return <CloudSnow className={`${sizeClasses} text-blue-300`} fill="currentColor" />;
+    } else if (conditionLower.includes('wind')) {
+      return <Wind className={`${sizeClasses} text-slate-500`} />;
+    }
+    return <Cloud className={`${sizeClasses} text-slate-400`} fill="currentColor" />;
+  };
+
+  const getShortDay = (dateStr) => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const date = new Date(dateStr);
+    return days[date.getDay()];
+  };
+
+  const getTemp = (tempC, tempF) => {
+    return unit === "C" ? Math.round(tempC) : Math.round(tempF);
   };
 
   return (
@@ -149,296 +180,445 @@ const UserDashboard = () => {
             WELCOME, {name}
           </h1>
 
-          <div className="flex flex-col lg:flex-row gap-5 mb-5">
-            <div className="flex flex-col gap-4 w-full lg:w-80 xl:w-96">
-              <div
-                className="w-full bg-white rounded-md shadow-xl p-4"
-                style={{ boxShadow: "4px 4px 3px rgba(0,0,0,0.5)" }}
-              >
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-4">
-                  <div className="flex items-center px-3 py-2 rounded-full bg-green-800 w-full sm:w-auto justify-center">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="20"
-                      height="20"
-                      viewBox="0 0 48 48"
-                    >
-                      <path
-                        fill="none"
-                        stroke="#fff"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={4}
-                        d="M24 44s14-10.435 14-24A14 14 0 1 0 10 20c0 13.565 14 24 14 24z"
-                      />
-                      <circle cx="24" cy="20" r="4" fill="#fff"></circle>
-                    </svg>
-                    <span className="text-white font-semibold ml-2 text-sm sm:text-base">
-                      {location || "Loading..."}
-                    </span>
-                  </div>
+          <div className="flex flex-col lg:flex-row gap-6 mb-6">
+            <div className="flex flex-col gap-5 w-full lg:w-80 xl:w-96">
+              {/* Modern Weather Card - Softer Green */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-green-400 via-emerald-500 to-teal-600 rounded-3xl shadow-2xl p-6">
+                {/* Decorative Elements */}
+                <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
+                <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
 
-                  {/* Temperature Unit Toggle */}
-                  <div
-                    className="flex items-center w-20 h-10 bg-gray-200 rounded-full cursor-pointer relative"
-                    onClick={() => setUnit(unit === "C" ? "F" : "C")}
-                  >
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2 backdrop-blur-sm bg-white/20 px-4 py-2 rounded-full border border-white/30">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 48 48"
+                      >
+                        <path
+                          fill="none"
+                          stroke="#fff"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={4}
+                          d="M24 44s14-10.435 14-24A14 14 0 1 0 10 20c0 13.565 14 24 14 24z"
+                        />
+                        <circle cx="24" cy="20" r="4" fill="#fff"></circle>
+                      </svg>
+                      <span className="text-white font-medium text-sm">
+                        {location || "Loading..."}
+                      </span>
+                    </div>
+
+                    {/* Modern Temperature Toggle */}
                     <div
-                      className={`absolute w-1/2 h-full rounded-full bg-green-900 transition-all duration-300 ${
-                        unit === "C" ? "left-0" : "left-1/2"
-                      }`}
-                    />
-                    <div className="flex w-full justify-between text-sm font-bold px-2 relative z-10 pointer-events-none">
-                      <span className={unit === "C" ? "text-white" : "text-gray-600"}>C</span>
-                      <span className={unit === "F" ? "text-white" : "text-gray-600"}>F</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Weather Info */}
-                {weather ? (
-                  <div className="flex flex-col sm:flex-row items-center justify-between px-2">
-                    <div className="flex flex-col items-center mb-4 sm:mb-0">
-                      <h2 className="text-2xl sm:text-3xl font-bold">{weekday}</h2>
-                      <p className="text-sm tracking-widest text-gray-600">{formattedDate}</p>
-                      <h3 className="text-4xl sm:text-5xl font-bold mt-2">
-                        {unit === "C" ? weather.current.temp_c : weather.current.temp_f}°
-                      </h3>
-                    </div>
-
-                    <div className="flex flex-col items-center">
-                      <img
-                        src={weather.current.condition.icon}
-                        alt={weather.current.condition.text}
-                        className="w-24 sm:w-32"
+                      className="flex items-center w-20 h-9 backdrop-blur-sm bg-white/20 rounded-full cursor-pointer relative border border-white/30"
+                      onClick={() => setUnit(unit === "C" ? "F" : "C")}
+                    >
+                      <div
+                        className={`absolute w-1/2 h-[calc(100%-4px)] rounded-full bg-white shadow-lg transition-all duration-300 top-0.5 ${
+                          unit === "C" ? "left-0.5" : "left-[calc(50%-2px)]"
+                        }`}
                       />
-                      <h4 className="font-bold text-base sm:text-lg">
-                        {weather.current.condition.text}
-                      </h4>
-                      <p className="text-sm text-gray-600">
-                        Feels like{" "}
-                        {unit === "C"
-                          ? `${weather.current.temp_c}°C`
-                          : `${weather.current.temp_f}°F`}
-                      </p>
+                      <div className="flex w-full justify-between text-sm font-bold px-2.5 relative z-10 pointer-events-none">
+                        <span className={unit === "C" ? "text-green-600" : "text-white"}>C</span>
+                        <span className={unit === "F" ? "text-green-600" : "text-white"}>F</span>
+                      </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="text-center py-4 text-gray-500">Fetching Weather...</div>
-                )}
+
+                  {/* Weather Info */}
+                  {weather ? (
+                    <div className="space-y-4">
+                      <div className="text-center">
+                        <h2 className="text-xl font-semibold text-white/90">{weekday}</h2>
+                        <p className="text-sm text-white/70 tracking-wide">{formattedDate}</p>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <h3 className="text-6xl font-bold text-white mb-1">
+                            {unit === "C" ? weather.current.temp_c : weather.current.temp_f}°
+                          </h3>
+                          <p className="text-white/80 text-sm">
+                            Feels like {unit === "C" ? weather.current.temp_c : weather.current.temp_f}°
+                          </p>
+                        </div>
+
+                        <div className="flex flex-col items-center">
+                          <img
+                            src={weather.current.condition.icon}
+                            alt={weather.current.condition.text}
+                            className="w-20 h-20 drop-shadow-lg"
+                          />
+                          <h4 className="font-semibold text-white text-sm mt-1">
+                            {weather.current.condition.text}
+                          </h4>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-white/70">Fetching Weather...</div>
+                  )}
+                </div>
               </div>
 
-              {/* Crop Advisory Card */}
-              <div
-                className="w-full bg-white px-4 py-4 rounded-md shadow-md"
-                style={{ boxShadow: "4px 4px 3px rgba(0,0,0,0.5)" }}
-              >
-                <div className="bg-green-800 rounded-full px-4 py-2 text-center w-fit mx-auto">
-                  <p className="font-semibold text-white text-sm">Crop Advisory</p>
-                </div>
+              {/* Modern Crop Advisory Card */}
+              <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl p-6 border border-gray-100">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full blur-3xl opacity-50"></div>
 
-                <div className="mt-3 text-center">
-                  {alert && alert.length > 0 ? (
-                    <p className="text-xs md:text-sm text-red-500 font-medium">{alert}</p>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    <h3 className="font-bold text-gray-800 text-lg">Crop Advisory</h3>
+                  </div>
+
+                  <div className="mt-4 text-center bg-gradient-to-br from-gray-50 to-green-50 rounded-2xl p-4 border border-gray-100">
+                    {alert && alert.length > 0 ? (
+                      <p className="text-sm text-red-600 font-medium">{alert}</p>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <span className="text-2xl">✓</span>
+                        <p className="text-sm text-gray-600">All systems optimal</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3-Day Forecast Section - Better Glassmorphism */}
+            <div className="flex-1 w-full">
+              <div
+                className="relative overflow-hidden rounded-3xl h-full p-8"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.75) 0%, rgba(5, 150, 105, 0.8) 50%, rgba(4, 120, 87, 0.85) 100%)',
+                  backdropFilter: 'blur(16px)',
+                  boxShadow: '0 8px 32px 0 rgba(5, 150, 105, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)'
+                }}
+              >
+                {/* Decorative background elements - More subtle */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-300/10 rounded-full blur-3xl"></div>
+
+                <div className="relative z-10">
+                  <h2 className="text-2xl font-bold text-white mb-6 drop-shadow-sm">3-Day Forecast</h2>
+
+                  {forecastData && forecastData.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-4">
+                      {forecastData.map((day, index) => (
+                        <div
+                          key={index}
+                          className="backdrop-blur-md bg-white/15 rounded-2xl p-6 border border-white/25 hover:bg-white/25 transition-all duration-300 hover:scale-105 cursor-pointer"
+                          style={{
+                            boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)'
+                          }}
+                        >
+                          <div className="text-center">
+                            <p className="text-white/95 text-sm font-medium mb-4 drop-shadow-sm">
+                              {index === 0 ? 'Today' : getShortDay(day.date)}
+                            </p>
+                            <div className="flex justify-center mb-4">
+                              {getWeatherIcon(day.day.condition.text)}
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-4xl font-bold text-white drop-shadow-sm">
+                                {getTemp(day.day.maxtemp_c, day.day.maxtemp_f)}°
+                              </p>
+                              <p className="text-xl text-white/90 drop-shadow-sm">
+                                {getTemp(day.day.mintemp_c, day.day.mintemp_f)}°
+                              </p>
+                              <p className="text-sm text-white/80 mt-2">
+                                {day.day.condition.text}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   ) : (
-                    <p className="text-xs md:text-sm text-gray-500 italic">No alerts</p>
+                    <div className="flex items-center justify-center h-64">
+                      <p className="text-white text-lg drop-shadow-sm">Loading forecast...</p>
+                    </div>
                   )}
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Chart Section */}
-            <div className="flex-1 w-full">
-              <Card sx={{ boxShadow: 3, height: '100%' }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Environmental Condition
-                  </Typography>
+          {/* Modern Environmental Condition Chart */}
+          <div className="mb-6">
+            <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-gray-100">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full blur-3xl opacity-30"></div>
 
-                  {error && <Typography color="error">{error}</Typography>}
-
-                  <div style={{ width: "100%", height: 300 }}>
-                    {data.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={data}>
-                          <CartesianGrid stroke="#ccc" />
-                          <XAxis dataKey="time" />
-                          <YAxis
-                            yAxisId="left"
-                            label={{
-                              value: "Temperature (°C)",
-                              angle: -90,
-                              position: "insideLeft",
-                            }}
-                          />
-                          <YAxis
-                            yAxisId="right"
-                            orientation="right"
-                            label={{
-                              value: "Humidity (%)",
-                              angle: 90,
-                              position: "insideRight",
-                            }}
-                          />
-                          <Tooltip />
-                          <Legend />
-                          <Line
-                            yAxisId="left"
-                            type="monotone"
-                            dataKey="temp"
-                            stroke="red"
-                            dot={false}
-                            name="Temperature"
-                          />
-                          <Line
-                            yAxisId="right"
-                            type="monotone"
-                            dataKey="humidity"
-                            stroke="green"
-                            dot={false}
-                            name="Humidity"
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <Typography variant="body2" color="textSecondary">
-                          Loading sensors data...
-                        </Typography>
-                      </div>
-                    )}
+              <div className="relative z-10 p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+                      <span className="text-white text-xl">📊</span>
+                    </div>
+                    <h3 className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                      Environmental Condition
+                    </h3>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                      <span className="text-sm font-medium text-gray-600">Temperature</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      <span className="text-sm font-medium text-gray-600">Humidity</span>
+                    </div>
+                  </div>
+                </div>
+
+                {error && <p className="text-red-500 mb-4 font-medium">{error}</p>}
+
+                <div style={{ width: "100%", height: 320 }}>
+                  {data.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={data}>
+                        <CartesianGrid stroke="#e5e7eb" strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="time"
+                          stroke="#9ca3af"
+                          style={{ fontSize: '12px', fontWeight: '500' }}
+                        />
+                        <YAxis
+                          yAxisId="left"
+                          stroke="#ef4444"
+                          label={{
+                            value: "Temperature (°C)",
+                            angle: -90,
+                            position: "insideLeft",
+                            style: { fontSize: '12px', fontWeight: '600', fill: '#ef4444' }
+                          }}
+                          style={{ fontSize: '12px', fontWeight: '500' }}
+                        />
+                        <YAxis
+                          yAxisId="right"
+                          orientation="right"
+                          stroke="#22c55e"
+                          label={{
+                            value: "Humidity (%)",
+                            angle: 90,
+                            position: "insideRight",
+                            style: { fontSize: '12px', fontWeight: '600', fill: '#22c55e' }
+                          }}
+                          style={{ fontSize: '12px', fontWeight: '500' }}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            border: 'none',
+                            borderRadius: '12px',
+                            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                            padding: '12px'
+                          }}
+                        />
+                        <Legend
+                          wrapperStyle={{
+                            paddingTop: '20px',
+                            fontSize: '14px',
+                            fontWeight: '600'
+                          }}
+                        />
+                        <Line
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="temp"
+                          stroke="#ef4444"
+                          strokeWidth={3}
+                          dot={{ fill: '#ef4444', r: 5 }}
+                          activeDot={{ r: 7, fill: '#dc2626' }}
+                          name="Temperature"
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="humidity"
+                          stroke="#22c55e"
+                          strokeWidth={3}
+                          dot={{ fill: '#22c55e', r: 5 }}
+                          activeDot={{ r: 7, fill: '#16a34a' }}
+                          name="Humidity"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-500 font-medium">Loading sensors data...</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Bottom Section: Crops Table & Info Card */}
+          {/* Modern Crops Section */}
           <div className="flex flex-col lg:flex-row gap-6">
-            {/* Available Crops Table */}
-            <div
-              className="p-4 bg-white shadow-md rounded-lg w-full lg:w-1/2"
-              style={{ boxShadow: "4px 4px 3px rgba(0,0,0,0.5)" }}
-            >
-              <h2 className="text-center font-semibold mb-4 text-lg text-gray-700">
-                Available Crops
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="w-full border border-gray-200 rounded-md text-sm">
-                  <thead>
-                    <tr className="bg-green-100 text-gray-700">
-                      <th className="border border-gray-200 px-3 py-2 text-left">
-                        Crop Name
-                      </th>
-                      <th className="border border-gray-200 px-3 py-2 text-center">
-                        Planted
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {crops.length > 0 ? (
-                      crops.map((crop, index) => (
-                        <tr
-                          key={index}
-                          className={`${
-                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                          } hover:bg-green-50 transition`}
-                        >
-                          <td className="border border-gray-200 px-3 py-2 font-medium text-gray-700">
-                            {crop.name}
-                          </td>
-                          <td className="border border-gray-200 px-3 py-2 text-center">
-                            {crop.planted_at ? (
-                              <span className="text-green-600 text-lg">✅</span>
-                            ) : (
-                              <span className="text-gray-400 text-lg">—</span>
-                            )}
+            {/* Modern Available Crops Table */}
+            <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-gray-100 w-full lg:w-1/2">
+              <div className="absolute top-0 left-0 w-48 h-48 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full blur-3xl opacity-40"></div>
+
+              <div className="relative z-10 p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
+                    <span className="text-white text-xl">🌱</span>
+                  </div>
+                  <h2 className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                    Available Crops
+                  </h2>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b-2 border-gray-200">
+                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          Crop Name
+                        </th>
+                        <th className="px-4 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          Status
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {crops.length > 0 ? (
+                        crops.map((crop, index) => (
+                          <tr
+                            key={index}
+                            className="hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 transition-all duration-200 group"
+                          >
+                            <td className="px-4 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                                  <span className="text-white text-sm">🌿</span>
+                                </div>
+                                <span className="font-semibold text-gray-800">{crop.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 text-center">
+                              {crop.planted_at ? (
+                                <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full font-medium text-sm border border-green-200">
+                                  <span className="text-base">✓</span>
+                                  <span>Planted</span>
+                                </div>
+                              ) : (
+                                <div className="inline-flex items-center gap-2 bg-gray-100 text-gray-500 px-4 py-2 rounded-full font-medium text-sm border border-gray-200">
+                                  <span className="text-base">○</span>
+                                  <span>Pending</span>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="2" className="px-4 py-12">
+                            <div className="text-center">
+                              <div className="text-6xl mb-4">🌾</div>
+                              <p className="text-gray-500 font-medium">No crops available yet</p>
+                            </div>
                           </td>
                         </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="2" className="text-center py-8 text-gray-500">
-                          No crops available yet 🌱
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
-            {/* Crop Info Card */}
-            <div
-              className="w-full lg:w-1/2 bg-white rounded-md shadow-md"
-              style={{ boxShadow: "4px 4px 3px rgba(0,0,0,0.5)" }}
-            >
+            {/* Modern Crop Info Card */}
+            <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-gray-100 w-full lg:w-1/2">
+              <div className="absolute bottom-0 right-0 w-48 h-48 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full blur-3xl opacity-40"></div>
+
               <div className="relative">
-                {/* Crop Image */}
-                <img
-                  src={
-                    activeCrop?.image
-                      ? `${import.meta.env.VITE_API_BASE_URL}/sensor_images/${activeCrop.image}`
-                      : image
-                  }
-                  alt={activeCrop?.name || "Crop Background"}
-                  className="rounded-t-md w-full h-64 sm:h-80 object-cover"
-                />
+                {/* Modern Crop Image */}
+                <div className="relative h-72 overflow-hidden rounded-t-3xl">
+                  <img
+                    src={
+                      activeCrop?.image
+                        ? `${import.meta.env.VITE_API_BASE_URL}/sensor_images/${activeCrop.image}`
+                        : image
+                    }
+                    alt={activeCrop?.name || "Crop Background"}
+                    className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+                </div>
 
-                {/* Overlay Info Box */}
-                <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 bg-white w-[90%] flex flex-col rounded-md shadow-lg px-3 py-3">
-                  {/* Select Crop + More Details Button */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <select
-                      name="crop"
-                      value={selectedCrop}
-                      onChange={(e) => setSelectedCrop(e.target.value)}
-                      className="flex-1 border border-gray-300 rounded-md bg-white outline-none px-3 py-2 text-sm font-medium text-gray-700"
-                    >
-                      <option value="">Select Crop</option>
-                      {crops.map((crop, index) => (
-                        <option key={index} value={crop.name}>
-                          {crop.name}
-                        </option>
-                      ))}
-                    </select>
+                {/* Modern Overlay Info Box */}
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-[92%]">
+                  <div className="backdrop-blur-xl bg-white/95 rounded-3xl shadow-2xl border border-white/50 p-5">
+                    {/* Select Crop + More Details Button */}
+                    <div className="flex items-center gap-3 mb-4">
+                      <select
+                        name="crop"
+                        value={selectedCrop}
+                        onChange={(e) => setSelectedCrop(e.target.value)}
+                        className="flex-1 border-2 border-gray-200 rounded-2xl bg-white outline-none px-4 py-3 text-sm font-semibold text-gray-700 hover:border-green-400 focus:border-green-500 transition-colors cursor-pointer"
+                      >
+                        <option value="">🌾 Select Crop</option>
+                        {crops.map((crop, index) => (
+                          <option key={index} value={crop.name}>
+                            {crop.name}
+                          </option>
+                        ))}
+                      </select>
 
-                    <button
-                      className="px-3 py-2 border border-gray-400 rounded-md text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                      disabled={!activeCrop}
-                      onClick={() => activeCrop && handleMoreDetails(activeCrop)}
-                    >
-                      More Details ↗
-                    </button>
-                  </div>
-
-                  {/* Info Boxes */}
-                  <div className="flex justify-between gap-2">
-                    <div className="flex flex-col items-center border border-gray-300 rounded-md px-2 py-2 flex-1">
-                      <h3 className="text-[0.6rem] sm:text-xs text-gray-500 uppercase tracking-wide">
-                        Crop Health
-                      </h3>
-                      <p className="text-xs sm:text-sm font-semibold text-gray-800">
-                        {activeCrop ? "Good" : "—"}
-                      </p>
+                      <button
+                        className="px-5 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-2xl text-sm font-bold text-white shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-lg whitespace-nowrap transform hover:scale-105 disabled:hover:scale-100"
+                        disabled={!activeCrop}
+                        onClick={() => activeCrop && handleMoreDetails(activeCrop)}
+                      >
+                        Details →
+                      </button>
                     </div>
 
-                    <div className="flex flex-col items-center border border-gray-300 rounded-md px-2 py-2 flex-1">
-                      <h3 className="text-[0.6rem] sm:text-xs text-gray-500 uppercase tracking-wide">
-                        Planting Date
-                      </h3>
-                      <p className="text-xs sm:text-sm font-semibold text-gray-800">
-                        {activeCrop?.planted_at || "—"}
-                      </p>
-                    </div>
+                    {/* Modern Info Boxes */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-4 border-2 border-green-100 hover:border-green-300 transition-colors">
+                        <div className="text-center">
+                          <span className="text-2xl mb-2 block">💚</span>
+                          <h3 className="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">
+                            Health
+                          </h3>
+                          <p className="text-sm font-bold text-gray-800">
+                            {activeCrop ? "Good" : "—"}
+                          </p>
+                        </div>
+                      </div>
 
-                    <div className="flex flex-col items-center border border-gray-300 rounded-md px-2 py-2 flex-1">
-                      <h3 className="text-[0.6rem] sm:text-xs text-gray-500 uppercase tracking-wide">
-                        Growth Stage
-                      </h3>
-                      <p className="text-xs sm:text-sm font-semibold text-gray-800">
-                        {activeCrop ? "Harvest Stage" : "—"}
-                      </p>
+                      <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-4 border-2 border-blue-100 hover:border-blue-300 transition-colors">
+                        <div className="text-center">
+                          <span className="text-2xl mb-2 block">📅</span>
+                          <h3 className="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">
+                            Planted
+                          </h3>
+                          <p className="text-sm font-bold text-gray-800">
+                            {activeCrop?.planted_at || "—"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-4 border-2 border-purple-100 hover:border-purple-300 transition-colors">
+                        <div className="text-center">
+                          <span className="text-2xl mb-2 block">🌱</span>
+                          <h3 className="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">
+                            Stage
+                          </h3>
+                          <p className="text-sm font-bold text-gray-800">
+                            {activeCrop ? "Harvest" : "—"}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

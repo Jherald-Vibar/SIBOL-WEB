@@ -96,7 +96,7 @@ const CropCareConfig = () => {
     image: null,
   });
 
-  setImagePreview(`${import.meta.env.VITE_API_BASE_URL}/sensor_images/${crop.image}`);
+  setImagePreview(`${import.meta.env.VITE_API_BASE_URL}/crops_image/${crop.image}`);
   setModalOpen(true);
 };
 
@@ -381,11 +381,7 @@ const CropCareConfig = () => {
               >
                 <div className="w-full h-48 overflow-hidden">
                   <img
-                    src={
-                      crop.type === 'crop'
-                    ? `${import.meta.env.VITE_API_BASE_URL}/crops_image/${crop.image}`
-                    : `${import.meta.env.VITE_API_BASE_URL}/sensor_images/${crop.image}`
-                    }
+                    src={`${import.meta.env.VITE_API_BASE_URL}/crops_image/${crop.image}`}
                     alt={crop.name}
                     className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                   />

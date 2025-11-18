@@ -12,7 +12,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 class IotController extends Controller
 {
     public function getEspData(Request $request)
-{
+    {
     try {
         $validated = $request->validate([
             'esp_api_key' => 'required|string',

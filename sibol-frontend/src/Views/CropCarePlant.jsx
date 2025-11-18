@@ -15,6 +15,7 @@ const CropCarePlant = () => {
   const [cropInfo, setCropInfo] = useState(null)
   const [alerts, setAlerts] = useState([])
   const [historyData, setHistoryData] = useState([])
+  const [isIrrigating, setIsIrrigating] = useState(false)
 
   useEffect(() => {
     const fetchSensorData = async () => {
@@ -40,6 +41,12 @@ const CropCarePlant = () => {
       fetchSensorData()
     }
   }, [garden_id, crop_name])
+
+  const handleIrrigateToggle = () => {
+    setIsIrrigating(!isIrrigating)
+    // Add your irrigation logic here
+    // Example: axiosClient.post(`/irrigate/${garden_id}/${crop_name}`, { status: !isIrrigating })
+  }
 
   const getNPKStatus = (n, p, k) => {
     if (!n || !p || !k) return { text: '—', color: 'text-gray-500' }
@@ -172,17 +179,50 @@ const CropCarePlant = () => {
         <div className="px-4 sm:px-6 lg:px-10 py-4 sm:py-6">
           {/* Page Header */}
           <div className="mb-6">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-serif font-semibold text-gray-800">
-              {crop_name || 'Crop Details'}
-            </h1>
-            <div className="flex flex-wrap gap-2 mt-2 text-sm text-gray-500">
-              <span>Garden ID: {garden_id}</span>
-              {sensorData?.created_at && (
-                <>
-                  <span>•</span>
-                  <span>Last updated: {formatDate(sensorData.created_at)}</span>
-                </>
-              )}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div className="flex-1">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-serif font-semibold text-gray-800">
+                  {crop_name || 'Crop Details'}
+                </h1>
+                <div className="flex flex-wrap gap-2 mt-2 text-sm text-gray-500">
+                  <span>Garden ID: {garden_id}</span>
+                  {sensorData?.created_at && (
+                    <>
+                      <span>•</span>
+                      <span>Last updated: {formatDate(sensorData.created_at)}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Irrigate Toggle Button */}
+              <button
+                onClick={handleIrrigateToggle}
+                className={`group relative inline-flex items-center gap-2 px-6 py-3 font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 active:scale-95 ${
+                  isIrrigating
+                    ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
+                    : 'bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white'
+                }`}
+              >
+                <svg
+                  className={`w-5 h-5 transition-all duration-300 ${isIrrigating ? 'animate-pulse' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                </svg>
+                <span className="text-sm sm:text-base">
+                  {isIrrigating ? 'Irrigating...' : 'Start Irrigation'}
+                </span>
+                {isIrrigating && (
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                  </span>
+                )}
+                <div className="absolute inset-0 rounded-xl bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+              </button>
             </div>
           </div>
 

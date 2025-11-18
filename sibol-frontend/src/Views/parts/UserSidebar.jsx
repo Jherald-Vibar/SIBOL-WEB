@@ -59,7 +59,7 @@ const UserSidebar = () => {
   return (
     <>
       {/* Desktop Sidebar */}
-      <div className="hidden md:flex w-64 min-h-screen bg-white shadow-xl p-6 flex-col">
+      <div className="hidden md:flex w-64 min-h-screen bg-white shadow-xl p-6 flex-col font-['Roboto',sans-serif]">
         {/* Header Section */}
         <div className="mb-10 pb-4 flex flex-col items-center justify-center border-gray-700">
           <img src={Logo} alt="Logo" className='w-32' />
@@ -111,7 +111,7 @@ const UserSidebar = () => {
       </div>
 
       {/* Mobile Footer Navigation */}
-      <div className="md:hidden w-full bg-white shadow-2xl border-t-2 border-gray-200">
+      <div className="md:hidden w-full bg-white shadow-2xl border-t-2 border-gray-200 font-['Roboto',sans-serif]">
         <nav className="flex items-center justify-around px-2 py-3">
           {sidebarMenus.slice(0, 5).map((menu, i) => (
             <NavLink

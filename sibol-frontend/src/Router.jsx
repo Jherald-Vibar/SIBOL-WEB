@@ -16,6 +16,7 @@ import AdminCropProfile from "./Views/AdminCropProfile.jsx";
 import AdminAccountSettings from "./Views/AdminAccountSettings.jsx";
 import CropCareConfig from "./Views/CropCareConfig.jsx";
 import CropCarePlant from "./Views/CropCarePlant.jsx";
+import AboutUs from "./Views/AboutUs.jsx";
 
 const router = createBrowserRouter ([
 
@@ -23,7 +24,6 @@ const router = createBrowserRouter ([
         path: '/',
         element: <App/>
     },
-
     {
      path: '/guest',
      element: <GuestLayout/>,
@@ -52,7 +52,7 @@ const router = createBrowserRouter ([
                     {
                         path: "/admin/account-settings",
                         element: <AdminAccountSettings/>
-                    }
+                    },
                 ],
             },
             {
@@ -90,7 +90,11 @@ const router = createBrowserRouter ([
                     {
                         path: "/user/account-settings",
                         element: <AccountSettings/>
-                    }
+                    },
+                    {
+                      path: "/user/about-us",
+                      element: <AboutUs/>
+                    },
                 ],
             }
         ]
