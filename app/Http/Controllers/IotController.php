@@ -119,23 +119,23 @@ class IotController extends Controller
         $user = $request->user();
         $esp = Esp::where("user_id", $user->id)->first();
 
-        if (!$esp) { return response()->json([ 'data' => [], 'message' => 'No ESP device found for this user' ], 200); }
-
-
-        $data = SensorData::where('esp_id', $esp->id)->orderBy('created_at', 'desc')
-            ->take(7)
-            ->get(['esp_id', 'air_temperature as temp', 'air_humidity as humidity', 'created_at']);
-
-        $firstReading = $data->first();
-        if ($firstReading) {
-            $esp = Esp::find($firstReading->esp_id);
+        if (!$esp) {
+            return response()->json([
+                'data' => [],
+                'message' => 'No ESP device found for this user'
+            ], 200);
         }
 
-        $data = $data->map(function($item, $index) {
+        $data = SensorData::where('esp_id', $esp->id)
+            ->orderBy('created_at', 'desc')
+            ->take(10)
+            ->get(['esp_id', 'air_temperature', 'air_humidity', 'created_at']);
+
+        $data = $data->map(function($item) {
             return [
-                'name' => 'Reading ' . ($index + 1),
-                'temp' => round($item->temp, 1),
-                'humidity' => round($item->humidity, 0),
+                'time' => $item->created_at->format('H:i'),
+                'temp' => round($item->air_temperature, 1),
+                'humidity' => round($item->air_humidity, 0),
             ];
         })->reverse()->values();
 
