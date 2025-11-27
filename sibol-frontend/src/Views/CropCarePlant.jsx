@@ -233,8 +233,8 @@ const CropCarePlant = () => {
               <img
                 src={
                      cropInfo.type === "crop"
-                    ? `${import.meta.env.VITE_API_BASE_URL}/crops_image/${cropInfo.image}`
-                    : `${import.meta.env.VITE_API_BASE_URL}/sensor_images/${cropInfo.image}`
+                    ? cropInfo.image
+                    : "No Image"
                 }
                 alt={crop_name}
                 className="w-full max-w-[200px] h-auto object-contain rounded-lg"
