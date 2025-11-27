@@ -11,7 +11,19 @@ Route::get('/test', function () {
     return ['message' => 'API IS WORKING!'];
 });
 
+// In routes/api.php or routes/web.php
+Route::get('/test-cloudinary-direct', function () {
+    $cloudName = env('CLOUDINARY_CLOUD_NAME');
+    $apiKey = env('CLOUDINARY_API_KEY');
+    $apiSecret = env('CLOUDINARY_API_SECRET');
 
+    return response()->json([
+        'cloud_name' => $cloudName ?: 'NOT SET',
+        'api_key' => $apiKey ?: 'NOT SET',
+        'api_secret' => $apiSecret ? 'SET (length: ' . strlen($apiSecret) . ')' : 'NOT SET',
+        'all_set' => $cloudName && $apiKey && $apiSecret ? 'YES ✓' : 'NO ✗'
+    ]);
+});
 Route::post('/send', [IotController::class, 'getEspData']);
 
 

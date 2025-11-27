@@ -115,7 +115,7 @@ const CropCareConfig = () => {
       image: null,
     });
 
-    setImagePreview(`${import.meta.env.VITE_API_BASE_URL}/crops_image/${crop.image}`);
+    setImagePreview(crop.image);
     setModalOpen(true);
   };
 
@@ -429,7 +429,7 @@ const CropCareConfig = () => {
               >
                 <div className="w-full h-48 overflow-hidden">
                   <img
-                    src={`${import.meta.env.VITE_API_BASE_URL}/crops_image/${crop.image}`}
+                    src={crop.image}
                     alt={crop.name}
                     className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                   />
