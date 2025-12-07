@@ -158,7 +158,7 @@ const UserNavbar = () => {
                   <>
                     {/* Mobile: Full Screen Overlay */}
                     <div
-                      className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+                      className="md:hidden fixed inset-0 bg-white/20 backdrop-blur-lg z-40"
                       onClick={() => setShowNotifications(false)}
                     />
 
