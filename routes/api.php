@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\Accounts\UserController;
+use App\Http\Controllers\DetectionResultController;
 use App\Http\Controllers\GardenController;
 use App\Http\Controllers\IotController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -67,9 +69,29 @@ Route::middleware('auth:sanctum')->group(function () {
 
     //Admin Routes
     Route::post("/addAdminCrop", [GardenController::class, 'addAdminCrop']);
-    Route::get("/getCropProfile", [GardenController::class, "showCropsProfile"]);
+    Route::get('/getCropProfile', [GardenController::class, "showCropsProfile"]);
     Route::put('/updateAdminCrop/{id}', [GardenController::class, 'updateAdminCrop']);
     Route::delete('/deleteAdminCrop/{id}', [GardenController::class, 'deleteAdminCrop']);
+
+
+
+    //Detection
+    Route::get('/scan/{sensorDataId}', [DetectionResultController::class, 'getBySensorData']);
+    Route::get('/crop/{cropId}/latest-scan', [DetectionResultController::class, 'getLatestScanByCrop']);
+    Route::get('/crop/{cropId}/scan-history', [DetectionResultController::class, 'getScanHistoryByCrop']);
+    Route::get('/crop/{cropId}/overview', [DetectionResultController::class, 'getCropHealthOverview']);
+    Route::get('/esp/{espId}/latest-scan', [DetectionResultController::class, 'getLatestScanByEsp']);
+    Route::get('/diseased/current', [DetectionResultController::class, 'getCurrentDiseased']);
+    Route::get('/statistics', [DetectionResultController::class, 'getStatistics']);
+    //Route::get('/{id}', [DetectionResultController::class, 'getById']);
+
+    //notification
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread', [NotificationController::class, 'unread']);
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'delete']);
+
 });
 
 

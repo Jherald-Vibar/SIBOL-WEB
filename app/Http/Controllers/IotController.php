@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Crop;
+use App\Models\DetectionResults;
 use App\Models\Esp;
+use App\Models\Notification;
 use App\Models\SensorData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -27,8 +29,8 @@ class IotController extends Controller
         ]);
     }
 
-    public function getEspData(Request $request)
-{
+    /*public function getEspData(Request $request)
+    {
     try {
         $validated = $request->validate([
             'esp_api_key' => 'required|string',
@@ -175,6 +177,244 @@ class IotController extends Controller
             'message' => 'Data saved successfully',
             'data' => $sensorData,
             'image_url' => $imageUrl
+        ], 200);
+
+    } catch (\Exception $e) {
+        Log::error('ESP data error', [
+            'message' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine()
+        ]);
+
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage()
+        ], 500);
+    }
+}*/
+
+    public function getEspData(Request $request)
+    {
+
+    try {
+        $validated = $request->validate([
+            'esp_api_key' => 'required|string',
+            'crop_name' => 'required|string',
+            'soil_temperature' => 'nullable|numeric',
+            'air_temperature'  => 'nullable|numeric',
+            'air_humidity'     => 'nullable|numeric',
+            'image' => 'nullable|string',
+            'soil_moisture'    => 'nullable|numeric',
+            'ph'               => 'nullable|numeric',
+            'electrical_conductivity' => 'nullable|numeric',
+            'nitrogen'         => 'nullable|numeric',
+            'phosphorus'       => 'nullable|numeric',
+            'potassium'        => 'nullable|numeric',
+        ]);
+
+        $esp = Esp::where('serial_number', $validated['esp_api_key'])->first();
+
+        if (!$esp) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'ESP device not found'
+            ], 404);
+        }
+
+        $cropExist = Crop::where('name', $validated['crop_name'])->first();
+
+        if(!$cropExist) {
+            return response()->json([
+                "message" => "NO CROPS FOR NOW!"
+            ], 404);
+        }
+
+        $imageUrl = null;
+        $yoloDetectionResult = null;
+
+        if ($request->has('image') && !empty($request->image)) {
+            try {
+                $image = $request->image;
+
+                if (strpos($image, 'data:image') !== false) {
+                    $image = substr($image, strpos($image, ',') + 1);
+                }
+
+                $imageData = base64_decode($image);
+
+                $tempFile = tempnam(sys_get_temp_dir(), 'esp_image_');
+                file_put_contents($tempFile, $imageData);
+
+                Log::info('Temp file created', ['path' => $tempFile]);
+
+                $cloudName = env('CLOUDINARY_CLOUD_NAME');
+                $apiKey = env('CLOUDINARY_API_KEY');
+                $apiSecret = env('CLOUDINARY_API_SECRET');
+
+                if (!$cloudName || !$apiKey || !$apiSecret) {
+                    throw new \Exception('Cloudinary credentials not configured');
+                }
+
+                $timestamp = time();
+                $publicId = 'esp_' . $esp->id . '_' . $timestamp;
+                $folder = 'esp_sensor_images';
+
+
+                $params = [
+                    'timestamp' => $timestamp,
+                    'folder' => $folder,
+                    'public_id' => $publicId
+                ];
+
+                ksort($params);
+                $signature = '';
+                foreach ($params as $key => $value) {
+                    $signature .= $key . '=' . $value . '&';
+                }
+                $signature = rtrim($signature, '&') . $apiSecret;
+                $signature = sha1($signature);
+
+
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, "https://api.cloudinary.com/v1_1/{$cloudName}/image/upload");
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, [
+                    'file' => new \CURLFile($tempFile),
+                    'api_key' => $apiKey,
+                    'timestamp' => $timestamp,
+                    'signature' => $signature,
+                    'folder' => $folder,
+                    'public_id' => $publicId
+                ]);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                if (file_exists($tempFile)) {
+                    unlink($tempFile);
+                }
+
+                if ($httpCode == 200) {
+                    $result = json_decode($response, true);
+                    $imageUrl = $result['secure_url'];
+                    Log::info('Cloudinary upload successful', ['url' => $imageUrl]);
+
+                    try {
+                        $yoloServiceUrl = env('YOLO_SERVICE_URL', 'http://localhost:5000');
+
+                        $yoloCh = curl_init();
+                        curl_setopt($yoloCh, CURLOPT_URL, $yoloServiceUrl . '/detect');
+                        curl_setopt($yoloCh, CURLOPT_POST, true);
+                        curl_setopt($yoloCh, CURLOPT_POSTFIELDS, json_encode([
+                            'image' => $validated['image']
+                        ]));
+                        curl_setopt($yoloCh, CURLOPT_HTTPHEADER, [
+                            'Content-Type: application/json'
+                        ]);
+                        curl_setopt($yoloCh, CURLOPT_RETURNTRANSFER, true);
+                        curl_setopt($yoloCh, CURLOPT_TIMEOUT, 30);
+
+                        $yoloResponse = curl_exec($yoloCh);
+                        $yoloHttpCode = curl_getinfo($yoloCh, CURLINFO_HTTP_CODE);
+                        $yoloError = curl_error($yoloCh);
+                        curl_close($yoloCh);
+
+                        if ($yoloHttpCode == 200 && $yoloResponse) {
+                            $yoloDetectionResult = json_decode($yoloResponse, true);
+                            Log::info('YOLO detection successful', [
+                                'detections' => $yoloDetectionResult['total_detections'] ?? 0
+                            ]);
+
+                        } else {
+                            Log::error('YOLO detection failed', [
+                                'http_code' => $yoloHttpCode,
+                                'error' => $yoloError,
+                                'response' => $yoloResponse
+                            ]);
+                        }
+                    } catch (\Exception $yoloError) {
+                        Log::error('YOLO service error', [
+                            'error' => $yoloError->getMessage()
+                        ]);
+
+                    }
+                } else {
+                    throw new \Exception('Cloudinary upload failed: ' . $response);
+                }
+
+            } catch (\Exception $imageError) {
+                Log::error('Image upload failed', ['error' => $imageError->getMessage()]);
+                $imageUrl = null;
+            }
+        }
+
+        $sensorData = SensorData::create([
+            'esp_id' => $esp->id,
+            'crop_id' => $cropExist->id,
+            'soil_temperature' => $validated['soil_temperature'] ?? null,
+            'air_temperature'  => $validated['air_temperature'] ?? null,
+            'air_humidity'     => $validated['air_humidity'] ?? null,
+            'soil_moisture'    => $validated['soil_moisture'] ?? null,
+            'ph'               => $validated['ph'] ?? null,
+            'electrical_conductivity' => $validated['electrical_conductivity'] ?? null,
+            'nitrogen'         => $validated['nitrogen'] ?? null,
+            'phosphorus'       => $validated['phosphorus'] ?? null,
+            'potassium'        => $validated['potassium'] ?? null,
+        ]);
+
+        $notificationService = new \App\Services\NotificationService();
+        $notificationService->processSensorNotifications($sensorData, $esp);
+
+        if ($yoloDetectionResult && $yoloDetectionResult['success'] && !empty($yoloDetectionResult['detections'])) {
+
+            foreach ($yoloDetectionResult['detections'] as $detection) {
+                $recommendations = $detection['recommendations'];
+
+                DetectionResults::create([
+                    'sensor_data_id' => $sensorData->id,
+                    'crop_id' => $cropExist->id,
+                    'esp_id' => $esp->id,
+
+                    'detected_class' => $detection['class'],
+                    'confidence' => $detection['confidence'],
+                    'image_url' => $imageUrl,
+
+                    'recommendations' => json_encode($recommendations['recommendations']),
+                    'harvest_tips' => json_encode($recommendations['harvest_tips'] ?? null),
+                ]);
+
+                $notificationService->createDiseaseDetectionNotification(
+                    $esp->user,
+                    $detection['class'],
+                    $detection['confidence'],
+                    $cropExist->name
+                );
+            }
+
+            Log::info('Saved detection results', [
+                'total_saved' => count($yoloDetectionResult['detections']),
+                'sensor_data_id' => $sensorData->id
+            ]);
+        }
+
+        if ($imageUrl) {
+            $cropExist->update([
+                "image" => $imageUrl,
+            ]);
+        }
+
+        $esp->update([
+            "status" => "active"
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Data saved successfully',
+            'data' => $sensorData,
+            'image_url' => $imageUrl,
+            'yolo_detection' => $yoloDetectionResult
         ], 200);
 
     } catch (\Exception $e) {

@@ -17,4 +17,8 @@ class Esp extends Model
     public function sensorData() {
         return $this->hasMany(SensorData::class);
     }
+
+    public function user() {
+      return $this->belongsTo(User::class);
+    }
 }

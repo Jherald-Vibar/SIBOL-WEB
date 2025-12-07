@@ -7,6 +7,7 @@ use App\Models\CropProfile;
 use App\Models\Esp;
 use App\Models\Garden;
 use App\Models\SensorData;
+use App\Services\NotificationService;
 use Cloudinary\Cloudinary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,14 +16,13 @@ use Illuminate\Support\Facades\Log;
 
 class GardenController extends Controller
 {
-    // Helper method to get Cloudinary instance
     private function getCloudinaryInstance()
     {
         return new Cloudinary([
             'cloud' => [
-                'cloud_name' => env('CLOUDINARY_CLOUD_NAME', 'da02o1cvb'),
-                'api_key'    => env('CLOUDINARY_API_KEY', '484565416935298'),
-                'api_secret' => env('CLOUDINARY_API_SECRET', 'AGHIb8Z8mDBUtve43JuktPRdNYQ'),
+                'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
+                'api_key'    => env('CLOUDINARY_API_KEY'),
+                'api_secret' => env('CLOUDINARY_API_SECRET'),
             ],
             'url' => [
                 'secure' => true
@@ -52,6 +52,10 @@ class GardenController extends Controller
                 'name' => $validated['garden_name'],
                 'location' => $validated['location'],
             ]);
+
+            $notificationService = new NotificationService();
+            $notificationService->addGarden($garden, $user);
+
 
             return response()->json([
                 "message" => "Garden Successfully Created!",
@@ -175,6 +179,11 @@ class GardenController extends Controller
                 'image' => $imageUrl,
                 'planted_at' => $validated['planted_date']
             ]);
+
+            $garden = Garden::find($gardenId);
+
+            $notificationService = new \App\Services\NotificationService();
+            $notificationService->checkCrop($crop, $user, $garden);
 
             Log::info('Crop created successfully', ['crop_id' => $crop->id]);
 
@@ -306,14 +315,13 @@ class GardenController extends Controller
     }
 
     public function showCropsProfile() {
-      $crops = CropProfile::all();
+  $crops = CropProfile::all();
 
-      return response()->json([
-        "status" => "Success!",
-        "data" => $crops,
-      ], 201);
-    }
-
+  return response()->json([
+    "message" => "Success!",  // Changed from "status"
+    "data" => $crops,
+  ], 200);  // Changed from 201 to 200 (GET requests typically return 200)
+}
     public function getUserCropProfile(Request $request) {
       $user = $request->user();
 
@@ -588,10 +596,16 @@ class GardenController extends Controller
               'message' => 'Garden not found or you do not have permission to delete it'
           ], 404);
       }
+
       $garden->delete();
+
+      $notificationService = new NotificationService();
+      $notificationService->deleteGarden($garden, $user);
+
       return response()->json([
           'message' => 'Garden deleted successfully'
       ], 200);
+
     }
 
     public function updateCrop(Request $request, $crop_id)
@@ -705,7 +719,13 @@ class GardenController extends Controller
                 ], 404);
             }
 
+            $cropName = $crop->name;
+            $garden = $crop->garden;
+
             $crop->delete();
+
+            $notificationService = new NotificationService();
+            $notificationService->deleteCrop($garden, $user, $crop);
 
             Log::info('Crop deleted successfully', ['crop_id' => $crop_id]);
 

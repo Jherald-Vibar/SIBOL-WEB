@@ -22,6 +22,10 @@ class User extends Authenticatable
         return $this->hasMany(Garden::class);
     }
 
+    public function notifications() {
+        return $this->hasMany(Notification::class);
+    }
+
      protected function casts(): array
     {
         return [
