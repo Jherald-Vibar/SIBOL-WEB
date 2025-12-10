@@ -412,8 +412,6 @@ class IotController extends Controller
         $notificationService = new \App\Services\NotificationService();
         $notificationService->processSensorNotifications($sensorData, $esp, $cropProfile);
 
-        // Detection result saving logic (no change)
-
         if ($yoloDetectionResult && $yoloDetectionResult['success'] && !empty($yoloDetectionResult['detections'])) {
 
             foreach ($yoloDetectionResult['detections'] as $detection) {
