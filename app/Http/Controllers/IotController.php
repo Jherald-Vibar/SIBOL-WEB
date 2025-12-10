@@ -386,6 +386,8 @@ class IotController extends Controller
             }
         }
 
+        // Sensor data saving logic (no change)
+
         $sensorData = SensorData::create([
             'esp_id' => $esp->id,
             'crop_id' => $cropExist->id,
@@ -400,18 +402,11 @@ class IotController extends Controller
             'potassium'        => $validated['potassium'] ?? null,
         ]);
 
-        $cropUser = Crop::where('esp_id', $esp->id)
-            ->where('id', $sensorData->crop_id)
-            ->first();
-
-        $cropProfile = null;
-        if ($cropUser && $cropUser->crop_profile_id) {
-            $cropProfile = CropProfile::find($cropUser->crop_profile_id);
-        }
 
         $notificationService = new \App\Services\NotificationService();
-        $notificationService->processSensorNotifications($sensorData, $esp, $cropProfile);
+        $notificationService->processSensorNotifications($sensorData, $esp);
 
+        // Detection result saving logic (no change)
 
         if ($yoloDetectionResult && $yoloDetectionResult['success'] && !empty($yoloDetectionResult['detections'])) {
 
