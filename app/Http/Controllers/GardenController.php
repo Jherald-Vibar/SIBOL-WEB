@@ -320,8 +320,8 @@ class GardenController extends Controller
   return response()->json([
     "message" => "Success!",  // Changed from "status"
     "data" => $crops,
-  ], 200);  // Changed from 201 to 200 (GET requests typically return 200)
-}
+   ], 200);  // Changed from 201 to 200 (GET requests typically return 200)
+  }
     public function getUserCropProfile(Request $request) {
       $user = $request->user();
 
@@ -360,7 +360,7 @@ class GardenController extends Controller
 
   public function getSensorDataCrop(Request $request, $garden_id, $crop) {
     $user = $request->user();
-    $esp = Esp::where("user_id", $user->id)->first();
+    $esp = Esp::where('garden_id', $garden_id)->where('user_id', $user->id)->first();
 
     $cropSensor = Crop::with('cropProfile')
         ->where('user_id', $user->id)
