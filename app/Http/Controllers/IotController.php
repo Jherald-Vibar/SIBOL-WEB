@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Crop;
+use App\Models\CropProfile;
 use App\Models\DetectionResults;
 use App\Models\Esp;
 use App\Models\Notification;
@@ -195,7 +196,6 @@ class IotController extends Controller
 
     public function getEspData(Request $request)
     {
-
     try {
         $validated = $request->validate([
             'esp_api_key' => 'required|string',
@@ -235,23 +235,58 @@ class IotController extends Controller
         if ($request->has('image') && !empty($request->image)) {
             try {
                 $image = $request->image;
+                $rawImageLength = strlen($image);
+
+                // 💡 DEBUG LOG 1: Raw Base64 string check
+                Log::info('Image processing: Raw payload received.', [
+                    'raw_length' => $rawImageLength,
+                    'starts_with' => substr($image, 0, 30),
+                    'ends_with' => substr($image, -30)
+                ]);
+
 
                 if (strpos($image, 'data:image') !== false) {
                     $image = substr($image, strpos($image, ',') + 1);
                 }
 
+                // 💡 DEBUG LOG 2: Length after prefix removal
+                Log::info('Image processing: Prefix removed.', ['processed_length' => strlen($image)]);
+
+
                 $imageData = base64_decode($image);
+
+                // 💡 DEBUG LOG 3: CRITICAL check for decoding failure
+                if ($imageData === false || empty($imageData)) {
+                    Log::error('Base64 Decoding Failed or resulted in empty data.', [
+                        'base64_string_length' => strlen($image),
+                        'decoded_data_type' => gettype($imageData),
+                        'decoded_data_size' => $imageData === false ? 'FALSE' : strlen($imageData)
+                    ]);
+                    throw new \Exception('Base64 decoding resulted in empty or corrupted data.');
+                }
 
                 $tempFile = tempnam(sys_get_temp_dir(), 'esp_image_');
                 file_put_contents($tempFile, $imageData);
 
-                Log::info('Temp file created', ['path' => $tempFile]);
+                // 💡 DEBUG LOG 4: Check if the temporary file is empty
+                if (file_exists($tempFile) && filesize($tempFile) === 0) {
+                    Log::error('Temp file created but is empty.', ['base64_string_length' => strlen($image)]);
+                    unlink($tempFile); // Clean up empty file
+                    throw new \Exception('Decoded image data resulted in an empty file (zero bytes).');
+                }
+
+                Log::info('Temp file created and has content.', ['path' => $tempFile, 'size' => filesize($tempFile)]);
+
 
                 $cloudName = env('CLOUDINARY_CLOUD_NAME');
                 $apiKey = env('CLOUDINARY_API_KEY');
                 $apiSecret = env('CLOUDINARY_API_SECRET');
 
                 if (!$cloudName || !$apiKey || !$apiSecret) {
+                    // Check if the empty file was deleted before throwing error
+                    if (file_exists($tempFile)) {
+                        unlink($tempFile);
+                    }
                     throw new \Exception('Cloudinary credentials not configured');
                 }
 
@@ -302,6 +337,7 @@ class IotController extends Controller
                     Log::info('Cloudinary upload successful', ['url' => $imageUrl]);
 
                     try {
+                        // The YOLO service call remains as it was
                         $yoloServiceUrl = env('YOLO_SERVICE_URL', 'http://localhost:5000');
 
                         $yoloCh = curl_init();
@@ -364,8 +400,18 @@ class IotController extends Controller
             'potassium'        => $validated['potassium'] ?? null,
         ]);
 
+        $cropUser = Crop::where('esp_id', $esp->id)
+            ->where('id', $sensorData->crop_id)
+            ->first();
+
+        $cropProfile = null;
+        if ($cropUser && $cropUser->crop_profile_id) {
+            $cropProfile = CropProfile::find($cropUser->crop_profile_id);
+        }
+
         $notificationService = new \App\Services\NotificationService();
-        $notificationService->processSensorNotifications($sensorData, $esp);
+        $notificationService->processSensorNotifications($sensorData, $esp, $cropProfile);
+
 
         if ($yoloDetectionResult && $yoloDetectionResult['success'] && !empty($yoloDetectionResult['detections'])) {
 

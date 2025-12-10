@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\SensorData;
 use App\Models\Esp;
 use App\Models\Garden;
+use App\Models\CropProfile;
 use Illuminate\Support\Facades\Log;
 
 class NotificationService
@@ -15,7 +16,7 @@ class NotificationService
     /**
      * Check sensor data and create notifications based on thresholds
      */
-    public function processSensorNotifications(SensorData $sensorData, Esp $esp): void
+    public function processSensorNotifications(SensorData $sensorData, Esp $esp, ?CropProfile $cropProfile = null): void
     {
         $user = $esp->user;
 
@@ -26,21 +27,36 @@ class NotificationService
 
         // Check soil moisture
         if ($sensorData->soil_moisture !== null) {
-            $this->checkSoilMoisture($sensorData, $user, $esp);
+            $this->checkSoilMoisture($sensorData, $user, $esp, $cropProfile);
         }
 
         // Check pH levels
         if ($sensorData->ph !== null) {
-            $this->checkPH($sensorData, $user, $esp);
+            $this->checkPH($sensorData, $user, $esp, $cropProfile);
         }
 
-        // Check temperature
+        // Check air temperature
         if ($sensorData->air_temperature !== null) {
-            $this->checkTemperature($sensorData, $user, $esp);
+            $this->checkAirTemperature($sensorData, $user, $esp, $cropProfile);
+        }
+
+        // Check soil temperature
+        if ($sensorData->soil_temperature !== null) {
+            $this->checkSoilTemperature($sensorData, $user, $esp, $cropProfile);
+        }
+
+        // Check air humidity
+        if ($sensorData->air_humidity !== null) {
+            $this->checkAirHumidity($sensorData, $user, $esp, $cropProfile);
+        }
+
+        // Check electrical conductivity
+        if ($sensorData->electrical_conductivity !== null) {
+            $this->checkElectricalConductivity($sensorData, $user, $esp, $cropProfile);
         }
 
         // Check NPK levels
-        $this->checkNPKLevels($sensorData, $user, $esp);
+        $this->checkNPKLevels($sensorData, $user, $esp, $cropProfile);
     }
 
     /**
@@ -107,130 +123,416 @@ class NotificationService
 
     // Private helper methods
 
-    private function checkSoilMoisture(SensorData $sensorData, User $user, Esp $esp): void
+    private function checkSoilMoisture(SensorData $sensorData, User $user, Esp $esp, ?CropProfile $cropProfile): void
     {
         $moisture = $sensorData->soil_moisture;
 
-        // Low moisture threshold (below 30%)
-        if ($moisture < 30) {
-            Notification::create([
-                'user_id' => $user->id,
-                'type' => 'soil_moisture',
-                'title' => 'Soil Moisture Alert',
-                'description' => "Your garden's soil moisture is below optimal level at {$moisture}%",
-                'is_read' => false,
-                'priority' => 'high',
-                'metadata' => [
-                    'esp_id' => $esp->id,
-                    'sensor_data_id' => $sensorData->id,
-                    'moisture_level' => $moisture,
-                    'threshold' => 30,
-                ],
-            ]);
+        // Get thresholds from crop profile or use defaults
+        $minMoisture = $cropProfile->soil_moisture_min ?? 30;
+        $maxMoisture = $cropProfile->soil_moisture_max ?? 80;
+        $criticalThreshold = $minMoisture * 0.5; // Critical is 50% of minimum
+        $cropName = $cropProfile->name ?? 'garden';
+
+        // Check for recent similar notifications to prevent spam
+        $recentAlert = Notification::where('user_id', $user->id)
+            ->where('type', 'soil_moisture')
+            ->where('metadata->esp_id', $esp->id)
+            ->where('created_at', '>', now()->subHour())
+            ->exists();
+
+        if ($recentAlert) {
+            return; // Don't spam notifications
         }
 
-        // Very low moisture (below 15%) - critical
-        if ($moisture < 15) {
+        // Critical moisture (very low)
+        if ($moisture < $criticalThreshold) {
             Notification::create([
                 'user_id' => $user->id,
                 'type' => 'soil_moisture',
                 'title' => 'Critical: Soil Moisture',
-                'description' => "URGENT: Soil moisture critically low at {$moisture}%. Immediate irrigation needed!",
+                'description' => "URGENT: {$cropName} soil moisture critically low at {$moisture}%. Immediate irrigation needed! (Min: {$minMoisture}%)",
                 'is_read' => false,
                 'priority' => 'critical',
                 'metadata' => [
                     'esp_id' => $esp->id,
                     'sensor_data_id' => $sensorData->id,
                     'moisture_level' => $moisture,
-                    'threshold' => 15,
+                    'threshold' => $criticalThreshold,
+                    'crop_profile_id' => $cropProfile->id ?? null,
                 ],
             ]);
         }
-    }
-
-    private function checkPH(SensorData $sensorData, User $user, Esp $esp): void
-    {
-        $ph = $sensorData->ph;
-
-        // Optimal pH range is typically 6.0-7.5 for most crops
-        if ($ph < 5.5 || $ph > 8.0) {
-            $status = $ph < 5.5 ? 'too acidic' : 'too alkaline';
-
+        // Low moisture threshold
+        elseif ($moisture < $minMoisture) {
             Notification::create([
                 'user_id' => $user->id,
-                'type' => 'ph_alert',
-                'title' => 'Soil pH Alert',
-                'description' => "Soil pH is {$status} at {$ph}. Optimal range is 6.0-7.5",
+                'type' => 'soil_moisture',
+                'title' => 'Soil Moisture Alert',
+                'description' => "Your {$cropName}'s soil moisture is below optimal level at {$moisture}% (recommended: {$minMoisture}-{$maxMoisture}%)",
+                'is_read' => false,
+                'priority' => 'high',
+                'metadata' => [
+                    'esp_id' => $esp->id,
+                    'sensor_data_id' => $sensorData->id,
+                    'moisture_level' => $moisture,
+                    'min_threshold' => $minMoisture,
+                    'max_threshold' => $maxMoisture,
+                    'crop_profile_id' => $cropProfile->id ?? null,
+                ],
+            ]);
+        }
+        // High moisture threshold
+        elseif ($moisture > $maxMoisture) {
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => 'soil_moisture',
+                'title' => 'High Soil Moisture Alert',
+                'description' => "Your {$cropName}'s soil moisture is too high at {$moisture}% (recommended: {$minMoisture}-{$maxMoisture}%). Risk of root rot.",
                 'is_read' => false,
                 'priority' => 'normal',
                 'metadata' => [
                     'esp_id' => $esp->id,
                     'sensor_data_id' => $sensorData->id,
-                    'ph_level' => $ph,
-                    'optimal_min' => 6.0,
-                    'optimal_max' => 7.5,
+                    'moisture_level' => $moisture,
+                    'min_threshold' => $minMoisture,
+                    'max_threshold' => $maxMoisture,
+                    'crop_profile_id' => $cropProfile->id ?? null,
                 ],
             ]);
         }
     }
 
-    private function checkTemperature(SensorData $sensorData, User $user, Esp $esp): void
+    private function checkPH(SensorData $sensorData, User $user, Esp $esp, ?CropProfile $cropProfile): void
+    {
+        $ph = $sensorData->ph;
+
+        // Get pH range from crop profile or use defaults
+        $minPH = $cropProfile->ph_min ?? 6.0;
+        $maxPH = $cropProfile->ph_max ?? 7.5;
+        $cropName = $cropProfile->name ?? 'crops';
+
+        // Check for recent similar notifications
+        $recentAlert = Notification::where('user_id', $user->id)
+            ->where('type', 'ph_alert')
+            ->where('metadata->esp_id', $esp->id)
+            ->where('created_at', '>', now()->subHours(2))
+            ->exists();
+
+        if ($recentAlert) {
+            return;
+        }
+
+        if ($ph < $minPH || $ph > $maxPH) {
+            $status = $ph < $minPH ? 'too acidic' : 'too alkaline';
+            $priority = ($ph < $minPH - 1 || $ph > $maxPH + 1) ? 'high' : 'normal';
+
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => 'ph_alert',
+                'title' => 'Soil pH Alert',
+                'description' => "Soil pH is {$status} at {$ph} for {$cropName}. Optimal range is {$minPH}-{$maxPH}",
+                'is_read' => false,
+                'priority' => $priority,
+                'metadata' => [
+                    'esp_id' => $esp->id,
+                    'sensor_data_id' => $sensorData->id,
+                    'ph_level' => $ph,
+                    'optimal_min' => $minPH,
+                    'optimal_max' => $maxPH,
+                    'crop_profile_id' => $cropProfile->id ?? null,
+                ],
+            ]);
+        }
+    }
+
+    private function checkAirTemperature(SensorData $sensorData, User $user, Esp $esp, ?CropProfile $cropProfile): void
     {
         $temp = $sensorData->air_temperature;
 
-        // Extreme temperature alerts
-        if ($temp > 40) {
+        // Get temperature range from crop profile or use defaults
+        $minTemp = $cropProfile->air_temperature_min ?? 10;
+        $maxTemp = $cropProfile->air_temperature_max ?? 35;
+        $cropName = $cropProfile->name ?? 'crops';
+
+        // Check for recent similar notifications
+        $recentAlert = Notification::where('user_id', $user->id)
+            ->where('type', 'air_temperature')
+            ->where('metadata->esp_id', $esp->id)
+            ->where('created_at', '>', now()->subHour())
+            ->exists();
+
+        if ($recentAlert) {
+            return;
+        }
+
+        // High temperature alert
+        if ($temp > $maxTemp) {
+            $priority = $temp > ($maxTemp + 5) ? 'critical' : 'high';
+
             Notification::create([
                 'user_id' => $user->id,
-                'type' => 'temperature',
-                'title' => 'High Temperature Alert',
-                'description' => "Air temperature is extremely high at {$temp}°C. Consider providing shade.",
+                'type' => 'air_temperature',
+                'title' => 'High Air Temperature Alert',
+                'description' => "Air temperature is extremely high at {$temp}°C for {$cropName} (max: {$maxTemp}°C). Consider providing shade or cooling.",
                 'is_read' => false,
-                'priority' => 'high',
+                'priority' => $priority,
                 'metadata' => [
                     'esp_id' => $esp->id,
                     'sensor_data_id' => $sensorData->id,
                     'temperature' => $temp,
+                    'min_threshold' => $minTemp,
+                    'max_threshold' => $maxTemp,
+                    'crop_profile_id' => $cropProfile->id ?? null,
                 ],
             ]);
-        } elseif ($temp < 5) {
+        }
+        // Low temperature alert
+        elseif ($temp < $minTemp) {
+            $priority = $temp < ($minTemp - 5) ? 'critical' : 'high';
+
             Notification::create([
                 'user_id' => $user->id,
-                'type' => 'temperature',
-                'title' => 'Low Temperature Alert',
-                'description' => "Air temperature is very low at {$temp}°C. Risk of frost damage.",
+                'type' => 'air_temperature',
+                'title' => 'Low Air Temperature Alert',
+                'description' => "Air temperature is very low at {$temp}°C for {$cropName} (min: {$minTemp}°C). Risk of frost damage.",
                 'is_read' => false,
-                'priority' => 'high',
+                'priority' => $priority,
                 'metadata' => [
                     'esp_id' => $esp->id,
                     'sensor_data_id' => $sensorData->id,
                     'temperature' => $temp,
+                    'min_threshold' => $minTemp,
+                    'max_threshold' => $maxTemp,
+                    'crop_profile_id' => $cropProfile->id ?? null,
                 ],
             ]);
         }
     }
 
-    private function checkNPKLevels(SensorData $sensorData, User $user, Esp $esp): void
+    private function checkSoilTemperature(SensorData $sensorData, User $user, Esp $esp, ?CropProfile $cropProfile): void
+    {
+        $temp = $sensorData->soil_temperature;
+
+        // Get temperature range from crop profile or use defaults
+        $minTemp = $cropProfile->soil_temp_min ?? 15;
+        $maxTemp = $cropProfile->soil_temp_max ?? 30;
+        $cropName = $cropProfile->name ?? 'crops';
+
+        // Check for recent similar notifications
+        $recentAlert = Notification::where('user_id', $user->id)
+            ->where('type', 'soil_temperature')
+            ->where('metadata->esp_id', $esp->id)
+            ->where('created_at', '>', now()->subHours(2))
+            ->exists();
+
+        if ($recentAlert) {
+            return;
+        }
+
+        if ($temp > $maxTemp) {
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => 'soil_temperature',
+                'title' => 'High Soil Temperature Alert',
+                'description' => "Soil temperature is high at {$temp}°C for {$cropName} (max: {$maxTemp}°C). May affect root growth.",
+                'is_read' => false,
+                'priority' => 'normal',
+                'metadata' => [
+                    'esp_id' => $esp->id,
+                    'sensor_data_id' => $sensorData->id,
+                    'temperature' => $temp,
+                    'min_threshold' => $minTemp,
+                    'max_threshold' => $maxTemp,
+                    'crop_profile_id' => $cropProfile->id ?? null,
+                ],
+            ]);
+        } elseif ($temp < $minTemp) {
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => 'soil_temperature',
+                'title' => 'Low Soil Temperature Alert',
+                'description' => "Soil temperature is low at {$temp}°C for {$cropName} (min: {$minTemp}°C). May slow growth.",
+                'is_read' => false,
+                'priority' => 'normal',
+                'metadata' => [
+                    'esp_id' => $esp->id,
+                    'sensor_data_id' => $sensorData->id,
+                    'temperature' => $temp,
+                    'min_threshold' => $minTemp,
+                    'max_threshold' => $maxTemp,
+                    'crop_profile_id' => $cropProfile->id ?? null,
+                ],
+            ]);
+        }
+    }
+
+    private function checkAirHumidity(SensorData $sensorData, User $user, Esp $esp, ?CropProfile $cropProfile): void
+    {
+        $humidity = $sensorData->air_humidity;
+
+        // Get humidity range from crop profile or use defaults
+        $minHumidity = $cropProfile->air_humidity_min ?? 40;
+        $maxHumidity = $cropProfile->air_humidity_max ?? 70;
+        $cropName = $cropProfile->name ?? 'crops';
+
+        // Check for recent similar notifications
+        $recentAlert = Notification::where('user_id', $user->id)
+            ->where('type', 'air_humidity')
+            ->where('metadata->esp_id', $esp->id)
+            ->where('created_at', '>', now()->subHours(2))
+            ->exists();
+
+        if ($recentAlert) {
+            return;
+        }
+
+        if ($humidity > $maxHumidity) {
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => 'air_humidity',
+                'title' => 'High Humidity Alert',
+                'description' => "Air humidity is high at {$humidity}% for {$cropName} (max: {$maxHumidity}%). Risk of fungal diseases.",
+                'is_read' => false,
+                'priority' => 'normal',
+                'metadata' => [
+                    'esp_id' => $esp->id,
+                    'sensor_data_id' => $sensorData->id,
+                    'humidity' => $humidity,
+                    'min_threshold' => $minHumidity,
+                    'max_threshold' => $maxHumidity,
+                    'crop_profile_id' => $cropProfile->id ?? null,
+                ],
+            ]);
+        } elseif ($humidity < $minHumidity) {
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => 'air_humidity',
+                'title' => 'Low Humidity Alert',
+                'description' => "Air humidity is low at {$humidity}% for {$cropName} (min: {$minHumidity}%). Plants may experience water stress.",
+                'is_read' => false,
+                'priority' => 'normal',
+                'metadata' => [
+                    'esp_id' => $esp->id,
+                    'sensor_data_id' => $sensorData->id,
+                    'humidity' => $humidity,
+                    'min_threshold' => $minHumidity,
+                    'max_threshold' => $maxHumidity,
+                    'crop_profile_id' => $cropProfile->id ?? null,
+                ],
+            ]);
+        }
+    }
+
+    private function checkElectricalConductivity(SensorData $sensorData, User $user, Esp $esp, ?CropProfile $cropProfile): void
+    {
+        $ec = $sensorData->electrical_conductivity;
+
+        // Get EC range from crop profile or use defaults
+        $minEC = $cropProfile->electrical_conductivity_min ?? 0.5;
+        $maxEC = $cropProfile->electrical_conductivity_max ?? 2.0;
+        $cropName = $cropProfile->name ?? 'crops';
+
+        // Check for recent similar notifications
+        $recentAlert = Notification::where('user_id', $user->id)
+            ->where('type', 'electrical_conductivity')
+            ->where('metadata->esp_id', $esp->id)
+            ->where('created_at', '>', now()->subHours(6))
+            ->exists();
+
+        if ($recentAlert) {
+            return;
+        }
+
+        if ($ec > $maxEC) {
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => 'electrical_conductivity',
+                'title' => 'High Salinity Alert',
+                'description' => "Electrical conductivity is high at {$ec} mS/cm for {$cropName} (max: {$maxEC} mS/cm). Soil may have excessive salts.",
+                'is_read' => false,
+                'priority' => 'normal',
+                'metadata' => [
+                    'esp_id' => $esp->id,
+                    'sensor_data_id' => $sensorData->id,
+                    'ec_level' => $ec,
+                    'min_threshold' => $minEC,
+                    'max_threshold' => $maxEC,
+                    'crop_profile_id' => $cropProfile->id ?? null,
+                ],
+            ]);
+        } elseif ($ec < $minEC) {
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => 'electrical_conductivity',
+                'title' => 'Low Nutrient Content Alert',
+                'description' => "Electrical conductivity is low at {$ec} mS/cm for {$cropName} (min: {$minEC} mS/cm). Soil may need fertilization.",
+                'is_read' => false,
+                'priority' => 'normal',
+                'metadata' => [
+                    'esp_id' => $esp->id,
+                    'sensor_data_id' => $sensorData->id,
+                    'ec_level' => $ec,
+                    'min_threshold' => $minEC,
+                    'max_threshold' => $maxEC,
+                    'crop_profile_id' => $cropProfile->id ?? null,
+                ],
+            ]);
+        }
+    }
+
+    private function checkNPKLevels(SensorData $sensorData, User $user, Esp $esp, ?CropProfile $cropProfile): void
     {
         $alerts = [];
 
-        // Check Nitrogen (N) - optimal range varies but let's say 20-50 ppm
-        if ($sensorData->nitrogen !== null && $sensorData->nitrogen < 20) {
-            $alerts[] = "Nitrogen (N): {$sensorData->nitrogen} ppm";
+        // Get NPK thresholds from crop profile or use defaults
+        $minNitrogen = $cropProfile->nitrogen_min ?? 20;
+        $maxNitrogen = $cropProfile->nitrogen_max ?? 200;
+        $minPhosphorus = $cropProfile->phosphorus_min ?? 10;
+        $maxPhosphorus = $cropProfile->phosphorus_max ?? 100;
+        $minPotassium = $cropProfile->potassium_min ?? 50;
+        $maxPotassium = $cropProfile->potassium_max ?? 300;
+
+        // Check for recent similar notifications
+        $recentAlert = Notification::where('user_id', $user->id)
+            ->where('type', 'nutrient_alert')
+            ->where('metadata->esp_id', $esp->id)
+            ->where('created_at', '>', now()->subHours(6))
+            ->exists();
+
+        if ($recentAlert) {
+            return;
         }
 
-        // Check Phosphorus (P) - optimal range 10-30 ppm
-        if ($sensorData->phosphorus !== null && $sensorData->phosphorus < 10) {
-            $alerts[] = "Phosphorus (P): {$sensorData->phosphorus} ppm";
+        // Check Nitrogen (N)
+        if ($sensorData->nitrogen !== null) {
+            if ($sensorData->nitrogen < $minNitrogen) {
+                $alerts[] = "Nitrogen (N): {$sensorData->nitrogen} ppm - LOW (min: {$minNitrogen} ppm)";
+            } elseif ($sensorData->nitrogen > $maxNitrogen) {
+                $alerts[] = "Nitrogen (N): {$sensorData->nitrogen} ppm - HIGH (max: {$maxNitrogen} ppm)";
+            }
         }
 
-        // Check Potassium (K) - optimal range 50-200 ppm
-        if ($sensorData->potassium !== null && $sensorData->potassium < 50) {
-            $alerts[] = "Potassium (K): {$sensorData->potassium} ppm";
+        // Check Phosphorus (P)
+        if ($sensorData->phosphorus !== null) {
+            if ($sensorData->phosphorus < $minPhosphorus) {
+                $alerts[] = "Phosphorus (P): {$sensorData->phosphorus} ppm - LOW (min: {$minPhosphorus} ppm)";
+            } elseif ($sensorData->phosphorus > $maxPhosphorus) {
+                $alerts[] = "Phosphorus (P): {$sensorData->phosphorus} ppm - HIGH (max: {$maxPhosphorus} ppm)";
+            }
+        }
+
+        // Check Potassium (K)
+        if ($sensorData->potassium !== null) {
+            if ($sensorData->potassium < $minPotassium) {
+                $alerts[] = "Potassium (K): {$sensorData->potassium} ppm - LOW (min: {$minPotassium} ppm)";
+            } elseif ($sensorData->potassium > $maxPotassium) {
+                $alerts[] = "Potassium (K): {$sensorData->potassium} ppm - HIGH (max: {$maxPotassium} ppm)";
+            }
         }
 
         if (!empty($alerts)) {
-            $description = "Low nutrient levels detected: " . implode(", ", $alerts) . ". Consider fertilizing.";
+            $cropName = $cropProfile->name ?? 'crops';
+            $description = "Nutrient level alerts for {$cropName}: " . implode(", ", $alerts);
 
             Notification::create([
                 'user_id' => $user->id,
@@ -245,80 +547,82 @@ class NotificationService
                     'nitrogen' => $sensorData->nitrogen,
                     'phosphorus' => $sensorData->phosphorus,
                     'potassium' => $sensorData->potassium,
+                    'crop_profile_id' => $cropProfile->id ?? null,
                 ],
             ]);
         }
     }
 
-    public function checkCrop(Crop $crop, User $user, Garden $garden) {
+    public function checkCrop(Crop $crop, User $user, Garden $garden): void
+    {
+        $cropExists = Crop::where('garden_id', $garden->id)
+                        ->where('name', $crop->name)
+                        ->where('id', '!=', $crop->id)
+                        ->exists();
 
-      $cropExists = Crop::where('garden_id', $garden->id)
-                      ->where('name', $crop->name)
-                      ->where('id', '!=', $crop->id)
-                      ->exists();
+        if (!$cropExists) {
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => 'Crop Alert',
+                'title' => 'New Crop Added',
+                'description' => $crop->name . " added in your Garden",
+                'is_read' => false,
+                'priority' => 'normal',
+                'metadata' => [
+                    'crop_id' => $crop->id,
+                    'garden_id' => $garden->id,
+                    'crop_type' => $crop->type,
+                ],
+            ]);
+        }
+    }
 
-      if(!$cropExists) {
+    public function addGarden(Garden $garden, User $user): void
+    {
         Notification::create([
-        'user_id' => $user->id,
-              'type' => 'Crop Alert',
-              'title' => 'New Crop Added',
-              'description' => $crop->name , "Added in your Garden ",
-              'is_read' => false,
-              'priority' => 'normal',
-              'metadata' => [
-                  'crop_id' => $crop->id,
-                  'garden_id' => $garden->id,
-                  'crop_type' => $crop->type,
-              ],
-        ]);
-      }
-    }
-
-    public function addGarden(Garden $garden, User $user) {
-
-         Notification::create([
-        'user_id' => $user->id,
-              'type' => 'Garden Alert',
-              'title' => 'New Garden Added',
-              'description' => $garden->name , "Added in your Account ",
-              'is_read' => false,
-              'priority' => 'normal',
-              'metadata' => [
-                  'garden_id' => $garden->id,
-                  'location' => $garden->location,
-              ],
+            'user_id' => $user->id,
+            'type' => 'Garden Alert',
+            'title' => 'New Garden Added',
+            'description' => $garden->name . " added in your Account",
+            'is_read' => false,
+            'priority' => 'normal',
+            'metadata' => [
+                'garden_id' => $garden->id,
+                'location' => $garden->location,
+            ],
         ]);
     }
 
-
-    public function deleteCrop(Garden $garden, User $user, Crop $crop) {
+    public function deleteCrop(Garden $garden, User $user, Crop $crop): void
+    {
         Notification::create([
-        'user_id' => $user->id,
-              'type' => 'Crop Alert',
-              'title' => 'Crop Deleted',
-              'description' => $crop->name , "Deleted in your Garden ",
-              'is_read' => false,
-              'priority' => 'normal',
-              'metadata' => [
-                  'garden_id' => $garden->id,
-                  'crop_name' => $crop->name,
-                  'variety' => $crop->variety,
-              ],
+            'user_id' => $user->id,
+            'type' => 'Crop Alert',
+            'title' => 'Crop Deleted',
+            'description' => $crop->name . " deleted from your Garden",
+            'is_read' => false,
+            'priority' => 'normal',
+            'metadata' => [
+                'garden_id' => $garden->id,
+                'crop_name' => $crop->name,
+                'variety' => $crop->variety,
+            ],
         ]);
     }
 
-    public function deleteGarden(Garden $garden, User $user) {
-      Notification::create([
-        'user_id' => $user->id,
-              'type' => 'Garden Alert',
-              'title' => 'Garden Deleted',
-              'description' => $garden->name , "Deleted in your Account ",
-              'is_read' => false,
-              'priority' => 'normal',
-              'metadata' => [
-                  'garden_id' => $garden->id,
-                  'garden_name' => $garden->name,
-              ],
+    public function deleteGarden(Garden $garden, User $user): void
+    {
+        Notification::create([
+            'user_id' => $user->id,
+            'type' => 'Garden Alert',
+            'title' => 'Garden Deleted',
+            'description' => $garden->name . " deleted from your Account",
+            'is_read' => false,
+            'priority' => 'normal',
+            'metadata' => [
+                'garden_id' => $garden->id,
+                'garden_name' => $garden->name,
+            ],
         ]);
     }
 }
