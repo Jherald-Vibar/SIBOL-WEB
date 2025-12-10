@@ -360,6 +360,7 @@ class GardenController extends Controller
 
   public function getSensorDataCrop(Request $request, $garden_id, $crop) {
     $user = $request->user();
+    $esp = Esp::where("user_id", $user->id)->first();
 
     $cropSensor = Crop::with('cropProfile')
         ->where('user_id', $user->id)
@@ -375,6 +376,7 @@ class GardenController extends Controller
     }
 
     $latestData = SensorData::with('crop')
+        ->where('esp_id', $esp->id)
         ->where('crop_id', $cropSensor->id)
         ->orderBy('created_at', 'desc')
         ->first();
