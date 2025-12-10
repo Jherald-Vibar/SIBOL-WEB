@@ -196,6 +196,7 @@ class IotController extends Controller
 
     public function getEspData(Request $request)
     {
+
     try {
         $validated = $request->validate([
             'esp_api_key' => 'required|string',
@@ -221,7 +222,9 @@ class IotController extends Controller
             ], 404);
         }
 
-        $cropExist = Crop::where('name', $validated['crop_name'])->first();
+        $cropExist = Crop::where('garden_id', $esp->garden_id)
+        ->where('name', $validated['crop_name'])
+        ->first();
 
         if(!$cropExist) {
             return response()->json([
@@ -402,9 +405,12 @@ class IotController extends Controller
             'potassium'        => $validated['potassium'] ?? null,
         ]);
 
+        $cropUser = Crop::where('id', $sensorData->crop_id)->first();
+
+        $cropProfile = CropProfile::where("id", $cropUser->crop_profile_id)->first();
 
         $notificationService = new \App\Services\NotificationService();
-        $notificationService->processSensorNotifications($sensorData, $esp);
+        $notificationService->processSensorNotifications($sensorData, $esp, $cropProfile);
 
         // Detection result saving logic (no change)
 

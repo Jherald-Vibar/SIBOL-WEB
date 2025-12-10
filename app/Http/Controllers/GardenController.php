@@ -360,8 +360,8 @@ class GardenController extends Controller
 
   public function getSensorDataCrop(Request $request, $garden_id, $crop) {
     $user = $request->user();
-    $esp = Esp::where('garden_id', $garden_id)->where('user_id', $user->id)->first();
 
+    // Get crop with profile first
     $cropSensor = Crop::with('cropProfile')
         ->where('user_id', $user->id)
         ->where('garden_id', $garden_id)
@@ -375,13 +375,27 @@ class GardenController extends Controller
         ], 404);
     }
 
+    // Now check for ESP device
+    $esp = Esp::where('garden_id', $garden_id)
+        ->where('user_id', $user->id)
+        ->first();
+
+    if (!$esp) {
+        return response()->json([
+            'success' => false,
+            'message' => 'ESP device not found for this garden'
+        ], 404);
+    }
+
+    // Get latest sensor data
     $latestData = SensorData::with('crop')
         ->where('esp_id', $esp->id)
-        ->where('crop_id', $cropSensor->id)
         ->orderBy('created_at', 'desc')
         ->first();
 
-    $allData = SensorData::where('crop_id', $cropSensor->id)
+    // Get historical data
+    $allData = SensorData::where('esp_id', $esp->id)
+        ->where('crop_id', $cropSensor->id)
         ->orderBy('created_at', 'desc')
         ->limit(50)
         ->get();
@@ -389,7 +403,9 @@ class GardenController extends Controller
     $alerts = [];
     $profile = $cropSensor->cropProfile;
 
+    // Generate alerts only if we have both data and profile
     if ($latestData && $profile) {
+        // Soil Moisture Alert
         if ($latestData->soil_moisture < $profile->soil_moisture_min) {
             $alerts[] = [
                 'type' => 'soil_moisture',
@@ -397,7 +413,7 @@ class GardenController extends Controller
                 'severity' => 'high',
                 'current_value' => $latestData->soil_moisture,
                 'expected_range' => "{$profile->soil_moisture_min}-{$profile->soil_moisture_max}",
-                'timestamp' => now()
+                'timestamp' => $latestData->created_at
             ];
         } elseif ($latestData->soil_moisture > $profile->soil_moisture_max) {
             $alerts[] = [
@@ -406,19 +422,20 @@ class GardenController extends Controller
                 'severity' => 'medium',
                 'current_value' => $latestData->soil_moisture,
                 'expected_range' => "{$profile->soil_moisture_min}-{$profile->soil_moisture_max}",
-                'timestamp' => now()
+                'timestamp' => $latestData->created_at
             ];
         }
 
         // pH Alert
         if ($latestData->ph < $profile->ph_min || $latestData->ph > $profile->ph_max) {
+            $severity = ($latestData->ph < $profile->ph_min - 0.5 || $latestData->ph > $profile->ph_max + 0.5) ? 'high' : 'medium';
             $alerts[] = [
                 'type' => 'ph',
                 'message' => "Soil pH ({$latestData->ph}) is outside optimal range ({$profile->ph_min}-{$profile->ph_max}).",
-                'severity' => 'high',
+                'severity' => $severity,
                 'current_value' => $latestData->ph,
                 'expected_range' => "{$profile->ph_min}-{$profile->ph_max}",
-                'timestamp' => now()
+                'timestamp' => $latestData->created_at
             ];
         }
 
@@ -430,7 +447,7 @@ class GardenController extends Controller
                 'severity' => 'medium',
                 'current_value' => $latestData->soil_temperature,
                 'expected_range' => "{$profile->soil_temp_min}-{$profile->soil_temp_max}",
-                'timestamp' => now()
+                'timestamp' => $latestData->created_at
             ];
         } elseif ($latestData->soil_temperature > $profile->soil_temp_max) {
             $alerts[] = [
@@ -439,7 +456,7 @@ class GardenController extends Controller
                 'severity' => 'high',
                 'current_value' => $latestData->soil_temperature,
                 'expected_range' => "{$profile->soil_temp_min}-{$profile->soil_temp_max}",
-                'timestamp' => now()
+                'timestamp' => $latestData->created_at
             ];
         }
 
@@ -451,7 +468,7 @@ class GardenController extends Controller
                 'severity' => 'high',
                 'current_value' => $latestData->nitrogen,
                 'expected_range' => "{$profile->nitrogen_min}-{$profile->nitrogen_max}",
-                'timestamp' => now()
+                'timestamp' => $latestData->created_at
             ];
         } elseif ($latestData->nitrogen > $profile->nitrogen_max) {
             $alerts[] = [
@@ -460,7 +477,7 @@ class GardenController extends Controller
                 'severity' => 'medium',
                 'current_value' => $latestData->nitrogen,
                 'expected_range' => "{$profile->nitrogen_min}-{$profile->nitrogen_max}",
-                'timestamp' => now()
+                'timestamp' => $latestData->created_at
             ];
         }
 
@@ -472,7 +489,7 @@ class GardenController extends Controller
                 'severity' => 'high',
                 'current_value' => $latestData->phosphorus,
                 'expected_range' => "{$profile->phosphorus_min}-{$profile->phosphorus_max}",
-                'timestamp' => now()
+                'timestamp' => $latestData->created_at
             ];
         } elseif ($latestData->phosphorus > $profile->phosphorus_max) {
             $alerts[] = [
@@ -481,7 +498,7 @@ class GardenController extends Controller
                 'severity' => 'medium',
                 'current_value' => $latestData->phosphorus,
                 'expected_range' => "{$profile->phosphorus_min}-{$profile->phosphorus_max}",
-                'timestamp' => now()
+                'timestamp' => $latestData->created_at
             ];
         }
 
@@ -493,7 +510,7 @@ class GardenController extends Controller
                 'severity' => 'high',
                 'current_value' => $latestData->potassium,
                 'expected_range' => "{$profile->potassium_min}-{$profile->potassium_max}",
-                'timestamp' => now()
+                'timestamp' => $latestData->created_at
             ];
         } elseif ($latestData->potassium > $profile->potassium_max) {
             $alerts[] = [
@@ -502,12 +519,14 @@ class GardenController extends Controller
                 'severity' => 'medium',
                 'current_value' => $latestData->potassium,
                 'expected_range' => "{$profile->potassium_min}-{$profile->potassium_max}",
-                'timestamp' => now()
+                'timestamp' => $latestData->created_at
             ];
         }
 
         // Electrical Conductivity Alert
-        if (isset($latestData->electrical_conductivity)) {
+        if (isset($latestData->electrical_conductivity) &&
+            isset($profile->electrical_conductivity_min) &&
+            isset($profile->electrical_conductivity_max)) {
             if ($latestData->electrical_conductivity < $profile->electrical_conductivity_min) {
                 $alerts[] = [
                     'type' => 'electrical_conductivity',
@@ -515,7 +534,7 @@ class GardenController extends Controller
                     'severity' => 'medium',
                     'current_value' => $latestData->electrical_conductivity,
                     'expected_range' => "{$profile->electrical_conductivity_min}-{$profile->electrical_conductivity_max}",
-                    'timestamp' => now()
+                    'timestamp' => $latestData->created_at
                 ];
             } elseif ($latestData->electrical_conductivity > $profile->electrical_conductivity_max) {
                 $alerts[] = [
@@ -524,13 +543,15 @@ class GardenController extends Controller
                     'severity' => 'medium',
                     'current_value' => $latestData->electrical_conductivity,
                     'expected_range' => "{$profile->electrical_conductivity_min}-{$profile->electrical_conductivity_max}",
-                    'timestamp' => now()
+                    'timestamp' => $latestData->created_at
                 ];
             }
         }
 
         // Air Temperature Alert
-        if (isset($latestData->air_temperature)) {
+        if (isset($latestData->air_temperature) &&
+            isset($profile->air_temperature_min) &&
+            isset($profile->air_temperature_max)) {
             if ($latestData->air_temperature < $profile->air_temperature_min) {
                 $alerts[] = [
                     'type' => 'air_temperature',
@@ -538,7 +559,7 @@ class GardenController extends Controller
                     'severity' => 'medium',
                     'current_value' => $latestData->air_temperature,
                     'expected_range' => "{$profile->air_temperature_min}-{$profile->air_temperature_max}",
-                    'timestamp' => now()
+                    'timestamp' => $latestData->created_at
                 ];
             } elseif ($latestData->air_temperature > $profile->air_temperature_max) {
                 $alerts[] = [
@@ -547,13 +568,15 @@ class GardenController extends Controller
                     'severity' => 'high',
                     'current_value' => $latestData->air_temperature,
                     'expected_range' => "{$profile->air_temperature_min}-{$profile->air_temperature_max}",
-                    'timestamp' => now()
+                    'timestamp' => $latestData->created_at
                 ];
             }
         }
 
         // Air Humidity Alert
-        if (isset($latestData->air_humidity)) {
+        if (isset($latestData->air_humidity) &&
+            isset($profile->air_humidity_min) &&
+            isset($profile->air_humidity_max)) {
             if ($latestData->air_humidity < $profile->air_humidity_min) {
                 $alerts[] = [
                     'type' => 'air_humidity',
@@ -561,7 +584,7 @@ class GardenController extends Controller
                     'severity' => 'medium',
                     'current_value' => $latestData->air_humidity,
                     'expected_range' => "{$profile->air_humidity_min}-{$profile->air_humidity_max}",
-                    'timestamp' => now()
+                    'timestamp' => $latestData->created_at
                 ];
             } elseif ($latestData->air_humidity > $profile->air_humidity_max) {
                 $alerts[] = [
@@ -570,7 +593,7 @@ class GardenController extends Controller
                     'severity' => 'medium',
                     'current_value' => $latestData->air_humidity,
                     'expected_range' => "{$profile->air_humidity_min}-{$profile->air_humidity_max}",
-                    'timestamp' => now()
+                    'timestamp' => $latestData->created_at
                 ];
             }
         }
