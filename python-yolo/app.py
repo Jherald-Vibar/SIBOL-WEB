@@ -13,7 +13,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Load YOLO11s model
-MODEL_PATH = 'models/my_model.pt'
+MODEL_PATH = 'models/my_models.pt'
 model = YOLO(MODEL_PATH)
 
 print(f"✅ YOLO11s Model loaded from: {MODEL_PATH}")

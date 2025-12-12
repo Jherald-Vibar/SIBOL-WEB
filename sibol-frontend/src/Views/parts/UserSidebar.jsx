@@ -23,14 +23,34 @@ const UserSidebar = () => {
 
   const handleLogout = () => {
     Swal.fire({
-      title: "Do you want to Logout?",
-      showDenyButton: true,
-      confirmButtonText: "Yes",
-      denyButtonText: `No`,
+      title: "Logout",
+      text: "Are you sure you want to logout?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Yes, logout",
+      cancelButtonText: "Cancel",
       confirmButtonColor: '#dc2626',
-      denyButtonColor: '#6b7280',
+      cancelButtonColor: '#6b7280',
+      reverseButtons: true,
+      backdrop: true,
+      customClass: {
+        popup: 'rounded-2xl',
+        title: 'text-xl font-semibold',
+        confirmButton: 'rounded-lg px-6 py-2.5',
+        cancelButton: 'rounded-lg px-6 py-2.5'
+      }
     }).then((result) => {
       if (result.isConfirmed) {
+        // Show loading state
+        Swal.fire({
+          title: 'Logging out...',
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+
         const token = localStorage.getItem('authToken');
         if (token) {
           axiosClient.post('logout', {}, {
@@ -43,15 +63,32 @@ const UserSidebar = () => {
               localStorage.removeItem('username');
               localStorage.removeItem('location');
               localStorage.removeItem('role');
-              window.location.href = '/guest/login';
-              Swal.fire("Logged out!", "You have successfully logged out.", "success");
+
+              Swal.fire({
+                title: "Logged out!",
+                text: "You have successfully logged out.",
+                icon: "success",
+                timer: 1500,
+                showConfirmButton: false,
+                customClass: {
+                  popup: 'rounded-2xl'
+                }
+              }).then(() => {
+                window.location.href = '/guest/login';
+              });
             })
             .catch(error => {
-              Swal.fire("Error!", "There was an issue logging you out.", "error");
+              Swal.fire({
+                title: "Error!",
+                text: "There was an issue logging you out.",
+                icon: "error",
+                confirmButtonColor: '#dc2626',
+                customClass: {
+                  popup: 'rounded-2xl'
+                }
+              });
             });
         }
-      } else if (result.isDenied) {
-        Swal.fire("User Still Logged in!");
       }
     });
   };

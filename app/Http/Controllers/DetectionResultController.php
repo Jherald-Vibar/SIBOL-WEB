@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 
 use App\Models\DetectionResults;
+use App\Models\Esp;
 use App\Models\SensorData;
 use Illuminate\Http\Request;
 
@@ -305,5 +306,18 @@ class DetectionResultController extends Controller
                 'detected_at' => $detection->created_at,
             ]
         ]);
+    }
+
+    public function getCropAdvisory(Request $request) {
+        $user = $request->user();
+        $espIds = Esp::where('user_id', $user->id)->pluck('id');
+        $cropAdvisory = DetectionResults::with('crop')
+            ->whereIn('esp_id', $espIds)
+            ->get();
+
+        return response()->json([
+            "message" => "success",
+            'data' => $cropAdvisory,
+        ], 200);
     }
 }

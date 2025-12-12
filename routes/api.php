@@ -84,6 +84,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/diseased/current', [DetectionResultController::class, 'getCurrentDiseased']);
     Route::get('/statistics', [DetectionResultController::class, 'getStatistics']);
     //Route::get('/{id}', [DetectionResultController::class, 'getById']);
+    Route::get('/getCropAdvisory', [DetectionResultController::class, 'getCropAdvisory']);
 
     //notification
     Route::get('/notifications', [NotificationController::class, 'index']);

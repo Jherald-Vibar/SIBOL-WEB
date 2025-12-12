@@ -27,11 +27,22 @@ class Crop extends Model
 
     public function garden()
     {
-        return $this->belongsTo(Garden::class);
+        return $this->belongsTo(Garden::class, 'garden_id');
     }
 
     public function CropProfile()
     {
         return $this->belongsTo(CropProfile::class, 'crop_profile_id');
+    }
+
+    public function latestDetectionResult()
+    {
+        return $this->hasOne(DetectionResults::class, 'crop_id')->latestOfMany();
+    }
+
+
+    public function detectionResults()
+    {
+        return $this->hasMany(DetectionResults::class, 'crop_id');
     }
 }

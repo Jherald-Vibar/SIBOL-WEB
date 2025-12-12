@@ -440,7 +440,13 @@ const CropCareConfig = () => {
                     {crop.name}
                   </h2>
                   <p className="text-sm text-gray-500">{crop.variety}</p>
-                  <p className="text-xs text-gray-400 mt-1">Planted: {crop.planted_at}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Planted: {new Date(crop.planted_at).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    })}
+                  </p>
 
                   <div className="flex justify-end gap-2 mt-3">
                     <button

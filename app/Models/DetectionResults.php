@@ -29,12 +29,12 @@ class DetectionResults extends Model
     // Relationships
     public function sensorData()
     {
-        return $this->belongsTo(SensorData::class);
+        return $this->belongsTo(SensorData::class, 'sensor_id');
     }
 
     public function crop()
     {
-        return $this->belongsTo(Crop::class);
+        return $this->belongsTo(Crop::class, 'crop_id');
     }
 
     public function esp()

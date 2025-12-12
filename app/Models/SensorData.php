@@ -24,4 +24,5 @@ class SensorData extends Model
     {
         return $this->belongsTo(Crop::class);
     }
+
 }

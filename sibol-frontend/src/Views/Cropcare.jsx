@@ -12,6 +12,7 @@ const Cropcare = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
   const [garden, setGarden] = useState([]);
   const navigate = useNavigate();
   const [form, setForm] = useState({
@@ -42,6 +43,94 @@ const Cropcare = () => {
     setGardenToDelete(null);
     setError("");
   };
+
+  // Get user's current location
+const getCurrentLocation = () => {
+  setLocationLoading(true);
+  setError("");
+
+  if (!navigator.geolocation) {
+    setError("Geolocation is not supported by your browser");
+    setLocationLoading(false);
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      const { latitude, longitude } = position.coords;
+
+      try {
+        const response = await fetch(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+        );
+        const data = await response.json();
+
+        console.log("Location data:", data);
+
+        // Extract street and city
+        const street = data.localityInfo?.administrative?.[0]?.name || '';
+        const barangay = data.locality || '';
+        const city = data.city || data.principalSubdivision || '';
+
+        let formattedAddress = '';
+
+        if (street && city) {
+          formattedAddress = `${street}, ${city}`;
+        } else if (barangay && city) {
+          formattedAddress = `${barangay}, ${city}`;
+        } else if (street) {
+          formattedAddress = street;
+        } else if (barangay) {
+          formattedAddress = barangay;
+        } else if (city) {
+          formattedAddress = city;
+        } else {
+          // Fallback to coordinates
+          formattedAddress = `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`;
+        }
+
+        setForm({
+          ...form,
+          location: formattedAddress
+        });
+        setLocationLoading(false);
+      } catch (err) {
+        console.error("Geocoding error:", err);
+        // If reverse geocoding fails, use coordinates
+        setForm({
+          ...form,
+          location: `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`
+        });
+        setLocationLoading(false);
+      }
+    },
+    (error) => {
+      let errorMessage = "Unable to retrieve your location";
+
+      switch(error.code) {
+        case error.PERMISSION_DENIED:
+          errorMessage = "Location access denied. Please enable location permissions.";
+          break;
+        case error.POSITION_UNAVAILABLE:
+          errorMessage = "Location information unavailable.";
+          break;
+        case error.TIMEOUT:
+          errorMessage = "Location request timed out.";
+          break;
+        default:
+          errorMessage = "An unknown error occurred.";
+      }
+
+      setError(errorMessage);
+      setLocationLoading(false);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    }
+  );
+};
 
   const fetchGarden = async () => {
     setLoading(true);
@@ -235,14 +324,54 @@ const Cropcare = () => {
 
               <div className='flex flex-col gap-2'>
                 <label className='text-sm md:text-base font-semibold'>Location</label>
-                <input
-                  type="text"
-                  name='location'
-                  value={form.location}
-                  onChange={handleChange}
-                  placeholder='Enter location'
-                  className='px-3 py-2 border-2 border-gray-300 rounded-md focus:outline-none focus:border-[#114320BA] transition-colors'
-                />
+                <div className='flex gap-2'>
+                  <input
+                    type="text"
+                    name='location'
+                    value={form.location}
+                    onChange={handleChange}
+                    placeholder='Enter location or use current'
+                    className='flex-1 px-3 py-2 border-2 border-gray-300 rounded-md focus:outline-none focus:border-[#114320BA] transition-colors'
+                  />
+                  <button
+                    type='button'
+                    onClick={getCurrentLocation}
+                    disabled={locationLoading}
+                    className='bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shrink-0'
+                    title='Use current location'
+                  >
+                    {locationLoading ? (
+                      <svg
+                        className="animate-spin h-5 w-5 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                        />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                        <circle cx="12" cy="10" r="3"/>
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                <p className='text-xs text-gray-500 mt-1'>
+                  Click the location icon to use your current location
+                </p>
               </div>
 
               <div className='flex justify-end gap-3 pt-2'>

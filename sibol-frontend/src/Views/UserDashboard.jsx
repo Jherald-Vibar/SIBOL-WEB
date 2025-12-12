@@ -16,6 +16,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { useNavigate } from "react-router-dom";
 
 const UserDashboard = () => {
   const name = localStorage.getItem("username");
@@ -27,10 +28,11 @@ const UserDashboard = () => {
   const [date, setDate] = useState(new Date());
   const [data, setData] = useState([]);
   const [error, setError] = useState("");
-  const [alert, setAlert] = useState([]);
   const [selectedCrop, setSelectedCrop] = useState("");
   const [activeCrop, setActiveCrop] = useState(null);
   const [crops, setCrops] = useState([]);
+  const [cropAdvisory, setCropAdvisory] = useState([]);
+  const navigate = useNavigate();
 
   // Fetch sensor data
   useEffect(() => {
@@ -50,13 +52,14 @@ const UserDashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Update active crop when selection changes
+
   useEffect(() => {
-    const crop = crops.find((c) => c.name === selectedCrop);
+    const selectedId = parseInt(selectedCrop);
+    const crop = crops.find((c) => c.id === selectedId);
     setActiveCrop(crop || null);
   }, [selectedCrop, crops]);
 
-  // Fetch location
+
   useEffect(() => {
     const fetchLocation = async () => {
       try {
@@ -105,11 +108,11 @@ const UserDashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch crops
   const fetchCrops = async () => {
     try {
       const response = await axiosClient.get('/getCrops');
       setCrops(response.data.data);
+      console.log(response.data.data);
     } catch (error) {
       setError(error.response?.data?.message || "Something Went Wrong!");
     }
@@ -117,6 +120,20 @@ const UserDashboard = () => {
 
   useEffect(() => {
     fetchCrops();
+  }, []);
+
+
+  useEffect(() => {
+    const fetchCropAdvisory = async () => {
+      try {
+        const response = await axiosClient.get('/getCropAdvisory');
+        setCropAdvisory(response.data.data);
+        console.log(response.data.data);
+      } catch (error) {
+        setError(error.response?.data?.message || "Error Fetching Detection Results");
+      }
+    }
+    fetchCropAdvisory();
   }, []);
 
   const weekday = date.toLocaleDateString("en-US", { weekday: "long" });
@@ -129,7 +146,20 @@ const UserDashboard = () => {
     .replace(/\//g, " / ");
 
   const handleMoreDetails = (crop) => {
-    console.log("View details for:", crop);
+    const gardenName = crop.garden?.name;
+    const gardenLocation = crop.garden?.location;
+
+    console.log(gardenName, gardenLocation);
+    navigate(`/user/crop-care/${crop.garden?.id}/${crop.name}`);
+  };
+
+  // Format planted date
+  const formatPlantedDate = (dateString) => {
+    if (!dateString) return "—";
+
+    const date = new Date(dateString);
+    const options = { month: 'short', day: 'numeric', year: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
   };
 
   const getWeatherIcon = (condition, size = "default") => {
@@ -272,26 +302,69 @@ const UserDashboard = () => {
               </div>
 
               {/* Modern Crop Advisory Card */}
-              <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl p-6 border border-gray-100">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full blur-3xl opacity-50"></div>
+              <div className="relative overflow-hidden bg-white rounded-3xl shadow-lg p-6 border border-gray-200">
+                {/* Subtle background decoration */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full blur-3xl opacity-40"></div>
 
                 <div className="relative z-10">
-                  <div className="flex items-center justify-center gap-2 mb-4">
+                  {/* Header */}
+                  <div className="flex items-center gap-2 mb-4">
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                     <h3 className="font-bold text-gray-800 text-lg">Crop Advisory</h3>
+                    {cropAdvisory && cropAdvisory.length > 0 && (
+                      <span className="ml-auto text-xs font-semibold text-white bg-red-500 px-2 py-1 rounded-full">
+                        {cropAdvisory.length}
+                      </span>
+                    )}
                   </div>
 
-                  <div className="mt-4 text-center bg-gradient-to-br from-gray-50 to-green-50 rounded-2xl p-4 border border-gray-100">
-                    {alert && alert.length > 0 ? (
-                      <p className="text-sm text-red-600 font-medium">{alert}</p>
+                  {/* Content Area */}
+                  <div className="h-20 overflow-y-auto pr-2 space-y-2">
+                    {cropAdvisory && cropAdvisory.length > 0 ? (
+                      cropAdvisory.map((advisory, index) => (
+                        <div
+                          key={index}
+                          className="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-3 border-l-4 border-orange-500 hover:shadow-md transition-shadow duration-200"
+                        >
+                          {/* Crop Name */}
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-lg">🌾</span>
+                            <p className="text-sm font-bold text-gray-800">
+                              {advisory.crop?.name || 'Unknown Crop'}
+                            </p>
+                          </div>
+                          {/* Recommendation */}
+                          <p className="text-xs text-gray-700 leading-relaxed pl-7">
+                            {advisory.recommendations}
+                          </p>
+                        </div>
+                      ))
                     ) : (
-                      <div className="flex flex-col items-center gap-2">
-                        <span className="text-2xl">✓</span>
-                        <p className="text-sm text-gray-600">All systems optimal</p>
+                      <div className="flex flex-col items-center justify-center h-full gap-2">
+                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                          <svg className="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-600">All Systems Optimal</p>
                       </div>
                     )}
                   </div>
                 </div>
+
+                <style>{`
+                  .overflow-y-auto::-webkit-scrollbar {
+                    width: 4px;
+                  }
+                  .overflow-y-auto::-webkit-scrollbar-track {
+                    background: #f3f4f6;
+                    border-radius: 10px;
+                  }
+                  .overflow-y-auto::-webkit-scrollbar-thumb {
+                    background: #10b981;
+                    border-radius: 10px;
+                  }
+                `}</style>
               </div>
             </div>
 
@@ -573,7 +646,7 @@ const UserDashboard = () => {
                       >
                         <option value="">🌾 Select Crop</option>
                         {crops.map((crop, index) => (
-                          <option key={index} value={crop.name}>
+                          <option key={index} value={crop.id}>
                             {crop.name}
                           </option>
                         ))}
@@ -589,19 +662,49 @@ const UserDashboard = () => {
                     </div>
 
                     {/* Modern Info Boxes */}
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-4 border-2 border-green-100 hover:border-green-300 transition-colors">
-                        <div className="text-center">
-                          <span className="text-2xl mb-2 block">💚</span>
-                          <h3 className="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">
-                            Health
-                          </h3>
-                          <p className="text-sm font-bold text-gray-800">
-                            {activeCrop ? "Good" : "—"}
-                          </p>
-                        </div>
-                      </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Health Status Box - Dynamic Colors */}
+                      <div className={`bg-gradient-to-br ${
+                  activeCrop?.latest_detection_result?.detected_class
+                    ? (activeCrop.latest_detection_result.detected_class.toLowerCase().includes('healthy')
+                        ? "from-green-50 to-emerald-50"
+                        : "from-red-50 to-orange-50")
+                    : "from-gray-50 to-gray-100"
+                } rounded-2xl p-4 border-2 ${
+                  activeCrop?.latest_detection_result?.detected_class
+                    ? (activeCrop.latest_detection_result.detected_class.toLowerCase().includes('healthy')
+                        ? "border-green-200 hover:border-green-300"
+                        : "border-red-200 hover:border-red-300")
+                    : "border-gray-200 hover:border-gray-300"
+                } transition-colors`}>
+                  <div className="text-center">
+                      <span className="text-2xl mb-2 block">
+                          {activeCrop?.latest_detection_result?.detected_class
+                            ? (activeCrop.latest_detection_result.detected_class.toLowerCase().includes('healthy')
+                                ? "💚"
+                                : "⚠️")
+                            : "—"}
+                      </span>
+                      <h3 className="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">
+                          Health
+                      </h3>
+                      <p className={`text-sm font-bold ${
+                          activeCrop?.latest_detection_result?.detected_class
+                            ? (activeCrop.latest_detection_result.detected_class.toLowerCase().includes('healthy')
+                                ? "text-green-600"
+                                : "text-red-600")
+                            : "text-gray-800"
+                        }`}>
+                          {activeCrop?.latest_detection_result?.detected_class
+                            ? (activeCrop.latest_detection_result.detected_class.toLowerCase().includes('healthy')
+                                ? "Healthy"
+                                : "Diseased")
+                            : "No Data"}
+                      </p>
+                  </div>
+                </div>
 
+                      {/* Planted Date Box */}
                       <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-4 border-2 border-blue-100 hover:border-blue-300 transition-colors">
                         <div className="text-center">
                           <span className="text-2xl mb-2 block">📅</span>
@@ -609,19 +712,7 @@ const UserDashboard = () => {
                             Planted
                           </h3>
                           <p className="text-sm font-bold text-gray-800">
-                            {activeCrop?.planted_at || "—"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-4 border-2 border-purple-100 hover:border-purple-300 transition-colors">
-                        <div className="text-center">
-                          <span className="text-2xl mb-2 block">🌱</span>
-                          <h3 className="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">
-                            Stage
-                          </h3>
-                          <p className="text-sm font-bold text-gray-800">
-                            {activeCrop ? "Harvest" : "—"}
+                            {formatPlantedDate(activeCrop?.planted_at)}
                           </p>
                         </div>
                       </div>

@@ -273,7 +273,7 @@ class GardenController extends Controller
     public function getCrops(Request $request) {
         $user = $request->user();
 
-        $crops = Crop::where('user_id', $user->id)->get();
+        $crops = Crop::with(['garden', 'latestDetectionResult'])->where('user_id', $user->id)->get();
 
         return response()->json([
             "message" => "Success!",
@@ -362,7 +362,7 @@ class GardenController extends Controller
     $user = $request->user();
 
     // Get crop with profile first
-    $cropSensor = Crop::with('cropProfile')
+    $cropSensor = Crop::with(['cropProfile', 'latestDetectionResult'])
         ->where('user_id', $user->id)
         ->where('garden_id', $garden_id)
         ->where('name', $crop)
