@@ -17,6 +17,8 @@ const CropCarePlant = () => {
   const [historyData, setHistoryData] = useState([])
   const [isIrrigating, setIsIrrigating] = useState(false)
   const [imageError, setImageError] = useState(false)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [modalImage, setModalImage] = useState(null)
 
   useEffect(() => {
     const fetchSensorData = async () => {
@@ -133,6 +135,28 @@ const CropCarePlant = () => {
       borderWidth: 'border-4'
     }
   }
+
+  const openImageModal = (imageUrl) => {
+    setModalImage(imageUrl)
+    setIsModalOpen(true)
+    document.body.style.overflow = 'hidden'
+  }
+
+  const closeImageModal = () => {
+    setIsModalOpen(false)
+    setModalImage(null)
+    document.body.style.overflow = 'unset'
+  }
+
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && isModalOpen) {
+        closeImageModal()
+      }
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [isModalOpen])
 
   // Helper function to check individual nutrient status
   const getIndividualNutrientStatus = (value, min, max) => {
@@ -549,334 +573,373 @@ const CropCarePlant = () => {
                       <div className="flex justify-between items-center">
                         <span>P: <span className="font-medium">{detailedNPK.phosphorus.value ?? '—'}</span></span>
                         <span className={`text-xs px-2 py-0.5 rounded ${
-                          detailedNPK.phosphorus.status === 'optimal' ? 'bg-green-100 text-green-700' :
-                          detailedNPK.phosphorus.status === 'low' ? 'bg-red-100 text-red-700' :
-                          detailedNPK.phosphorus.status === 'high' ? 'bg-blue-100 text-blue-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {detailedNPK.phosphorus.status}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>K: <span className="font-medium">{detailedNPK.potassium.value ?? '—'}</span></span>
-                        <span className={`text-xs px-2 py-0.5 rounded ${
-                          detailedNPK.potassium.status === 'optimal' ? 'bg-green-100 text-green-700' :
-                          detailedNPK.potassium.status === 'low' ? 'bg-red-100 text-red-700' :
-                          detailedNPK.potassium.status === 'high' ? 'bg-blue-100 text-blue-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {detailedNPK.potassium.status}
-                        </span>
-                      </div>
-                    </div>
-                    {cropProfile && (
-                      <p className="text-xs text-gray-400 mt-2">
-                        Target ranges: N({detailedNPK.nitrogen.range}), P({detailedNPK.phosphorus.range}), K({detailedNPK.potassium.range})
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Environmental Condition Card */}
-              <div className="bg-white shadow-md rounded-lg p-4 sm:p-5">
-                <h2 className="text-base sm:text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2"><span className="text-xl">🌤</span>Environmental Condition</h2>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="flex flex-col">
-                    <span className="text-gray-500 text-xs">Air Temperature</span>
-                    <span className={`font-semibold ${airTempStatus.color}`}>
-                      {airTempStatus.text}
+                      detailedNPK.phosphorus.status === 'optimal' ? 'bg-green-100 text-green-700' :
+                      detailedNPK.phosphorus.status === 'low' ? 'bg-red-100 text-red-700' :
+                      detailedNPK.phosphorus.status === 'high' ? 'bg-blue-100 text-blue-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {detailedNPK.phosphorus.status}
                     </span>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-gray-500 text-xs">Humidity</span>
-                    <span className={`font-semibold ${humidityStatus.color}`}>
-                      {humidityStatus.text}
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-gray-500 text-xs">Lux</span>
-                    <span className="font-semibold text-gray-800">
-                      {sensorData?.rainfall ? `${sensorData.rainfall} mm` : '—'}
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-gray-500 text-xs">EC</span>
-                    <span className={`font-semibold ${ecStatus.color}`}>
-                      {ecStatus.text}
+                  <div className="flex justify-between items-center">
+                    <span>K: <span className="font-medium">{detailedNPK.potassium.value ?? '—'}</span></span>
+                    <span className={`text-xs px-2 py-0.5 rounded ${
+                      detailedNPK.potassium.status === 'optimal' ? 'bg-green-100 text-green-700' :
+                      detailedNPK.potassium.status === 'low' ? 'bg-red-100 text-red-700' :
+                      detailedNPK.potassium.status === 'high' ? 'bg-blue-100 text-blue-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {detailedNPK.potassium.status}
                     </span>
                   </div>
                 </div>
                 {cropProfile && (
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <p className="text-xs text-gray-400">
-                      Optimal Ranges:
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 mt-1 text-xs text-gray-500">
-                      {cropProfile.air_temperature_min && cropProfile.air_temperature_max && (
-                        <span>Temp: {cropProfile.air_temperature_min}-{cropProfile.air_temperature_max}°C</span>
-                      )}
-                      {cropProfile.air_humidity_min && cropProfile.air_humidity_max && (
-                        <span>Humidity: {cropProfile.air_humidity_min}-{cropProfile.air_humidity_max}%</span>
-                      )}
-                    </div>
-                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Target ranges: N({detailedNPK.nitrogen.range}), P({detailedNPK.phosphorus.range}), K({detailedNPK.potassium.range})
+                  </p>
                 )}
+              </div>
+            )}
+          </div>
+
+          {/* Environmental Condition Card */}
+          <div className="bg-white shadow-md rounded-lg p-4 sm:p-5">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2"><span className="text-xl">🌤</span>Environmental Condition</h2>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="flex flex-col">
+                <span className="text-gray-500 text-xs">Air Temperature</span>
+                <span className={`font-semibold ${airTempStatus.color}`}>
+                  {airTempStatus.text}
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-gray-500 text-xs">Humidity</span>
+                <span className={`font-semibold ${humidityStatus.color}`}>
+                  {humidityStatus.text}
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-gray-500 text-xs">Lux</span>
+                <span className="font-semibold text-gray-800">
+                  {sensorData?.rainfall ? `${sensorData.rainfall} mm` : '—'}
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-gray-500 text-xs">EC</span>
+                <span className={`font-semibold ${ecStatus.color}`}>
+                  {ecStatus.text}
+                </span>
               </div>
             </div>
-
-            {/* Leaf Condition and Alerts */}
-            <div className="flex flex-col gap-4">
-              {/* Leaf Condition Card - UPDATED VERSION */}
-              <div className="bg-white shadow-md rounded-lg p-4 sm:p-5 h-[400px] flex flex-col">
-                <h2 className="text-base sm:text-lg font-semibold text-gray-700 mb-3 flex items-center justify-between flex-shrink-0">
-                  <span className="flex items-center gap-2">
-                    <span className="text-xl">🍃</span>Leaf Condition
-                  </span>
-                  {cropInfo?.detection_results && cropInfo.detection_results.length > 0 && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-green-500 text-white">
-                      {cropInfo.detection_results.length}
-                    </span>
+            {cropProfile && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <p className="text-xs text-gray-400">
+                  Optimal Ranges:
+                </p>
+                <div className="grid grid-cols-2 gap-2 mt-1 text-xs text-gray-500">
+                  {cropProfile.air_temperature_min && cropProfile.air_temperature_max && (
+                    <span>Temp: {cropProfile.air_temperature_min}-{cropProfile.air_temperature_max}°C</span>
                   )}
-                </h2>
-
-                {cropInfo?.detection_results && cropInfo.detection_results.length > 0 ? (
-                  <div className="flex-1 flex flex-col overflow-hidden">
-                    {/* Image Preview - Compact */}
-                    {cropInfo.detection_results[0]?.image_url && (
-                      <div className="relative flex justify-center mb-2 flex-shrink-0">
-                        <img
-                          src={cropInfo.detection_results[0].image_url}
-                          alt="Detected leaf"
-                          className="w-32 h-32 rounded-lg object-cover border-2 border-green-200 shadow-sm"
-                        />
-                        <div className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow">
-                          AI
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Scrollable Content Area */}
-                    <div className="flex-1 overflow-y-auto pr-1 space-y-2">
-                      {/* Detected Conditions - Compact Pills */}
-                      <div>
-                        <div className="flex items-center gap-1.5 mb-1.5">
-                          <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <span className="text-[10px] text-gray-600 font-semibold uppercase">Conditions</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {cropInfo.detection_results.map((result, index) => {
-                            const className = result.detected_class.toLowerCase();
-                            const isHealthy = className.includes('healthy');
-                            const displayName = result.detected_class
-                              .split('_')
-                              .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                              .join(' ');
-
-                            return (
-                              <span
-                                key={index}
-                                className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold ${
-                                  isHealthy
-                                    ? 'bg-green-100 text-green-700 border border-green-300'
-                                    : 'bg-yellow-100 text-yellow-700 border border-yellow-300'
-                                }`}
-                              >
-                                <span className="mr-1 text-[10px]">
-                                  {isHealthy ? '✓' : '⚠'}
-                                </span>
-                                {displayName}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Confidence Scores - Compact Bars */}
-                      <div>
-                        <div className="flex items-center gap-1.5 mb-1.5">
-                          <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                          </svg>
-                          <span className="text-[10px] text-gray-600 font-semibold uppercase">Confidence</span>
-                        </div>
-                        <div className="space-y-1.5">
-                          {cropInfo.detection_results.map((result, index) => {
-                            const confidence = parseFloat(result.confidence) * 100;
-                            const shortName = result.detected_class.split('_')[0].charAt(0).toUpperCase() +
-                                            result.detected_class.split('_')[0].slice(1);
-                            return (
-                              <div key={index} className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-medium text-gray-600 min-w-[45px]">{shortName}</span>
-                                <div className="flex-1 bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                                  <div
-                                    className={`h-full transition-all duration-500 ${
-                                      confidence >= 80 ? 'bg-green-500' :
-                                      confidence >= 60 ? 'bg-yellow-500' :
-                                      'bg-orange-500'
-                                    }`}
-                                    style={{ width: `${confidence}%` }}
-                                  />
-                                </div>
-                                <span className={`text-[10px] font-bold min-w-[35px] text-right ${
-                                  confidence >= 80 ? 'text-green-600' :
-                                  confidence >= 60 ? 'text-yellow-600' :
-                                  'text-orange-600'
-                                }`}>
-                                  {confidence.toFixed(0)}%
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Summary Stats - Compact */}
-                      <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-gray-100">
-                        <div className="bg-green-50 rounded-md p-1.5">
-                          <p className="text-[9px] text-gray-500">Avg Confidence</p>
-                          <p className="text-xs font-bold text-green-700">
-                            {(cropInfo.detection_results.reduce((sum, r) => sum + parseFloat(r.confidence), 0) / cropInfo.detection_results.length * 100).toFixed(0)}%
-                          </p>
-                        </div>
-                        <div className="bg-green-50 rounded-md p-1.5">
-                          <p className="text-[9px] text-gray-500">Last Scan</p>
-                          <p className="text-[10px] font-semibold text-gray-700 truncate">
-                            {cropInfo.detection_results[0]?.created_at
-                              ? new Date(cropInfo.detection_results[0].created_at).toLocaleString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })
-                              : 'N/A'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  // No detection data available
-                  <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-                    <div className="relative mb-2">
-                      <img src={Leaf} alt="Leaf placeholder" className="w-16 h-16 rounded-lg object-cover opacity-20" />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <svg className="w-6 h-6 text-gray-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                      </div>
-                    </div>
-                    <p className="text-xs font-medium">No Analysis</p>
-                    <p className="text-[10px] mt-0.5">Waiting for scan...</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Alerts Card */}
-              <div className="bg-white shadow-md rounded-lg p-4 sm:p-5 flex flex-col h-full">
-                <h2 className="text-base sm:text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xl">⚠️</span>Alerts & Notifications
-                </h2>
-                <div className="space-y-2 overflow-y-auto flex-1 pr-1" style={{ maxHeight: '300px' }}>
-                  {alerts && alerts.length > 0 ? (
-                    alerts.map((alert, index) => (
-                      <div key={index} className={`p-3 rounded-lg text-xs ${
-                        alert.severity === 'high' ? 'bg-red-50 text-red-700 border border-red-200' :
-                        alert.severity === 'medium' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
-                        'bg-blue-50 text-blue-700 border border-blue-200'
-                      }`}>
-                        <p className="font-medium">{alert.message}</p>
-                        {alert.timestamp && (
-                          <p className="text-xs opacity-75 mt-1">{formatDate(alert.timestamp)}</p>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-6 text-gray-400">
-                      <svg className="w-10 h-10 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <p className="text-sm">No alerts at this time</p>
-                      <p className="text-xs mt-1">All systems normal</p>
-                    </div>
+                  {cropProfile.air_humidity_min && cropProfile.air_humidity_max && (
+                    <span>Humidity: {cropProfile.air_humidity_min}-{cropProfile.air_humidity_max}%</span>
                   )}
                 </div>
               </div>
-            </div>
+            )}
+          </div>
+        </div>
+
+        {/* Leaf Condition and Alerts */}
+        <div className="flex flex-col gap-4">
+          {/* Leaf Condition Card */}
+          <div className="bg-white shadow-md rounded-lg p-4 sm:p-5 h-[400px] flex flex-col">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-700 mb-3 flex items-center justify-between flex-shrink-0">
+              <span className="flex items-center gap-2">
+                <span className="text-xl">🍃</span>Leaf Condition
+              </span>
+              {cropInfo?.detection_results && cropInfo.detection_results.length > 0 && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-green-500 text-white">
+                  {cropInfo.detection_results.length}
+                </span>
+              )}
+            </h2>
+
+            {cropInfo?.detection_results && cropInfo.detection_results.length > 0 ? (
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Image Preview - Compact & Clickable */}
+                {cropInfo.detection_results[0]?.image_url && (
+                  <div className="relative flex justify-center mb-2 flex-shrink-0">
+                    <img
+                      src={cropInfo.detection_results[0].image_url}
+                      alt="Detected leaf"
+                      className="w-32 h-32 rounded-lg object-cover border-2 border-green-200 shadow-sm cursor-pointer hover:border-green-400 transition-all duration-200 hover:shadow-md"
+                      onClick={() => openImageModal(cropInfo.detection_results[0].image_url)}
+                    />
+                    <div className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow">
+                      AI
+                    </div>
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200 bg-black bg-opacity-20 rounded-lg pointer-events-none">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                      </svg>
+                    </div>
+                  </div>
+                )}
+
+                {/* Scrollable Content Area */}
+                <div className="flex-1 overflow-y-auto pr-1 space-y-2">
+                  {/* Detected Conditions - Compact Pills */}
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="text-[10px] text-gray-600 font-semibold uppercase">Conditions</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {cropInfo.detection_results.map((result, index) => {
+                        const className = result.detected_class.toLowerCase();
+                        const isHealthy = className.includes('healthy');
+                        const displayName = result.detected_class
+                          .split('_')
+                          .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                          .join(' ');
+
+                        return (
+                          <span
+                            key={index}
+                            className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold ${
+                              isHealthy
+                                ? 'bg-green-100 text-green-700 border border-green-300'
+                                : 'bg-yellow-100 text-yellow-700 border border-yellow-300'
+                            }`}
+                          >
+                            <span className="mr-1 text-[10px]">
+                              {isHealthy ? '✓' : '⚠'}
+                            </span>
+                            {displayName}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Confidence Scores - Compact Bars */}
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      <span className="text-[10px] text-gray-600 font-semibold uppercase">Confidence</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {cropInfo.detection_results.map((result, index) => {
+                        const confidence = parseFloat(result.confidence) * 100;
+                        const shortName = result.detected_class.split('_')[0].charAt(0).toUpperCase() +
+                                        result.detected_class.split('_')[0].slice(1);
+                        return (
+                          <div key={index} className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-medium text-gray-600 min-w-[45px]">{shortName}</span>
+                            <div className="flex-1 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-500 ${
+                                  confidence >= 80 ? 'bg-green-500' :
+                                  confidence >= 60 ? 'bg-yellow-500' :
+                                  'bg-orange-500'
+                                }`}
+                                style={{ width: `${confidence}%` }}
+                              />
+                            </div>
+                            <span className={`text-[10px] font-bold min-w-[35px] text-right ${
+                              confidence >= 80 ? 'text-green-600' :
+                              confidence >= 60 ? 'text-yellow-600' :
+                              'text-orange-600'
+                            }`}>
+                              {confidence.toFixed(0)}%
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Summary Stats - Compact */}
+                  <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-gray-100">
+                    <div className="bg-green-50 rounded-md p-1.5">
+                      <p className="text-[9px] text-gray-500">Avg Confidence</p>
+                      <p className="text-xs font-bold text-green-700">
+                        {(cropInfo.detection_results.reduce((sum, r) => sum + parseFloat(r.confidence), 0) / cropInfo.detection_results.length * 100).toFixed(0)}%
+                      </p>
+                    </div>
+                    <div className="bg-green-50 rounded-md p-1.5">
+                      <p className="text-[9px] text-gray-500">Last Scan</p>
+                      <p className="text-[10px] font-semibold text-gray-700 truncate">
+                        {cropInfo.detection_results[0]?.created_at
+                          ? new Date(cropInfo.detection_results[0].created_at).toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })
+                          : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // No detection data available
+              <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+                <div className="relative mb-2">
+                  <img src={Leaf} alt="Leaf placeholder" className="w-16 h-16 rounded-lg object-cover opacity-20" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-gray-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                </div>
+                <p className="text-xs font-medium">No Analysis</p>
+                <p className="text-[10px] mt-0.5">Waiting for scan...</p>
+              </div>
+            )}
           </div>
 
-          {/* Charts Section */}
-          <div className="bg-white shadow-md rounded-lg p-4 sm:p-6">
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-4 flex items-center gap-2">
-              <span className="text-xl">📈</span>Trend and Analytics
+          {/* Alerts Card */}
+          <div className="bg-white shadow-md rounded-lg p-4 sm:p-5 flex flex-col h-full">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2 flex-shrink-0">
+              <span className="text-xl">⚠️</span>Alerts & Notifications
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Temperature Chart */}
-              <div>
-                <h3 className="text-gray-700 font-medium mb-3 text-sm sm:text-base">Temperature Trend</h3>
-                {chartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="timestamp" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
-                      <YAxis tick={{ fontSize: 12 }} label={{ value: '°C', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend wrapperStyle={{ fontSize: '12px' }} />
-                      <Line type="monotone" dataKey="soilTemp" stroke="#8b5cf6" strokeWidth={2} name="Soil Temp" dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                      <Line type="monotone" dataKey="airTemp" stroke="#f59e0b" strokeWidth={2} name="Air Temp" dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="w-full h-48 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                    <div className="text-center text-gray-400">
-                      <svg className="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                      </svg>
-                      <p className="text-sm font-medium">No data available</p>
-                    </div>
+            <div className="space-y-2 overflow-y-auto flex-1 pr-1" style={{ maxHeight: '300px' }}>
+              {alerts && alerts.length > 0 ? (
+                alerts.map((alert, index) => (
+                  <div key={index} className={`p-3 rounded-lg text-xs ${
+                    alert.severity === 'high' ? 'bg-red-50 text-red-700 border border-red-200' :
+                    alert.severity === 'medium' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
+                    'bg-blue-50 text-blue-700 border border-blue-200'
+                  }`}>
+                    <p className="font-medium">{alert.message}</p>
+                    {alert.timestamp && (
+                      <p className="text-xs opacity-75 mt-1">{formatDate(alert.timestamp)}</p>
+                    )}
                   </div>
-                )}
-              </div>
-
-              {/* Moisture Chart */}
-              <div>
-                <h3 className="text-gray-700 font-medium mb-3 text-sm sm:text-base">Soil Moisture Trend</h3>
-                {chartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="timestamp" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
-                      <YAxis tick={{ fontSize: 12 }} label={{ value: '%', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend wrapperStyle={{ fontSize: '12px' }} />
-                      <Line type="monotone" dataKey="soilMoisture" stroke="#10b981" strokeWidth={2} name="Soil Moisture" dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                      <Line type="monotone" dataKey="humidity" stroke="#3b82f6" strokeWidth={2} name="Air Humidity" dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="w-full h-48 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                    <div className="text-center text-gray-400">
-                      <svg className="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                      </svg>
-                      <p className="text-sm font-medium">No data available</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+                ))
+              ) : (
+                <div className="text-center py-6 text-gray-400">
+                  <svg className="w-10 h-10 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-sm">No alerts at this time</p>
+                  <p className="text-xs mt-1">All systems normal</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Mobile Sidebar */}
-      <div className='md:hidden fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t border-gray-200 z-40'>
-        <UserSidebar />
+      {/* Charts Section */}
+      <div className="bg-white shadow-md rounded-lg p-4 sm:p-6">
+        <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-4 flex items-center gap-2">
+          <span className="text-xl">📈</span>Trend and Analytics
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Temperature Chart */}
+          <div>
+            <h3 className="text-gray-700 font-medium mb-3 text-sm sm:text-base">Temperature Trend</h3>
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="timestamp" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
+                  <YAxis tick={{ fontSize: 12 }} label={{ value: '°C', angle: -90, position: 'insideLeft' }} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: '12px' }} />
+                  <Line type="monotone" dataKey="soilTemp" stroke="#8b5cf6" strokeWidth={2} name="Soil Temp" dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                  <Line type="monotone" dataKey="airTemp" stroke="#f59e0b" strokeWidth={2} name="Air Temp" dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-48 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                <div className="text-center text-gray-400">
+                  <svg className="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                  </svg>
+                  <p className="text-sm font-medium">No data available</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Moisture Chart */}
+          <div>
+            <h3 className="text-gray-700 font-medium mb-3 text-sm sm:text-base">Soil Moisture Trend</h3>
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="timestamp" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
+                  <YAxis tick={{ fontSize: 12 }} label={{ value: '%', angle: -90, position: 'insideLeft' }} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: '12px' }} />
+                  <Line type="monotone" dataKey="soilMoisture" stroke="#10b981" strokeWidth={2} name="Soil Moisture" dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                  <Line type="monotone" dataKey="humidity" stroke="#3b82f6" strokeWidth={2} name="Air Humidity" dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-48 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                <div className="text-center text-gray-400">
+                  <svg className="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                  </svg>
+                  <p className="text-sm font-medium">No data available</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
-  )
-}
+  </div>
 
+  {/* Mobile Sidebar */}
+  <div className='md:hidden fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t border-gray-200 z-40'>
+    <UserSidebar />
+  </div>
+
+  {/* Image Modal */}
+  {isModalOpen && modalImage && (
+    <div
+      className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4"
+      onClick={closeImageModal}
+    >
+      <div className="relative max-w-4xl max-h-[90vh] w-full">
+        {/* Close Button */}
+        <button
+          onClick={closeImageModal}
+          className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+        >
+          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        {/* Image */}
+        <img
+          src={modalImage}
+          alt="Leaf detection full view"
+          className="w-full h-full object-contain rounded-lg"
+          onClick={(e) => e.stopPropagation()}
+        />
+
+        {/* Image Info */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4 rounded-b-lg">
+          <p className="text-white text-sm">Leaf Detection Analysis - AI Processed</p>
+          <p className="text-gray-300 text-xs mt-1">Click outside to close or press ESC</p>
+        </div>
+      </div>
+    </div>
+  )}
+</div>
+)
+}
 export default CropCarePlant
