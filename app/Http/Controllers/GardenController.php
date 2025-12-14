@@ -361,8 +361,13 @@ class GardenController extends Controller
   public function getSensorDataCrop(Request $request, $garden_id, $crop) {
     $user = $request->user();
 
-    // Get crop with profile first
-    $cropSensor = Crop::with(['cropProfile', 'latestDetectionResult'])
+    // Get crop with profile and ALL detection results (not just latest)
+    $cropSensor = Crop::with([
+        'cropProfile',
+        'detectionResults' => function($query) {
+            $query->orderBy('created_at', 'desc')->limit(10); // Get last 10 detections
+        }
+    ])
         ->where('user_id', $user->id)
         ->where('garden_id', $garden_id)
         ->where('name', $crop)
@@ -599,10 +604,15 @@ class GardenController extends Controller
         }
     }
 
+    // IMPORTANT: Add detection_results to the crop object
+    // This makes it accessible as cropInfo.detection_results in React
+    $cropData = $cropSensor->toArray();
+    $cropData['detection_results'] = $cropSensor->detectionResults; // Add the relationship
+
     return response()->json([
         'success' => true,
         'data' => [
-            'crop' => $cropSensor,
+            'crop' => $cropData, // Use modified array instead of $cropSensor
             'crop_profile' => $profile,
             'latest' => $latestData,
             'history' => $allData,
