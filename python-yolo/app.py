@@ -8,17 +8,70 @@ import io
 import os
 from datetime import datetime
 import base64
+import sys
 
 app = Flask(__name__)
 
-# Configure CORS properly for production
+# ✅ ENHANCED CORS Configuration
 CORS(app, resources={
     r"/*": {
         "origins": "*",  # In production, replace with your Laravel domain
-        "methods": ["GET", "POST"],
-        "allow_headers": ["Content-Type"]
+        "methods": ["GET", "POST", "OPTIONS"],  # Added OPTIONS
+        "allow_headers": ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
+        "expose_headers": ["Content-Type"],
+        "supports_credentials": True,
+        "max_age": 3600
     }
 })
+
+# ✅ Handle Preflight OPTIONS Requests
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'ok'})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization,Accept,X-Requested-With")
+        response.headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+        return response, 200
+
+# ✅ Log ALL Incoming Requests
+@app.before_request
+def log_request_info():
+    print("\n" + "=" * 80, flush=True)
+    print(f"🌐 INCOMING REQUEST", flush=True)
+    print("=" * 80, flush=True)
+    print(f"⏰ Time: {datetime.now().isoformat()}", flush=True)
+    print(f"📍 Method: {request.method}", flush=True)
+    print(f"🔗 URL: {request.url}", flush=True)
+    print(f"🔗 Path: {request.path}", flush=True)
+    print(f"🌍 Origin: {request.headers.get('Origin', 'No Origin Header')}", flush=True)
+    print(f"📦 Content-Type: {request.content_type}", flush=True)
+    print(f"📄 Is JSON: {request.is_json}", flush=True)
+    print(f"📁 Files: {list(request.files.keys())}", flush=True)
+    print(f"📝 Form Keys: {list(request.form.keys())}", flush=True)
+    print(f"🔑 Headers:", flush=True)
+    for key, value in request.headers:
+        print(f"   {key}: {value}", flush=True)
+    print("=" * 80, flush=True)
+
+# ✅ Log ALL Responses
+@app.after_request
+def log_response_info(response):
+    print(f"✅ RESPONSE: {response.status_code} - {request.method} {request.path}", flush=True)
+    # Add CORS headers to all responses
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept,X-Requested-With')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    return response
+
+# Debug startup info
+print("\n" + "=" * 80, flush=True)
+print("🚀 YOLO DETECTION SERVICE INITIALIZING", flush=True)
+print("=" * 80, flush=True)
+print(f"Python version: {sys.version}", flush=True)
+print(f"Working directory: {os.getcwd()}", flush=True)
+print(f"Files in working dir: {os.listdir('.')}", flush=True)
+print("=" * 80, flush=True)
 
 # Load YOLO11s model
 MODEL_PATH = os.environ.get('MODEL_PATH', 'models/my_models.pt')
@@ -28,38 +81,43 @@ def load_model():
     """Load model with error handling"""
     global model
     try:
-        print(f"🔍 Looking for model at: {MODEL_PATH}")
-        print(f"📂 Current directory: {os.getcwd()}")
-        print(f"📁 Files in current directory: {os.listdir('.')}")
+        print(f"🔍 Looking for model at: {MODEL_PATH}", flush=True)
+        print(f"📂 Current directory: {os.getcwd()}", flush=True)
+        print(f"📁 Files in current directory: {os.listdir('.')}", flush=True)
 
         if os.path.exists('models'):
-            print(f"📁 Files in models/: {os.listdir('models')}")
+            print(f"📁 Files in models/: {os.listdir('models')}", flush=True)
         else:
-            print("❌ models/ directory does not exist!")
+            print("❌ models/ directory does not exist!", flush=True)
             return False
 
         if os.path.exists(MODEL_PATH):
-            print(f"✅ Model file found at {MODEL_PATH}")
-            print(f"📊 Model file size: {os.path.getsize(MODEL_PATH) / (1024*1024):.2f} MB")
+            print(f"✅ Model file found at {MODEL_PATH}", flush=True)
+            print(f"📊 Model file size: {os.path.getsize(MODEL_PATH) / (1024*1024):.2f} MB", flush=True)
             model = YOLO(MODEL_PATH)
-            print(f"✅ YOLO11s Model loaded from: {MODEL_PATH}")
+            print(f"✅ YOLO11s Model loaded from: {MODEL_PATH}", flush=True)
             return True
         else:
-            print(f"❌ Model not found at {MODEL_PATH}")
-            print(f"📂 Absolute path: {os.path.abspath(MODEL_PATH)}")
+            print(f"❌ Model not found at {MODEL_PATH}", flush=True)
+            print(f"📂 Absolute path: {os.path.abspath(MODEL_PATH)}", flush=True)
             return False
     except Exception as e:
-        print(f"❌ Error loading model: {e}")
+        print(f"❌ Error loading model: {e}", flush=True)
         import traceback
         traceback.print_exc()
         return False
 
 # Load model on startup
+print("📦 Loading YOLO model...", flush=True)
 model_loaded = load_model()
+print(f"✅ Model loaded: {model_loaded}", flush=True)
 
 # Create directories for saving results (optional in production)
 os.makedirs('results', exist_ok=True)
 os.makedirs('uploads', exist_ok=True)
+
+# Set max content length (16MB)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 # Recommendations database for Mustasa and Pechay
 RECOMMENDATIONS_DB = {
@@ -385,13 +443,16 @@ def health_check():
         'total_classes': len(RECOMMENDATIONS_DB)
     })
 
-@app.route('/detect', methods=['POST'])
+@app.route('/detect', methods=['POST', 'OPTIONS'])
 def detect():
     """
     Detect objects from uploaded image file or base64
     Expected: multipart/form-data with 'image' file OR JSON with base64 'image'
     """
+    print("🎯 /detect endpoint called", flush=True)
+
     if model is None:
+        print("❌ Model is None - returning 503", flush=True)
         return jsonify({
             'success': False,
             'error': 'Model not loaded'
@@ -402,53 +463,75 @@ def detect():
 
         # Check if it's multipart/form-data (file upload)
         if 'image' in request.files:
+            print("📁 Processing file upload from request.files", flush=True)
             file = request.files['image']
             if file.filename == '':
+                print("❌ Empty filename", flush=True)
                 return jsonify({
                     'success': False,
                     'error': 'No image selected'
                 }), 400
 
             img_bytes = file.read()
+            print(f"📊 File size: {len(img_bytes)} bytes", flush=True)
             nparr = np.frombuffer(img_bytes, np.uint8)
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         # Check if it's JSON with base64 image
         elif request.is_json:
+            print("📄 Processing JSON request", flush=True)
             data = request.get_json()
+
             if 'image' not in data:
+                print("❌ No 'image' key in JSON", flush=True)
                 return jsonify({
                     'success': False,
                     'error': 'No image provided in JSON'
                 }), 400
 
             image_data = data['image']
+            print(f"📊 Base64 string length: {len(image_data)}", flush=True)
 
             # Handle base64 with data URI prefix
             if 'base64,' in image_data:
+                print("🔄 Removing data URI prefix", flush=True)
                 image_data = image_data.split('base64,')[1]
 
             # Decode base64
-            img_bytes = base64.b64decode(image_data)
-            nparr = np.frombuffer(img_bytes, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            try:
+                img_bytes = base64.b64decode(image_data)
+                print(f"✅ Base64 decoded: {len(img_bytes)} bytes", flush=True)
+                nparr = np.frombuffer(img_bytes, np.uint8)
+                img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            except Exception as decode_error:
+                print(f"❌ Base64 decode error: {decode_error}", flush=True)
+                return jsonify({
+                    'success': False,
+                    'error': f'Base64 decode failed: {str(decode_error)}'
+                }), 400
 
         else:
+            print("❌ No valid image source found", flush=True)
             return jsonify({
                 'success': False,
                 'error': 'No image provided. Send either file upload or JSON with base64 image'
             }), 400
 
         if img is None:
+            print("❌ cv2.imdecode returned None - invalid image format", flush=True)
             return jsonify({
                 'success': False,
                 'error': 'Invalid image format'
             }), 400
 
+        print(f"✅ Image loaded successfully: {img.shape}", flush=True)
+
         # Get confidence threshold from request (default 0.25)
         confidence_threshold = float(request.form.get('confidence', 0.25)) if not request.is_json else 0.25
+        print(f"🎯 Confidence threshold: {confidence_threshold}", flush=True)
 
         # Run YOLO11s detection
+        print("🔍 Running YOLO detection...", flush=True)
         results = model.predict(
             source=img,
             conf=confidence_threshold,
@@ -461,12 +544,15 @@ def detect():
         result = results[0]
 
         if len(result.boxes) > 0:
+            print(f"✅ Found {len(result.boxes)} detections", flush=True)
             boxes = result.boxes
             for box in boxes:
                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
                 confidence = float(box.conf[0].cpu().numpy())
                 class_id = int(box.cls[0].cpu().numpy())
                 class_name = result.names[class_id]
+
+                print(f"   Detection: {class_name} ({confidence:.2%})", flush=True)
 
                 # Get recommendations for this detection
                 recommendations = get_recommendations(class_name)
@@ -485,6 +571,8 @@ def detect():
                     },
                     'recommendations': recommendations
                 })
+        else:
+            print("ℹ️  No detections found", flush=True)
 
         # Get highest confidence detection for primary recommendation
         primary_detection = None
@@ -507,10 +595,11 @@ def detect():
             'timestamp': datetime.now().isoformat()
         }
 
+        print(f"✅ Returning success response with {len(detections)} detections", flush=True)
         return jsonify(response_data)
 
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
+        print(f"❌ ERROR in /detect: {str(e)}", flush=True)
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -589,7 +678,7 @@ def detect_batch():
         })
 
     except Exception as e:
-        print(f"❌ Batch Error: {str(e)}")
+        print(f"❌ Batch Error: {str(e)}", flush=True)
         return jsonify({
             'success': False,
             'error': str(e)
@@ -640,13 +729,13 @@ def get_class_recommendations(class_name):
 if __name__ == '__main__':
     # Check if model exists
     if not model_loaded:
-        print(f"⚠️  Warning: Model not found at {MODEL_PATH}")
-        print("Service will start but detection endpoints will return 503")
+        print(f"⚠️  Warning: Model not found at {MODEL_PATH}", flush=True)
+        print("Service will start but detection endpoints will return 503", flush=True)
 
-    print(f"✅ YOLO11s Detection Service Starting")
-    print(f"📂 Model path: {MODEL_PATH}")
-    print(f"🌿 Crop classes: {list(RECOMMENDATIONS_DB.keys())}")
-    print(f"🚀 Starting Flask server on http://0.0.0.0:5000")
+    print(f"\n✅ YOLO11s Detection Service Starting", flush=True)
+    print(f"📂 Model path: {MODEL_PATH}", flush=True)
+    print(f"🌿 Crop classes: {list(RECOMMENDATIONS_DB.keys())}", flush=True)
+    print(f"🚀 Starting Flask server on http://0.0.0.0:5000\n", flush=True)
 
     # Use environment PORT or default to 5000
     port = int(os.environ.get('PORT', 5000))
