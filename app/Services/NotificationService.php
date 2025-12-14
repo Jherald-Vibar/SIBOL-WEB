@@ -63,28 +63,37 @@ class NotificationService
      * Create notification for disease detection
      */
     public function createDiseaseDetectionNotification(
-        User $user,
-        string $detectedClass,
-        float $confidence,
-        string $cropName
-    ): void {
-        $priority = $confidence > 0.8 ? 'high' : 'normal';
+    User $user,
+    string $detectedClass,
+    float $confidence,
+    string $cropName
+): void {
+    // Convert to lowercase for case-insensitive comparison
+    $detectedClassLower = strtolower($detectedClass);
 
-        Notification::create([
-            'user_id' => $user->id,
-            'type' => 'disease_detection',
-            'title' => 'Disease Detection Alert',
-            'description' => "Potential {$detectedClass} detected in {$cropName} with " .
-                           number_format($confidence * 100, 1) . "% confidence",
-            'is_read' => false,
-            'priority' => $priority,
-            'metadata' => [
-                'detected_class' => $detectedClass,
-                'confidence' => $confidence,
-                'crop_name' => $cropName,
-            ],
-        ]);
+    // Only create notification if detected class contains leaf_spot or yellow_leaf
+    if (!str_contains($detectedClassLower, 'leaf_spot') &&
+        !str_contains($detectedClassLower, 'yellow_leaf')) {
+        return; // Exit early if it's not one of the target diseases
     }
+
+    $priority = $confidence > 0.8 ? 'high' : 'normal';
+
+    Notification::create([
+        'user_id' => $user->id,
+        'type' => 'disease_detection',
+        'title' => 'Disease Detection Alert',
+        'description' => "Potential {$detectedClass} detected in {$cropName} with " .
+                       number_format($confidence * 100, 1) . "% confidence",
+        'is_read' => false,
+        'priority' => $priority,
+        'metadata' => [
+            'detected_class' => $detectedClass,
+            'confidence' => $confidence,
+            'crop_name' => $cropName,
+        ],
+    ]);
+}
 
     /**
      * Create notification for irrigation completion
