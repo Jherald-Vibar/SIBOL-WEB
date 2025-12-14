@@ -194,9 +194,8 @@ class IotController extends Controller
     }
 }*/
 
-    public function getEspData(Request $request)
-    {
-
+   public function getEspData(Request $request)
+{
     try {
         $validated = $request->validate([
             'esp_api_key' => 'required|string',
@@ -223,8 +222,8 @@ class IotController extends Controller
         }
 
         $cropExist = Crop::where('garden_id', $esp->garden_id)
-        ->where('name', $validated['crop_name'])
-        ->first();
+            ->where('name', $validated['crop_name'])
+            ->first();
 
         if(!$cropExist) {
             return response()->json([
@@ -237,28 +236,29 @@ class IotController extends Controller
 
         if ($request->has('image') && !empty($request->image)) {
             try {
+                // ✅ IMPORTANT: Keep the original image for YOLO
+                $originalImageBase64 = $request->image;
+
                 $image = $request->image;
                 $rawImageLength = strlen($image);
 
-                // 💡 DEBUG LOG 1: Raw Base64 string check
                 Log::info('Image processing: Raw payload received.', [
                     'raw_length' => $rawImageLength,
                     'starts_with' => substr($image, 0, 30),
                     'ends_with' => substr($image, -30)
                 ]);
 
-
+                // Remove prefix for Cloudinary upload
                 if (strpos($image, 'data:image') !== false) {
                     $image = substr($image, strpos($image, ',') + 1);
                 }
 
-                // 💡 DEBUG LOG 2: Length after prefix removal
-                Log::info('Image processing: Prefix removed.', ['processed_length' => strlen($image)]);
-
+                Log::info('Image processing: Prefix removed for Cloudinary.', [
+                    'processed_length' => strlen($image)
+                ]);
 
                 $imageData = base64_decode($image);
 
-                // 💡 DEBUG LOG 3: CRITICAL check for decoding failure
                 if ($imageData === false || empty($imageData)) {
                     Log::error('Base64 Decoding Failed or resulted in empty data.', [
                         'base64_string_length' => strlen($image),
@@ -271,22 +271,25 @@ class IotController extends Controller
                 $tempFile = tempnam(sys_get_temp_dir(), 'esp_image_');
                 file_put_contents($tempFile, $imageData);
 
-                // 💡 DEBUG LOG 4: Check if the temporary file is empty
                 if (file_exists($tempFile) && filesize($tempFile) === 0) {
-                    Log::error('Temp file created but is empty.', ['base64_string_length' => strlen($image)]);
-                    unlink($tempFile); // Clean up empty file
+                    Log::error('Temp file created but is empty.', [
+                        'base64_string_length' => strlen($image)
+                    ]);
+                    unlink($tempFile);
                     throw new \Exception('Decoded image data resulted in an empty file (zero bytes).');
                 }
 
-                Log::info('Temp file created and has content.', ['path' => $tempFile, 'size' => filesize($tempFile)]);
+                Log::info('Temp file created and has content.', [
+                    'path' => $tempFile,
+                    'size' => filesize($tempFile)
+                ]);
 
-
+                // Cloudinary Upload
                 $cloudName = env('CLOUDINARY_CLOUD_NAME');
                 $apiKey = env('CLOUDINARY_API_KEY');
                 $apiSecret = env('CLOUDINARY_API_SECRET');
 
                 if (!$cloudName || !$apiKey || !$apiSecret) {
-                    // Check if the empty file was deleted before throwing error
                     if (file_exists($tempFile)) {
                         unlink($tempFile);
                     }
@@ -296,7 +299,6 @@ class IotController extends Controller
                 $timestamp = time();
                 $publicId = 'esp_' . $esp->id . '_' . $timestamp;
                 $folder = 'esp_sensor_images';
-
 
                 $params = [
                     'timestamp' => $timestamp,
@@ -311,7 +313,6 @@ class IotController extends Controller
                 }
                 $signature = rtrim($signature, '&') . $apiSecret;
                 $signature = sha1($signature);
-
 
                 $ch = curl_init();
                 curl_setopt($ch, CURLOPT_URL, "https://api.cloudinary.com/v1_1/{$cloudName}/image/upload");
@@ -339,58 +340,87 @@ class IotController extends Controller
                     $imageUrl = $result['secure_url'];
                     Log::info('Cloudinary upload successful', ['url' => $imageUrl]);
 
+                    // ✅ YOLO Detection - Send ORIGINAL base64 with prefix
                     try {
-                        // The YOLO service call remains as it was
                         $yoloServiceUrl = env('YOLO_SERVICE_URL', 'http://localhost:5000');
+
+                        Log::info('Calling YOLO service', [
+                            'url' => $yoloServiceUrl . '/detect',
+                            'image_length' => strlen($originalImageBase64),
+                            'has_prefix' => strpos($originalImageBase64, 'data:image') !== false
+                        ]);
 
                         $yoloCh = curl_init();
                         curl_setopt($yoloCh, CURLOPT_URL, $yoloServiceUrl . '/detect');
                         curl_setopt($yoloCh, CURLOPT_POST, true);
                         curl_setopt($yoloCh, CURLOPT_POSTFIELDS, json_encode([
-                            'image' => $validated['image']
+                            'image' => $originalImageBase64  // ✅ Send original with prefix
                         ]));
                         curl_setopt($yoloCh, CURLOPT_HTTPHEADER, [
-                            'Content-Type: application/json'
+                            'Content-Type: application/json',
+                            'Accept: application/json'
                         ]);
                         curl_setopt($yoloCh, CURLOPT_RETURNTRANSFER, true);
-                        curl_setopt($yoloCh, CURLOPT_TIMEOUT, 30);
+                        curl_setopt($yoloCh, CURLOPT_TIMEOUT, 60);  // Increased timeout
+                        curl_setopt($yoloCh, CURLOPT_CONNECTTIMEOUT, 30);
 
                         $yoloResponse = curl_exec($yoloCh);
                         $yoloHttpCode = curl_getinfo($yoloCh, CURLINFO_HTTP_CODE);
                         $yoloError = curl_error($yoloCh);
+
+                        // Get detailed curl info
+                        $curlInfo = curl_getinfo($yoloCh);
                         curl_close($yoloCh);
+
+                        Log::info('YOLO service response', [
+                            'http_code' => $yoloHttpCode,
+                            'response_length' => strlen($yoloResponse ?? ''),
+                            'curl_error' => $yoloError,
+                            'total_time' => $curlInfo['total_time'] ?? null,
+                            'connect_time' => $curlInfo['connect_time'] ?? null
+                        ]);
 
                         if ($yoloHttpCode == 200 && $yoloResponse) {
                             $yoloDetectionResult = json_decode($yoloResponse, true);
-                            Log::info('YOLO detection successful', [
-                                'detections' => $yoloDetectionResult['total_detections'] ?? 0
-                            ]);
 
+                            if (json_last_error() !== JSON_ERROR_NONE) {
+                                Log::error('YOLO response JSON decode failed', [
+                                    'json_error' => json_last_error_msg(),
+                                    'response' => substr($yoloResponse, 0, 500)
+                                ]);
+                            } else {
+                                Log::info('YOLO detection successful', [
+                                    'success' => $yoloDetectionResult['success'] ?? false,
+                                    'detections' => $yoloDetectionResult['total_detections'] ?? 0
+                                ]);
+                            }
                         } else {
                             Log::error('YOLO detection failed', [
                                 'http_code' => $yoloHttpCode,
                                 'error' => $yoloError,
-                                'response' => $yoloResponse
+                                'response' => substr($yoloResponse ?? '', 0, 500)
                             ]);
                         }
                     } catch (\Exception $yoloError) {
                         Log::error('YOLO service error', [
-                            'error' => $yoloError->getMessage()
+                            'error' => $yoloError->getMessage(),
+                            'trace' => $yoloError->getTraceAsString()
                         ]);
-
                     }
                 } else {
                     throw new \Exception('Cloudinary upload failed: ' . $response);
                 }
 
             } catch (\Exception $imageError) {
-                Log::error('Image upload failed', ['error' => $imageError->getMessage()]);
+                Log::error('Image upload failed', [
+                    'error' => $imageError->getMessage(),
+                    'trace' => $imageError->getTraceAsString()
+                ]);
                 $imageUrl = null;
             }
         }
 
-        // Sensor data saving logic (no change)
-
+        // Save Sensor Data
         $sensorData = SensorData::create([
             'esp_id' => $esp->id,
             'crop_id' => $cropExist->id,
@@ -406,53 +436,58 @@ class IotController extends Controller
         ]);
 
         $cropUser = Crop::where('id', $sensorData->crop_id)->first();
-
         $cropProfile = CropProfile::where("id", $cropUser->crop_profile_id)->first();
 
         $notificationService = new \App\Services\NotificationService();
         $notificationService->processSensorNotifications($sensorData, $esp, $cropProfile);
 
-        if ($yoloDetectionResult && $yoloDetectionResult['success'] && !empty($yoloDetectionResult['detections'])) {
+        // Save YOLO Detection Results
+        if ($yoloDetectionResult && isset($yoloDetectionResult['success']) && $yoloDetectionResult['success'] && !empty($yoloDetectionResult['detections'])) {
 
             foreach ($yoloDetectionResult['detections'] as $detection) {
-                $recommendations = $detection['recommendations'];
+                $recommendations = $detection['recommendations'] ?? [];
 
                 DetectionResults::create([
                     'sensor_data_id' => $sensorData->id,
                     'crop_id' => $cropExist->id,
                     'esp_id' => $esp->id,
-
-                    'detected_class' => $detection['class'],
-                    'confidence' => $detection['confidence'],
+                    'detected_class' => $detection['class'] ?? 'unknown',
+                    'confidence' => $detection['confidence'] ?? 0,
                     'image_url' => $imageUrl,
-
-                    'recommendations' => json_encode($recommendations['recommendations']),
-                    'harvest_tips' => json_encode($recommendations['harvest_tips'] ?? null),
+                    'recommendations' => json_encode($recommendations['recommendations'] ?? []),
+                    'harvest_tips' => json_encode($recommendations['harvest_tips'] ?? []),
                 ]);
 
-                $notificationService->createDiseaseDetectionNotification(
-                    $esp->user,
-                    $detection['class'],
-                    $detection['confidence'],
-                    $cropExist->name
-                );
+                if (isset($detection['class'])) {
+                    $notificationService->createDiseaseDetectionNotification(
+                        $esp->user,
+                        $detection['class'],
+                        $detection['confidence'] ?? 0,
+                        $cropExist->name
+                    );
+                }
             }
 
             Log::info('Saved detection results', [
                 'total_saved' => count($yoloDetectionResult['detections']),
                 'sensor_data_id' => $sensorData->id
             ]);
-        }
-
-        if ($imageUrl) {
-            $cropExist->update([
-                "image" => $imageUrl,
+        } else {
+            Log::warning('No YOLO detections to save', [
+                'yolo_result_exists' => !is_null($yoloDetectionResult),
+                'has_success_key' => isset($yoloDetectionResult['success']),
+                'success_value' => $yoloDetectionResult['success'] ?? null,
+                'has_detections' => !empty($yoloDetectionResult['detections'] ?? [])
             ]);
         }
 
-        $esp->update([
-            "status" => "active"
-        ]);
+        // Update crop image
+        if ($imageUrl) {
+            $cropExist->update(['image' => $imageUrl]);
+        }
+
+        // Update ESP status
+        $esp->update(['status' => 'active']);
 
         return response()->json([
             'status' => 'success',
@@ -466,7 +501,8 @@ class IotController extends Controller
         Log::error('ESP data error', [
             'message' => $e->getMessage(),
             'file' => $e->getFile(),
-            'line' => $e->getLine()
+            'line' => $e->getLine(),
+            'trace' => $e->getTraceAsString()
         ]);
 
         return response()->json([
