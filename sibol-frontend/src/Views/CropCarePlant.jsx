@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import UserSidebar from './parts/UserSidebar'
 import UserNavbar from './parts/UserNavbar'
 import axiosClient from './axios'
 import Leaf from '../assets/leaf.png'
+import { connectMQTT, disconnectMQTT, publishMessage, subscribe, unsubscribe } from '../utils/mqttClient'
 
 const CropCarePlant = () => {
   const { garden_id, crop_name } = useParams()
@@ -15,9 +16,73 @@ const CropCarePlant = () => {
   const [cropProfile, setCropProfile] = useState(null)
   const [alerts, setAlerts] = useState([])
   const [historyData, setHistoryData] = useState([])
-  const [isIrrigating, setIsIrrigating] = useState(false)
   const [imageError, setImageError] = useState(false)
 
+  // MQTT States
+  const [mqttConnected, setMqttConnected] = useState(false)
+  const [isIrrigating, setIsIrrigating] = useState(false)
+  const [irrigationStatus, setIrrigationStatus] = useState('idle')
+
+  // MQTT Topics
+  const TOPIC_COMMAND = `cropcare/garden/${garden_id}/irrigation/cmd`
+  const TOPIC_STATUS = `cropcare/garden/${garden_id}/irrigation/status`
+
+  // Handle MQTT messages
+  const handleMQTTMessage = useCallback((topic, payload) => {
+    console.log('📩 Received:', topic, payload)
+
+    if (topic === TOPIC_STATUS) {
+      const status = payload.status || payload.state
+
+      if (status === 'on' || status === 'active' || status === 1) {
+        setIsIrrigating(true)
+        setIrrigationStatus('active')
+        console.log('✅ Irrigation ON')
+      } else if (status === 'off' || status === 'idle' || status === 0) {
+        setIsIrrigating(false)
+        setIrrigationStatus('idle')
+        console.log('✅ Irrigation OFF')
+      }
+
+      if (payload.error) {
+        setIrrigationStatus('error')
+        setAlerts(prev => [{
+          message: `Irrigation Error: ${payload.error}`,
+          severity: 'high',
+          timestamp: new Date().toISOString()
+        }, ...prev])
+      }
+    }
+  }, [TOPIC_STATUS])
+
+  // Initialize MQTT
+  useEffect(() => {
+    const clientId = `cropcare_${garden_id}_${Math.random().toString(16).substr(2, 6)}`
+
+    const callbacks = {
+      onConnect: async () => {
+        setMqttConnected(true)
+        try {
+          await subscribe(TOPIC_STATUS)
+          await publishMessage(TOPIC_COMMAND, { cmd: 'status', garden_id })
+        } catch (err) {
+          console.error('Subscribe error:', err)
+        }
+      },
+      onError: () => setMqttConnected(false),
+      onOffline: () => setMqttConnected(false),
+      onMessage: handleMQTTMessage
+    }
+
+    connectMQTT(clientId, callbacks)
+
+    return () => {
+      unsubscribe(TOPIC_STATUS)
+      disconnectMQTT()
+    }
+  }, [garden_id, TOPIC_COMMAND, TOPIC_STATUS, handleMQTTMessage])
+
+  // Fetch sensor data
   useEffect(() => {
     const fetchSensorData = async () => {
       setLoading(true)
@@ -30,7 +95,6 @@ const CropCarePlant = () => {
           setAlerts(response.data.data.alerts || [])
           setHistoryData(response.data.data.history || [])
         }
-        console.log(response.data.data);
       } catch (error) {
         console.error(error)
         setError(error.response?.data?.message || "Failed to fetch sensor data!")
@@ -38,6 +102,7 @@ const CropCarePlant = () => {
         setLoading(false)
       }
     }
+
     if (garden_id && crop_name) {
       fetchSensorData()
       const interval = setInterval(fetchSensorData, 10000)
@@ -45,10 +110,86 @@ const CropCarePlant = () => {
     }
   }, [garden_id, crop_name])
 
-  const handleImageError = () => { setImageError(true) }
-  const handleIrrigateToggle = () => { setIsIrrigating(!isIrrigating) }
+  // Handle irrigation toggle
+  const handleIrrigateToggle = async () => {
+    if (!mqttConnected) {
+      alert('⚠️ MQTT not connected. Please wait...')
+      return
+    }
 
-  // Profile-based soil moisture status
+    const newState = !isIrrigating
+    const command = newState ? 'on' : 'off'
+
+    try {
+      setIrrigationStatus(newState ? 'starting' : 'stopping')
+
+      const message = {
+        cmd: command,
+        garden_id: garden_id,
+        crop_name: crop_name,
+        timestamp: Date.now()
+      }
+
+      await publishMessage(TOPIC_COMMAND, message)
+
+      setAlerts(prev => [{
+        message: `Irrigation ${command === 'on' ? 'started' : 'stopped'}`,
+        severity: 'low',
+        timestamp: new Date().toISOString()
+      }, ...prev])
+
+      setTimeout(() => {
+        if (irrigationStatus === 'starting' || irrigationStatus === 'stopping') {
+          setIsIrrigating(newState)
+          setIrrigationStatus(newState ? 'active' : 'idle')
+        }
+      }, 3000)
+
+    } catch (error) {
+      console.error('❌ Publish error:', error)
+      alert('Failed to control irrigation')
+      setIrrigationStatus('error')
+
+      setTimeout(() => {
+        setIrrigationStatus(isIrrigating ? 'active' : 'idle')
+      }, 2000)
+    }
+  }
+
+  const handleImageError = () => setImageError(true)
+
+  // Button config
+  const getButtonConfig = () => {
+    if (!mqttConnected) {
+      return {
+        disabled: true,
+        text: 'MQTT Disconnected',
+        bgClass: 'from-gray-400 to-gray-500 cursor-not-allowed'
+      }
+    }
+
+    if (irrigationStatus === 'starting') {
+      return { disabled: true, text: 'Starting...', bgClass: 'from-yellow-400 to-yellow-500' }
+    }
+
+    if (irrigationStatus === 'stopping') {
+      return { disabled: true, text: 'Stopping...', bgClass: 'from-yellow-400 to-yellow-500' }
+    }
+
+    if (irrigationStatus === 'error') {
+      return { disabled: false, text: 'Retry', bgClass: 'from-red-500 to-red-600 hover:from-red-600 hover:to-red-700' }
+    }
+
+    if (isIrrigating) {
+      return { disabled: false, text: 'Stop Irrigation', bgClass: 'from-green-500 to-green-600 hover:from-green-600 hover:to-green-700' }
+    }
+
+    return { disabled: false, text: 'Start Irrigation', bgClass: 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700' }
+  }
+
+  const buttonConfig = getButtonConfig()
+
+  // All your existing helper functions...
   const getSoilMoistureStatus = (moisture) => {
     if (!moisture) return {
       status: 'Unknown',
@@ -60,12 +201,11 @@ const CropCarePlant = () => {
 
     const value = parseFloat(moisture)
 
-    // Use crop profile if available
     if (cropProfile?.soil_moisture_min && cropProfile?.soil_moisture_max) {
       const min = parseFloat(cropProfile.soil_moisture_min)
       const max = parseFloat(cropProfile.soil_moisture_max)
       const range = max - min
-      const tolerance = range * 0.1 // 10% tolerance
+      const tolerance = range * 0.1
 
       if (value < min - tolerance) {
         return {
@@ -110,7 +250,6 @@ const CropCarePlant = () => {
       }
     }
 
-    // Fallback to generic thresholds
     if (value < 40) return {
       status: 'Low - Needs Water',
       color: 'border-red-500',
@@ -134,7 +273,6 @@ const CropCarePlant = () => {
     }
   }
 
-  // Helper function to check individual nutrient status
   const getIndividualNutrientStatus = (value, min, max) => {
     if (!min || !max || !value) return 'unknown'
     const numValue = parseFloat(value)
@@ -146,7 +284,6 @@ const CropCarePlant = () => {
     return 'high'
   }
 
-  // Profile-based NPK status
   const getNPKStatus = (n, p, k) => {
     if (!n || !p || !k) return { text: '—', color: 'text-gray-500', detail: '' }
 
@@ -154,7 +291,6 @@ const CropCarePlant = () => {
     const phosphorus = parseFloat(p)
     const potassium = parseFloat(k)
 
-    // Use crop profile if available
     if (cropProfile) {
       const nStatus = getIndividualNutrientStatus(
         nitrogen,
@@ -172,7 +308,6 @@ const CropCarePlant = () => {
         cropProfile.potassium_max
       )
 
-      // Count how many are in optimal range
       const optimalCount = [nStatus, pStatus, kStatus].filter(s => s === 'optimal').length
 
       if (optimalCount === 3) {
@@ -202,14 +337,12 @@ const CropCarePlant = () => {
       }
     }
 
-    // Fallback to average-based calculation
     const avg = (nitrogen + phosphorus + potassium) / 3
     if (avg > 70) return { text: 'High', color: 'text-green-600', detail: '' }
     if (avg > 40) return { text: 'Medium', color: 'text-yellow-600', detail: '' }
     return { text: 'Low', color: 'text-red-600', detail: '' }
   }
 
-  // Profile-based pH status
   const getPhStatus = (ph) => {
     if (!ph) return { text: '—', color: 'text-gray-500', status: 'Unknown' }
 
@@ -228,7 +361,6 @@ const CropCarePlant = () => {
       }
     }
 
-    // Generic pH ranges (most crops prefer 6.0-7.0)
     if (value >= 6.0 && value <= 7.0) {
       return { text: value.toFixed(1), color: 'text-green-600', status: 'Good' }
     } else if (value < 5.5 || value > 7.5) {
@@ -238,7 +370,6 @@ const CropCarePlant = () => {
     }
   }
 
-  // Profile-based soil temperature status
   const getSoilTempStatus = (temp) => {
     if (!temp) return { text: '—', color: 'text-gray-500' }
 
@@ -260,7 +391,6 @@ const CropCarePlant = () => {
     return { text: `${value}°C`, color: 'text-gray-800' }
   }
 
-  // Profile-based air temperature status
   const getAirTempStatus = (temp) => {
     if (!temp) return { text: '—', color: 'text-gray-500' }
 
@@ -282,7 +412,6 @@ const CropCarePlant = () => {
     return { text: `${value}°C`, color: 'text-gray-800' }
   }
 
-  // Profile-based humidity status
   const getHumidityStatus = (humidity) => {
     if (!humidity) return { text: '—', color: 'text-gray-500' }
 
@@ -304,7 +433,6 @@ const CropCarePlant = () => {
     return { text: `${value}%`, color: 'text-gray-800' }
   }
 
-  // Profile-based EC status
   const getECStatus = (ec) => {
     if (!ec) return { text: '—', color: 'text-gray-500' }
 
@@ -326,7 +454,6 @@ const CropCarePlant = () => {
     return { text: value.toFixed(2), color: 'text-gray-800' }
   }
 
-  // Get detailed NPK individual statuses for display
   const getDetailedNPKStatus = () => {
     if (!sensorData || !cropProfile) return null
 
@@ -439,19 +566,49 @@ const CropCarePlant = () => {
                   )}
                 </div>
               </div>
-              <button onClick={handleIrrigateToggle} className={`group relative inline-flex items-center gap-2 px-6 py-3 font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 active:scale-95 ${isIrrigating ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white' : 'bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white'}`}>
-                <svg className={`w-5 h-5 transition-all duration-300 ${isIrrigating ? 'animate-pulse' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                </svg>
-                <span className="text-sm sm:text-base">{isIrrigating ? 'Irrigating...' : 'Start Irrigation'}</span>
-                {isIrrigating && (<span className="absolute -top-1 -right-1 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span></span>)}
-                <div className="absolute inset-0 rounded-xl bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-              </button>
+
+              {/* MQTT Irrigation Button */}
+              <div className="flex flex-col items-end gap-2">
+                <button
+                  onClick={handleIrrigateToggle}
+                  disabled={buttonConfig.disabled}
+                  className={`group relative inline-flex items-center gap-2 px-6 py-3 font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-white bg-gradient-to-r ${buttonConfig.bgClass}`}
+                >
+                  {/* MQTT Status Indicator */}
+                  <span className="absolute -top-1 -left-1 flex h-3 w-3">
+                    <span className={`absolute inline-flex h-full w-full rounded-full ${mqttConnected ? 'bg-green-400' : 'bg-red-400'} opacity-75`}></span>
+                    <span className={`relative inline-flex rounded-full h-3 w-3 ${mqttConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                  </span>
+
+                  <svg className={`w-5 h-5 transition-all duration-300 ${isIrrigating ? 'animate-pulse' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  </svg>
+
+                  <span className="text-sm sm:text-base">{buttonConfig.text}</span>
+
+                  {isIrrigating && (
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                    </span>
+                  )}
+
+                  <div className="absolute inset-0 rounded-xl bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+                </button>
+
+                {/* MQTT Connection Status */}
+                <div className="text-xs flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${mqttConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                  <span className={mqttConnected ? 'text-green-600' : 'text-red-600'}>
+                    {mqttConnected ? 'MQTT Connected' : 'MQTT Disconnected'}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
-            {/* Crop Image Card */}
+            {/* Crop Image Card - Keep your existing code */}
             <div className="bg-white rounded-lg shadow-md p-6 flex flex-col items-center justify-center">
               <div className="relative">
                 {cropInfo?.image && !imageError ? (
@@ -494,9 +651,8 @@ const CropCarePlant = () => {
               )}
             </div>
 
-            {/* Soil and Environmental Conditions */}
+            {/* Soil and Environmental Conditions - Keep all your existing cards */}
             <div className="flex flex-col gap-4">
-              {/* Soil Condition Card */}
               <div className="bg-white shadow-md rounded-lg p-4 sm:p-5">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2"><span className="text-xl">🌱</span>Soil and Root Condition</h2>
                 <div className="grid grid-cols-2 gap-3 text-sm">
@@ -578,7 +734,6 @@ const CropCarePlant = () => {
                 )}
               </div>
 
-              {/* Environmental Condition Card */}
               <div className="bg-white shadow-md rounded-lg p-4 sm:p-5">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2"><span className="text-xl">🌤</span>Environmental Condition</h2>
                 <div className="grid grid-cols-2 gap-3 text-sm">
@@ -627,7 +782,6 @@ const CropCarePlant = () => {
 
             {/* Leaf Condition and Alerts */}
             <div className="flex flex-col gap-4">
-              {/* Leaf Condition Card */}
               <div className="bg-white shadow-md rounded-lg p-4 sm:p-5">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2"><span className="text-xl">🍃</span>Leaf Condition Index</h2>
                 <div className="flex items-start gap-4">
@@ -656,7 +810,6 @@ const CropCarePlant = () => {
                 </div>
               </div>
 
-              {/* Alerts Card */}
               <div className="bg-white shadow-md rounded-lg p-4 sm:p-5 flex flex-col h-full">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2 flex-shrink-0">
                   <span className="text-xl">⚠️</span>Alerts & Notifications
@@ -695,7 +848,6 @@ const CropCarePlant = () => {
               <span className="text-xl">📈</span>Trend and Analytics
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Temperature Chart */}
               <div>
                 <h3 className="text-gray-700 font-medium mb-3 text-sm sm:text-base">Temperature Trend</h3>
                 {chartData.length > 0 ? (
@@ -722,7 +874,6 @@ const CropCarePlant = () => {
                 )}
               </div>
 
-              {/* Moisture Chart */}
               <div>
                 <h3 className="text-gray-700 font-medium mb-3 text-sm sm:text-base">Soil Moisture Trend</h3>
                 {chartData.length > 0 ? (
@@ -753,7 +904,6 @@ const CropCarePlant = () => {
         </div>
       </div>
 
-      {/* Mobile Sidebar */}
       <div className='md:hidden fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t border-gray-200 z-40'>
         <UserSidebar />
       </div>

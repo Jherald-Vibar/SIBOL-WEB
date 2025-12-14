@@ -10,15 +10,39 @@ from datetime import datetime
 import base64
 
 app = Flask(__name__)
-CORS(app)
+
+# Configure CORS properly for production
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",  # In production, replace with your Laravel domain
+        "methods": ["GET", "POST"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 # Load YOLO11s model
-MODEL_PATH = 'models/my_models.pt'
-model = YOLO(MODEL_PATH)
+MODEL_PATH = os.environ.get('MODEL_PATH', 'models/my_models.pt')
+model = None
 
-print(f"✅ YOLO11s Model loaded from: {MODEL_PATH}")
+def load_model():
+    """Load model with error handling"""
+    global model
+    try:
+        if os.path.exists(MODEL_PATH):
+            model = YOLO(MODEL_PATH)
+            print(f"✅ YOLO11s Model loaded from: {MODEL_PATH}")
+            return True
+        else:
+            print(f"⚠️  Model not found at {MODEL_PATH}")
+            return False
+    except Exception as e:
+        print(f"❌ Error loading model: {e}")
+        return False
 
-# Create directories for saving results
+# Load model on startup
+model_loaded = load_model()
+
+# Create directories for saving results (optional in production)
 os.makedirs('results', exist_ok=True)
 os.makedirs('uploads', exist_ok=True)
 
@@ -319,14 +343,29 @@ def get_recommendations(class_name):
         'product_suggestions': ['Consult expert']
     }
 
+@app.route('/', methods=['GET'])
+def home():
+    """Root endpoint"""
+    return jsonify({
+        'service': 'YOLO11s Detection Service',
+        'status': 'online',
+        'model_loaded': model is not None,
+        'endpoints': {
+            'health': '/health',
+            'detect': '/detect (POST)',
+            'model_info': '/model-info',
+            'recommendations': '/recommendations/<class_name>'
+        }
+    })
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
     return jsonify({
-        'status': 'healthy',
+        'status': 'healthy' if model is not None else 'degraded',
         'message': 'YOLO11s Detection Service is running',
         'model': MODEL_PATH,
-        'model_loaded': True,
+        'model_loaded': model is not None,
         'available_classes': list(RECOMMENDATIONS_DB.keys()),
         'total_classes': len(RECOMMENDATIONS_DB)
     })
@@ -337,6 +376,12 @@ def detect():
     Detect objects from uploaded image file or base64
     Expected: multipart/form-data with 'image' file OR JSON with base64 'image'
     """
+    if model is None:
+        return jsonify({
+            'success': False,
+            'error': 'Model not loaded'
+        }), 503
+
     try:
         img = None
 
@@ -434,12 +479,6 @@ def detect():
         # Get image dimensions
         height, width = img.shape[:2]
 
-        # Save annotated image (optional)
-        annotated_image = result.plot()
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        save_path = f'results/detection_{timestamp}.jpg'
-        cv2.imwrite(save_path, annotated_image)
-
         response_data = {
             'success': True,
             'detections': detections,
@@ -450,8 +489,7 @@ def detect():
                 'height': int(height)
             },
             'model_classes': result.names,
-            'saved_path': save_path,
-            'timestamp': timestamp
+            'timestamp': datetime.now().isoformat()
         }
 
         return jsonify(response_data)
@@ -468,6 +506,12 @@ def detect():
 @app.route('/detect/batch', methods=['POST'])
 def detect_batch():
     """Handle multiple images at once"""
+    if model is None:
+        return jsonify({
+            'success': False,
+            'error': 'Model not loaded'
+        }), 503
+
     try:
         if 'images' not in request.files:
             return jsonify({
@@ -539,6 +583,12 @@ def detect_batch():
 @app.route('/model-info', methods=['GET'])
 def model_info():
     """Get model information"""
+    if model is None:
+        return jsonify({
+            'success': False,
+            'error': 'Model not loaded'
+        }), 503
+
     try:
         class_names = model.names
 
@@ -574,14 +624,15 @@ def get_class_recommendations(class_name):
 
 if __name__ == '__main__':
     # Check if model exists
-    if not os.path.exists(MODEL_PATH):
-        print(f"⚠️  Model not found at {MODEL_PATH}")
-        print("Please place your trained model (my_model.pt) in the models folder")
-        exit(1)
+    if not model_loaded:
+        print(f"⚠️  Warning: Model not found at {MODEL_PATH}")
+        print("Service will start but detection endpoints will return 503")
 
-    print(f"✅ YOLO11s Model loaded successfully")
+    print(f"✅ YOLO11s Detection Service Starting")
     print(f"📂 Model path: {MODEL_PATH}")
     print(f"🌿 Crop classes: {list(RECOMMENDATIONS_DB.keys())}")
     print(f"🚀 Starting Flask server on http://0.0.0.0:5000")
 
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Use environment PORT or default to 5000
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)

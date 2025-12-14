@@ -1,8 +1,24 @@
-flask>=3.0.0
-flask-cors>=4.0.0
-ultralytics>=8.1.0
-opencv-python>=4.8.0
-pillow>=10.0.0
-numpy>=1.24.0
-torch>=2.0.0
-torchvision>=0.15.0
+# Flask Framework
+flask==3.0.0
+flask-cors==4.0.0
+
+# YOLO and Computer Vision
+ultralytics==8.1.0
+opencv-python-headless==4.8.1.78
+pillow==10.1.0
+
+# ML Dependencies
+numpy==1.24.3
+
+# PyTorch - CPU only to save space (Railway has limited memory)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.1.0+cpu
+torchvision==0.16.0+cpu
+
+# Production Server
+gunicorn==21.2.0
+
+# Additional dependencies that ultralytics might need
+pyyaml>=5.3.1
+matplotlib>=3.3
+scipy>=1.4.1

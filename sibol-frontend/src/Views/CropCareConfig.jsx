@@ -587,15 +587,38 @@ const CropCareConfig = () => {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Variety *
                   </label>
-                  <input
-                    type="text"
-                    name="variety"
-                    placeholder="Enter variety"
-                    value={form.variety}
-                    onChange={handleChange}
-                    className="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-[#114320]"
-                    required
-                  />
+
+                  <div className="flex gap-6 border-2 border-gray-300 rounded-lg p-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="variety"
+                        value="Vegetable"
+                        checked={form.variety === "Vegetable"}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500"
+                        required
+                      />
+                      <span className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                        🥬 Vegetable
+                      </span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="variety"
+                        value="Fruit"
+                        checked={form.variety === "Fruit"}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-orange-600 border-gray-300 focus:ring-orange-500"
+                        required
+                      />
+                      <span className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                        🍓 Fruit
+                      </span>
+                    </label>
+                  </div>
                 </div>
 
                 <div>
