@@ -19,6 +19,9 @@ numpy==1.24.3
 torch==2.1.0+cpu
 torchvision==0.16.0+cpu
 
+# Cloud Storage
+cloudinary==1.36.0
+
 # Production Server
 gunicorn==21.2.0
 

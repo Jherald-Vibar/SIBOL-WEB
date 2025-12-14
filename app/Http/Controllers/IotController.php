@@ -340,18 +340,18 @@ class IotController extends Controller
                     $imageUrl = $result['secure_url'];
                     Log::info('Cloudinary upload successful', ['url' => $imageUrl]);
 
-                    // ✅ YOLO Detection - Send ORIGINAL base64 with prefix
+                    // ✅ YOLO Detection - Send ORIGINAL base64 with prefix AND request to save image
                     try {
                         $yoloServiceUrl = env('YOLO_SERVICE_URL', 'http://localhost:5000');
 
                         Log::info('Calling YOLO service', [
-                            'url' => $yoloServiceUrl . '/detect',
+                            'url' => $yoloServiceUrl . '/detect?save_image=true',
                             'image_length' => strlen($originalImageBase64),
                             'has_prefix' => strpos($originalImageBase64, 'data:image') !== false
                         ]);
 
                         $yoloCh = curl_init();
-                        curl_setopt($yoloCh, CURLOPT_URL, $yoloServiceUrl . '/detect');
+                        curl_setopt($yoloCh, CURLOPT_URL, $yoloServiceUrl . '/detect?save_image=true');  // ✅ Save image with boxes
                         curl_setopt($yoloCh, CURLOPT_POST, true);
                         curl_setopt($yoloCh, CURLOPT_POSTFIELDS, json_encode([
                             'image' => $originalImageBase64  // ✅ Send original with prefix
@@ -391,7 +391,9 @@ class IotController extends Controller
                             } else {
                                 Log::info('YOLO detection successful', [
                                     'success' => $yoloDetectionResult['success'] ?? false,
-                                    'detections' => $yoloDetectionResult['total_detections'] ?? 0
+                                    'detections' => $yoloDetectionResult['total_detections'] ?? 0,
+                                    'image_saved' => $yoloDetectionResult['image_saved'] ?? false,
+                                    'cloudinary_url' => $yoloDetectionResult['image_url'] ?? null
                                 ]);
                             }
                         } else {
@@ -444,6 +446,15 @@ class IotController extends Controller
         // Save YOLO Detection Results
         if ($yoloDetectionResult && isset($yoloDetectionResult['success']) && $yoloDetectionResult['success'] && !empty($yoloDetectionResult['detections'])) {
 
+            // ✅ Get the image URL with bounding boxes from YOLO response
+            $detectionImageUrl = $yoloDetectionResult['image_url'] ?? $imageUrl;  // Fallback to original if not available
+
+            Log::info('Saving detection results', [
+                'original_image' => $imageUrl,
+                'detection_image' => $detectionImageUrl,
+                'has_bounding_boxes' => isset($yoloDetectionResult['image_url'])
+            ]);
+
             foreach ($yoloDetectionResult['detections'] as $detection) {
                 $recommendations = $detection['recommendations'] ?? [];
 
@@ -453,7 +464,7 @@ class IotController extends Controller
                     'esp_id' => $esp->id,
                     'detected_class' => $detection['class'] ?? 'unknown',
                     'confidence' => $detection['confidence'] ?? 0,
-                    'image_url' => $imageUrl,
+                    'image_url' => $detectionImageUrl,  // ✅ Now saves image WITH bounding boxes
                     'recommendations' => json_encode($recommendations['recommendations'] ?? []),
                     'harvest_tips' => json_encode($recommendations['harvest_tips'] ?? []),
                 ]);
@@ -470,7 +481,8 @@ class IotController extends Controller
 
             Log::info('Saved detection results', [
                 'total_saved' => count($yoloDetectionResult['detections']),
-                'sensor_data_id' => $sensorData->id
+                'sensor_data_id' => $sensorData->id,
+                'image_url_type' => $detectionImageUrl === $imageUrl ? 'original' : 'with_bounding_boxes'
             ]);
         } else {
             Log::warning('No YOLO detections to save', [
@@ -481,7 +493,7 @@ class IotController extends Controller
             ]);
         }
 
-        // Update crop image
+        // Update crop image - keep original image
         if ($imageUrl) {
             $cropExist->update(['image' => $imageUrl]);
         }
@@ -493,7 +505,8 @@ class IotController extends Controller
             'status' => 'success',
             'message' => 'Data saved successfully',
             'data' => $sensorData,
-            'image_url' => $imageUrl,
+            'original_image_url' => $imageUrl,  // ✅ Original image
+            'detection_image_url' => $detectionImageUrl ?? null,  // ✅ Image with bounding boxes
             'yolo_detection' => $yoloDetectionResult
         ], 200);
 

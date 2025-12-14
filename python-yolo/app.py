@@ -9,14 +9,17 @@ import os
 from datetime import datetime
 import base64
 import sys
+import cloudinary
+import cloudinary.uploader
+from cloudinary.utils import cloudinary_url
 
 app = Flask(__name__)
 
 # ✅ ENHANCED CORS Configuration
 CORS(app, resources={
     r"/*": {
-        "origins": "*",  # In production, replace with your Laravel domain
-        "methods": ["GET", "POST", "OPTIONS"],  # Added OPTIONS
+        "origins": "*",
+        "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
         "expose_headers": ["Content-Type"],
         "supports_credentials": True,
@@ -24,7 +27,6 @@ CORS(app, resources={
     }
 })
 
-# ✅ Handle Preflight OPTIONS Requests
 @app.before_request
 def handle_preflight():
     if request.method == "OPTIONS":
@@ -34,7 +36,6 @@ def handle_preflight():
         response.headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
         return response, 200
 
-# ✅ Log ALL Incoming Requests
 @app.before_request
 def log_request_info():
     print("\n" + "=" * 80, flush=True)
@@ -46,19 +47,11 @@ def log_request_info():
     print(f"🔗 Path: {request.path}", flush=True)
     print(f"🌍 Origin: {request.headers.get('Origin', 'No Origin Header')}", flush=True)
     print(f"📦 Content-Type: {request.content_type}", flush=True)
-    print(f"📄 Is JSON: {request.is_json}", flush=True)
-    print(f"📁 Files: {list(request.files.keys())}", flush=True)
-    print(f"📝 Form Keys: {list(request.form.keys())}", flush=True)
-    print(f"🔑 Headers:", flush=True)
-    for key, value in request.headers:
-        print(f"   {key}: {value}", flush=True)
     print("=" * 80, flush=True)
 
-# ✅ Log ALL Responses
 @app.after_request
 def log_response_info(response):
     print(f"✅ RESPONSE: {response.status_code} - {request.method} {request.path}", flush=True)
-    # Add CORS headers to all responses
     response.headers.add('Access-Control-Allow-Origin', '*')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept,X-Requested-With')
     response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
@@ -70,7 +63,6 @@ print("🚀 YOLO DETECTION SERVICE INITIALIZING", flush=True)
 print("=" * 80, flush=True)
 print(f"Python version: {sys.version}", flush=True)
 print(f"Working directory: {os.getcwd()}", flush=True)
-print(f"Files in working dir: {os.listdir('.')}", flush=True)
 print("=" * 80, flush=True)
 
 # Load YOLO11s model
@@ -82,24 +74,14 @@ def load_model():
     global model
     try:
         print(f"🔍 Looking for model at: {MODEL_PATH}", flush=True)
-        print(f"📂 Current directory: {os.getcwd()}", flush=True)
-        print(f"📁 Files in current directory: {os.listdir('.')}", flush=True)
-
-        if os.path.exists('models'):
-            print(f"📁 Files in models/: {os.listdir('models')}", flush=True)
-        else:
-            print("❌ models/ directory does not exist!", flush=True)
-            return False
 
         if os.path.exists(MODEL_PATH):
             print(f"✅ Model file found at {MODEL_PATH}", flush=True)
-            print(f"📊 Model file size: {os.path.getsize(MODEL_PATH) / (1024*1024):.2f} MB", flush=True)
             model = YOLO(MODEL_PATH)
             print(f"✅ YOLO11s Model loaded from: {MODEL_PATH}", flush=True)
             return True
         else:
             print(f"❌ Model not found at {MODEL_PATH}", flush=True)
-            print(f"📂 Absolute path: {os.path.abspath(MODEL_PATH)}", flush=True)
             return False
     except Exception as e:
         print(f"❌ Error loading model: {e}", flush=True)
@@ -112,14 +94,42 @@ print("📦 Loading YOLO model...", flush=True)
 model_loaded = load_model()
 print(f"✅ Model loaded: {model_loaded}", flush=True)
 
-# Create directories for saving results (optional in production)
-os.makedirs('results', exist_ok=True)
-os.makedirs('uploads', exist_ok=True)
+# Configure Cloudinary
+cloudinary.config(
+    cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.environ.get('CLOUDINARY_API_KEY'),
+    api_secret=os.environ.get('CLOUDINARY_API_SECRET'),
+    secure=True
+)
+
+# Check Cloudinary configuration
+cloudinary_configured = all([
+    os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    os.environ.get('CLOUDINARY_API_KEY'),
+    os.environ.get('CLOUDINARY_API_SECRET')
+])
+
+if cloudinary_configured:
+    print("✅ Cloudinary configured successfully", flush=True)
+    print(f"📁 Cloud name: {os.environ.get('CLOUDINARY_CLOUD_NAME')}", flush=True)
+else:
+    print("⚠️  Cloudinary not fully configured - will use local storage only", flush=True)
+
+# Create directories for saving results
+# Use /tmp for Railway (ephemeral storage)
+RESULTS_DIR = os.environ.get('RESULTS_DIR', '/tmp/results')
+UPLOADS_DIR = os.environ.get('UPLOADS_DIR', '/tmp/uploads')
+
+os.makedirs(RESULTS_DIR, exist_ok=True)
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+
+print(f"📁 Results directory: {RESULTS_DIR}", flush=True)
+print(f"📁 Uploads directory: {UPLOADS_DIR}", flush=True)
 
 # Set max content length (16MB)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
-# Recommendations database for Mustasa and Pechay
+# Recommendations database (keeping your existing one)
 RECOMMENDATIONS_DB = {
     'mustasa_healthy': {
         'crop_type': 'Mustasa (Mustard Greens)',
@@ -130,32 +140,7 @@ RECOMMENDATIONS_DB = {
         'recommendations': [
             'Continue current care routine - your mustasa is thriving',
             'Monitor leaves regularly for any discoloration',
-            'Maintain consistent soil moisture',
-            'Harvest outer leaves regularly to encourage new growth',
-            'Ensure 4-6 hours of sunlight daily'
-        ],
-        'preventive_measures': [
-            'Inspect plants daily for pest or disease signs',
-            'Maintain spacing of 6-8 inches between plants',
-            'Keep growing area clean and weed-free',
-            'Practice crop rotation every season',
-            'Water in the morning to allow foliage to dry'
-        ],
-        'fertilizer_recommendation': 'Apply balanced 10-10-10 fertilizer every 2 weeks, or use organic compost tea',
-        'watering_schedule': 'Water consistently - 1 inch per week, keep soil moist but not waterlogged',
-        'urgency': 'low',
-        'estimated_recovery_days': 0,
-        'optimal_conditions': {
-            'temperature': '15-20°C (60-68°F)',
-            'humidity': '50-70%',
-            'soil_ph': '6.0-7.5',
-            'sunlight': '4-6 hours daily'
-        },
-        'harvest_tips': [
-            'Ready to harvest in 30-45 days',
-            'Pick outer leaves first',
-            'Harvest in the morning for best flavor',
-            'Cut leaves 1 inch above soil level'
+            'Maintain consistent soil moisture'
         ]
     },
     'mustasa_leaf_spot': {
@@ -163,258 +148,213 @@ RECOMMENDATIONS_DB = {
         'condition': 'Leaf Spot Disease',
         'severity': 'medium',
         'severity_level': 2,
-        'treatment': 'Fungicide application and improved sanitation',
-        'recommendations': [
-            'Remove all infected leaves immediately and destroy (do not compost)',
-            'Apply copper-based fungicide or neem oil spray',
-            'Spray early morning, covering both sides of leaves',
-            'Repeat treatment every 7-10 days',
-            'Improve air circulation by thinning plants if crowded',
-            'Avoid overhead watering - water at soil level only',
-            'Disinfect tools with 10% bleach solution after use'
-        ],
-        'preventive_measures': [
-            'Space plants 8-10 inches apart for better air flow',
-            'Remove plant debris and weeds regularly',
-            'Use drip irrigation or water at base only',
-            'Avoid working with plants when leaves are wet',
-            'Apply organic mulch to prevent soil splash',
-            'Rotate crops - don\'t plant mustasa in same spot for 2 years',
-            'Choose disease-resistant varieties when available'
-        ],
-        'fertilizer_recommendation': 'Reduce nitrogen temporarily, use balanced 5-10-10 with calcium',
-        'watering_schedule': 'Water at base in early morning only, reduce frequency to let soil dry slightly between waterings',
-        'urgency': 'medium',
-        'estimated_recovery_days': 14,
-        'optimal_conditions': {
-            'temperature': '15-20°C',
-            'humidity': 'Reduce to below 60%',
-            'soil_ph': '6.0-7.5',
-            'air_circulation': 'Increase significantly'
-        },
-        'product_suggestions': [
-            'Copper hydroxide fungicide',
-            'Neem oil organic spray',
-            'Calcium-enriched fertilizer',
-            'Organic mulch (straw or grass clippings)',
-            'Drip irrigation tubing'
-        ]
+        'treatment': 'Fungicide application and improved sanitation'
     },
     'mustasa_yellow_leaf': {
         'crop_type': 'Mustasa (Mustard Greens)',
         'condition': 'Yellow Leaf / Nutrient Deficiency',
         'severity': 'medium',
         'severity_level': 2,
-        'treatment': 'Nutrient supplementation and care adjustment',
-        'recommendations': [
-            'Test soil pH and nutrient levels if possible',
-            'Apply nitrogen-rich fertilizer immediately (higher N ratio)',
-            'Spray foliar feed with liquid fertilizer for quick response',
-            'Check for pest infestation (aphids can cause yellowing)',
-            'Ensure proper drainage - yellowing can indicate overwatering',
-            'Remove severely yellowed leaves to redirect plant energy',
-            'Add compost or aged manure to soil'
-        ],
-        'preventive_measures': [
-            'Maintain consistent fertilization schedule (every 2 weeks)',
-            'Ensure soil pH is 6.0-7.5 for optimal nutrient uptake',
-            'Improve drainage if soil stays soggy',
-            'Add organic matter to improve soil quality',
-            'Monitor for pests regularly (aphids, flea beetles)',
-            'Avoid overwatering which leads to root problems',
-            'Mulch to maintain consistent soil moisture'
-        ],
-        'fertilizer_recommendation': 'High nitrogen fertilizer 20-10-10 or fish emulsion (5-1-1), apply every week until green returns',
-        'watering_schedule': 'Water deeply but less frequently, check soil moisture 2 inches deep before watering',
-        'urgency': 'medium',
-        'estimated_recovery_days': 10,
-        'possible_causes': [
-            'Nitrogen deficiency (most common)',
-            'Overwatering / poor drainage',
-            'Iron deficiency (if yellowing between veins)',
-            'Natural aging of lower leaves',
-            'Pest damage',
-            'Root problems'
-        ],
-        'optimal_conditions': {
-            'temperature': '15-20°C',
-            'humidity': '50-70%',
-            'soil_ph': '6.0-7.5',
-            'drainage': 'Well-draining soil essential'
-        },
-        'product_suggestions': [
-            'Fish emulsion fertilizer (5-1-1)',
-            'Liquid nitrogen fertilizer (20-10-10)',
-            'Chelated iron supplement',
-            'Organic compost',
-            'pH test kit',
-            'Foliar spray fertilizer'
-        ]
+        'treatment': 'Nutrient supplementation and care adjustment'
     },
     'pechay_healthy': {
         'crop_type': 'Pechay (Chinese Cabbage)',
         'condition': 'Healthy',
         'severity': 'none',
         'severity_level': 0,
-        'treatment': 'No treatment needed - Continue current care',
-        'recommendations': [
-            'Continue current care routine - your pechay is in excellent condition',
-            'Monitor for pests (cabbage worms, aphids) regularly',
-            'Maintain consistent moisture for tender leaves',
-            'Harvest when heads are firm but before bolting',
-            'Ensure 4-6 hours of sunlight with afternoon shade'
-        ],
-        'preventive_measures': [
-            'Inspect undersides of leaves for eggs and pests',
-            'Space plants 8-12 inches apart',
-            'Use row covers to protect from pests',
-            'Keep area weed-free',
-            'Harvest before hot weather to prevent bolting',
-            'Water consistently at base of plants'
-        ],
-        'fertilizer_recommendation': 'Balanced 10-10-10 fertilizer every 2-3 weeks, or compost tea weekly',
-        'watering_schedule': 'Keep soil consistently moist - 1-1.5 inches per week, water daily in hot weather',
-        'urgency': 'low',
-        'estimated_recovery_days': 0,
-        'optimal_conditions': {
-            'temperature': '15-20°C (60-68°F) - cool weather crop',
-            'humidity': '60-70%',
-            'soil_ph': '6.0-7.5',
-            'sunlight': '4-6 hours, prefers cooler temperatures'
-        },
-        'harvest_tips': [
-            'Ready to harvest in 40-50 days',
-            'Harvest when heads are firm and compact',
-            'Cut at base with sharp knife',
-            'Best harvested in cool morning',
-            'Can harvest baby leaves earlier for salads'
-        ]
+        'treatment': 'No treatment needed - Continue current care'
     },
     'pechay_leaf_spot': {
         'crop_type': 'Pechay (Chinese Cabbage)',
         'condition': 'Leaf Spot Disease',
         'severity': 'medium',
         'severity_level': 2,
-        'treatment': 'Fungicide treatment and sanitation',
-        'recommendations': [
-            'Remove infected outer leaves immediately and destroy',
-            'Apply copper fungicide or organic neem oil spray',
-            'Spray in early morning, covering all leaf surfaces',
-            'Repeat application every 7-10 days',
-            'Increase spacing between plants for air circulation',
-            'Water only at soil level - never wet the leaves',
-            'Consider harvesting early if infection is spreading',
-            'Sanitize all gardening tools between plants'
-        ],
-        'preventive_measures': [
-            'Space plants 10-12 inches apart minimum',
-            'Use drip irrigation or soaker hoses only',
-            'Remove all plant debris after harvest',
-            'Avoid overhead watering completely',
-            'Apply thin layer of mulch to prevent soil splash',
-            'Practice 2-3 year crop rotation',
-            'Avoid working with wet plants',
-            'Choose resistant varieties when replanting'
-        ],
-        'fertilizer_recommendation': 'Reduce nitrogen, use 5-10-10 with added calcium to strengthen cell walls',
-        'watering_schedule': 'Water at base only in early morning, allow foliage to stay dry',
-        'urgency': 'medium',
-        'estimated_recovery_days': 14,
-        'optimal_conditions': {
-            'temperature': '15-20°C',
-            'humidity': 'Keep below 60% around plants',
-            'soil_ph': '6.0-7.5',
-            'air_circulation': 'Critical - ensure good ventilation'
-        },
-        'product_suggestions': [
-            'Copper fungicide spray',
-            'Organic neem oil concentrate',
-            'Calcium supplement spray',
-            'Drip irrigation system',
-            'Organic mulch',
-            'Hand pruners for removing leaves'
-        ]
+        'treatment': 'Fungicide treatment and sanitation'
     },
     'pechay_yellow_leaf': {
         'crop_type': 'Pechay (Chinese Cabbage)',
         'condition': 'Yellow Leaf / Nutrient Deficiency',
         'severity': 'medium',
         'severity_level': 2,
-        'treatment': 'Nutrient correction and environmental adjustment',
-        'recommendations': [
-            'Apply nitrogen-rich fertilizer immediately',
-            'Use foliar spray for rapid nutrient absorption',
-            'Check and adjust soil pH to 6.0-7.5',
-            'Improve drainage if soil is waterlogged',
-            'Remove heavily yellowed outer leaves',
-            'Check for root damage or pests',
-            'Add aged compost to boost soil fertility',
-            'Ensure adequate but not excessive watering'
-        ],
-        'preventive_measures': [
-            'Fertilize regularly every 2 weeks during growth',
-            'Test and maintain proper soil pH',
-            'Ensure excellent soil drainage',
-            'Add organic matter before planting',
-            'Monitor for cabbage root maggots',
-            'Check for aphids which can cause yellowing',
-            'Mulch to maintain consistent moisture',
-            'Avoid planting in compacted soil'
-        ],
-        'fertilizer_recommendation': 'High nitrogen fertilizer 21-0-0 or blood meal, followed by balanced 10-10-10 weekly',
-        'watering_schedule': 'Water deeply 2-3 times per week, ensure soil drains well and isn\'t soggy',
-        'urgency': 'medium',
-        'estimated_recovery_days': 10,
-        'possible_causes': [
-            'Nitrogen deficiency (primary cause)',
-            'Overwatering / waterlogged soil',
-            'Poor drainage / root rot',
-            'Soil pH too low or too high',
-            'Cabbage root maggot damage',
-            'Natural aging of outer leaves',
-            'Heat stress / bolting'
-        ],
-        'optimal_conditions': {
-            'temperature': '15-20°C - prefers cool weather',
-            'humidity': '60-70%',
-            'soil_ph': '6.0-7.5',
-            'drainage': 'Well-draining, loose soil essential'
-        },
-        'product_suggestions': [
-            'Blood meal (12-0-0) organic nitrogen',
-            'Fish emulsion liquid fertilizer',
-            'Liquid nitrogen fertilizer (21-0-0)',
-            'Soil pH test kit',
-            'Chelated iron supplement',
-            'Compost or aged manure',
-            'Foliar spray fertilizer'
-        ]
+        'treatment': 'Nutrient correction and environmental adjustment'
     }
 }
 
 def get_recommendations(class_name):
     """Get detailed recommendations for detected class"""
-    # Normalize class name
     class_name_normalized = class_name.lower().strip()
-
     if class_name_normalized in RECOMMENDATIONS_DB:
         return RECOMMENDATIONS_DB[class_name_normalized]
 
-    # Default recommendations if class not found
     return {
         'crop_type': 'Unknown',
         'condition': class_name.replace('_', ' ').title(),
         'severity': 'unknown',
         'severity_level': 1,
-        'treatment': 'Consult with agricultural expert',
-        'recommendations': ['Monitor plant closely', 'Document symptoms', 'Seek expert advice'],
-        'preventive_measures': ['Maintain good plant hygiene'],
-        'fertilizer_recommendation': 'Standard balanced fertilizer',
-        'watering_schedule': 'Regular watering',
-        'urgency': 'medium',
-        'estimated_recovery_days': None,
-        'product_suggestions': ['Consult expert']
+        'treatment': 'Consult with agricultural expert'
     }
+
+def draw_bounding_boxes(image, detections, result_names):
+    """
+    Draw bounding boxes on image with class labels and confidence
+
+    Args:
+        image: OpenCV image (numpy array)
+        detections: List of detection dictionaries
+        result_names: Dictionary mapping class IDs to class names
+
+    Returns:
+        Image with drawn bounding boxes
+    """
+    img_with_boxes = image.copy()
+
+    # Define colors for different severity levels
+    SEVERITY_COLORS = {
+        0: (0, 255, 0),      # Green - Healthy
+        1: (0, 255, 255),    # Yellow - Low severity
+        2: (0, 165, 255),    # Orange - Medium severity
+        3: (0, 0, 255)       # Red - High severity
+    }
+
+    for detection in detections:
+        bbox = detection['bbox']
+        class_name = detection['class']
+        confidence = detection['confidence']
+
+        # Get severity level for color
+        recommendations = detection.get('recommendations', {})
+        severity_level = recommendations.get('severity_level', 1)
+        color = SEVERITY_COLORS.get(severity_level, (255, 0, 0))
+
+        # Extract coordinates
+        x1 = int(bbox['x1'])
+        y1 = int(bbox['y1'])
+        x2 = int(bbox['x2'])
+        y2 = int(bbox['y2'])
+
+        # Draw rectangle
+        cv2.rectangle(img_with_boxes, (x1, y1), (x2, y2), color, 2)
+
+        # Prepare label
+        label = f"{class_name} {confidence:.2%}"
+
+        # Get text size for background
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.6
+        thickness = 2
+        (text_width, text_height), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+
+        # Draw background rectangle for text
+        cv2.rectangle(
+            img_with_boxes,
+            (x1, y1 - text_height - 10),
+            (x1 + text_width, y1),
+            color,
+            -1
+        )
+
+        # Draw text
+        cv2.putText(
+            img_with_boxes,
+            label,
+            (x1, y1 - 5),
+            font,
+            font_scale,
+            (255, 255, 255),  # White text
+            thickness
+        )
+
+    return img_with_boxes
+
+def save_detection_image(image_with_boxes, prefix="detection"):
+    """
+    Save image with bounding boxes to Cloudinary (and optionally local disk)
+
+    Args:
+        image_with_boxes: OpenCV image with drawn boxes
+        prefix: Filename prefix
+
+    Returns:
+        Tuple of (success, cloudinary_url, local_path, error_message)
+    """
+    try:
+        # Generate unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"{prefix}_{timestamp}"
+
+        cloudinary_url = None
+        local_path = None
+
+        # Upload to Cloudinary if configured
+        if cloudinary_configured:
+            try:
+                print("☁️  Uploading to Cloudinary...", flush=True)
+
+                # Encode image to JPEG in memory
+                success, buffer = cv2.imencode('.jpg', image_with_boxes, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                if not success:
+                    raise Exception("Failed to encode image")
+
+                # Convert to bytes
+                img_bytes = buffer.tobytes()
+
+                # Upload to Cloudinary
+                upload_result = cloudinary.uploader.upload(
+                    img_bytes,
+                    folder="yolo_detections",  # Organize in folder
+                    public_id=filename,
+                    resource_type="image",
+                    overwrite=False,
+                    format="jpg"
+                )
+
+                cloudinary_url = upload_result.get('secure_url')
+                print(f"✅ Uploaded to Cloudinary: {cloudinary_url}", flush=True)
+
+            except Exception as cloudinary_error:
+                print(f"⚠️  Cloudinary upload failed: {cloudinary_error}", flush=True)
+                # Continue to save locally as fallback
+
+        # Save locally as fallback or backup
+        local_filename = f"{filename}.jpg"
+        local_path = os.path.join(RESULTS_DIR, local_filename)
+
+        success = cv2.imwrite(local_path, image_with_boxes)
+
+        if success:
+            file_size = os.path.getsize(local_path)
+            print(f"✅ Saved locally: {local_path} ({file_size} bytes)", flush=True)
+        else:
+            print(f"⚠️  Failed to save locally", flush=True)
+
+        # Return success if either Cloudinary or local save worked
+        if cloudinary_url or success:
+            return True, cloudinary_url, local_path, None
+        else:
+            error_msg = "Failed to save image to Cloudinary and local storage"
+            return False, None, None, error_msg
+
+    except Exception as e:
+        error_msg = f"Error saving image: {str(e)}"
+        print(f"❌ {error_msg}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return False, None, None, error_msg
+
+def image_to_base64(image):
+    """Convert OpenCV image to base64 string"""
+    try:
+        # Encode image to JPEG
+        success, buffer = cv2.imencode('.jpg', image)
+        if not success:
+            return None
+
+        # Convert to base64
+        jpg_as_text = base64.b64encode(buffer).decode('utf-8')
+        return jpg_as_text
+    except Exception as e:
+        print(f"❌ Error converting image to base64: {e}", flush=True)
+        return None
 
 @app.route('/', methods=['GET'])
 def home():
@@ -440,14 +380,21 @@ def health_check():
         'model': MODEL_PATH,
         'model_loaded': model is not None,
         'available_classes': list(RECOMMENDATIONS_DB.keys()),
-        'total_classes': len(RECOMMENDATIONS_DB)
+        'total_classes': len(RECOMMENDATIONS_DB),
+        'results_dir': RESULTS_DIR,
+        'cloudinary_configured': cloudinary_configured,
+        'storage': 'cloudinary' if cloudinary_configured else 'local'
     })
 
 @app.route('/detect', methods=['POST', 'OPTIONS'])
 def detect():
     """
     Detect objects from uploaded image file or base64
-    Expected: multipart/form-data with 'image' file OR JSON with base64 'image'
+    Now includes option to save image with bounding boxes
+
+    Query params:
+        - save_image: true/false (default: false) - Save image with bounding boxes
+        - return_image: true/false (default: false) - Return base64 image with boxes
     """
     print("🎯 /detect endpoint called", flush=True)
 
@@ -490,11 +437,9 @@ def detect():
                 }), 400
 
             image_data = data['image']
-            print(f"📊 Base64 string length: {len(image_data)}", flush=True)
 
             # Handle base64 with data URI prefix
             if 'base64,' in image_data:
-                print("🔄 Removing data URI prefix", flush=True)
                 image_data = image_data.split('base64,')[1]
 
             # Decode base64
@@ -514,7 +459,7 @@ def detect():
             print("❌ No valid image source found", flush=True)
             return jsonify({
                 'success': False,
-                'error': 'No image provided. Send either file upload or JSON with base64 image'
+                'error': 'No image provided'
             }), 400
 
         if img is None:
@@ -526,9 +471,14 @@ def detect():
 
         print(f"✅ Image loaded successfully: {img.shape}", flush=True)
 
-        # Get confidence threshold from request (default 0.25)
+        # Get options from request
+        save_image = request.args.get('save_image', 'false').lower() == 'true'
+        return_image = request.args.get('return_image', 'false').lower() == 'true'
         confidence_threshold = float(request.form.get('confidence', 0.25)) if not request.is_json else 0.25
+
         print(f"🎯 Confidence threshold: {confidence_threshold}", flush=True)
+        print(f"💾 Save image: {save_image}", flush=True)
+        print(f"📤 Return image: {return_image}", flush=True)
 
         # Run YOLO11s detection
         print("🔍 Running YOLO detection...", flush=True)
@@ -554,7 +504,6 @@ def detect():
 
                 print(f"   Detection: {class_name} ({confidence:.2%})", flush=True)
 
-                # Get recommendations for this detection
                 recommendations = get_recommendations(class_name)
 
                 detections.append({
@@ -574,7 +523,7 @@ def detect():
         else:
             print("ℹ️  No detections found", flush=True)
 
-        # Get highest confidence detection for primary recommendation
+        # Get highest confidence detection
         primary_detection = None
         if detections:
             primary_detection = max(detections, key=lambda x: x['confidence'])
@@ -582,6 +531,7 @@ def detect():
         # Get image dimensions
         height, width = img.shape[:2]
 
+        # Prepare response
         response_data = {
             'success': True,
             'detections': detections,
@@ -595,6 +545,37 @@ def detect():
             'timestamp': datetime.now().isoformat()
         }
 
+        # Draw bounding boxes and save/return if requested
+        if detections and (save_image or return_image):
+            print("🎨 Drawing bounding boxes...", flush=True)
+            img_with_boxes = draw_bounding_boxes(img, detections, result.names)
+
+            # Save image to Cloudinary and/or disk
+            if save_image:
+                success, cloudinary_url, local_path, error_msg = save_detection_image(img_with_boxes)
+                response_data['image_saved'] = success
+
+                if success:
+                    # Prefer Cloudinary URL, fallback to local path info
+                    if cloudinary_url:
+                        response_data['image_url'] = cloudinary_url
+                        response_data['storage'] = 'cloudinary'
+                        print(f"✅ Image available at: {cloudinary_url}", flush=True)
+                    if local_path:
+                        response_data['local_path'] = local_path
+                        response_data['local_filename'] = os.path.basename(local_path)
+                        if not cloudinary_url:
+                            response_data['storage'] = 'local'
+                else:
+                    response_data['save_error'] = error_msg
+
+            # Return base64 image
+            if return_image:
+                base64_image = image_to_base64(img_with_boxes)
+                if base64_image:
+                    response_data['image_with_boxes'] = f"data:image/jpeg;base64,{base64_image}"
+                    print("✅ Added base64 image to response", flush=True)
+
         print(f"✅ Returning success response with {len(detections)} detections", flush=True)
         return jsonify(response_data)
 
@@ -602,83 +583,6 @@ def detect():
         print(f"❌ ERROR in /detect: {str(e)}", flush=True)
         import traceback
         traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@app.route('/detect/batch', methods=['POST'])
-def detect_batch():
-    """Handle multiple images at once"""
-    if model is None:
-        return jsonify({
-            'success': False,
-            'error': 'Model not loaded'
-        }), 503
-
-    try:
-        if 'images' not in request.files:
-            return jsonify({
-                'success': False,
-                'error': 'No images provided'
-            }), 400
-
-        files = request.files.getlist('images')
-        confidence_threshold = float(request.form.get('confidence', 0.25))
-        all_results = []
-
-        for file in files:
-            img_bytes = file.read()
-            nparr = np.frombuffer(img_bytes, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-            if img is None:
-                continue
-
-            results = model.predict(
-                source=img,
-                conf=confidence_threshold,
-                verbose=False
-            )
-
-            detections = []
-            result = results[0]
-
-            if len(result.boxes) > 0:
-                boxes = result.boxes
-                for box in boxes:
-                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                    confidence = float(box.conf[0].cpu().numpy())
-                    class_id = int(box.cls[0].cpu().numpy())
-                    class_name = result.names[class_id]
-
-                    recommendations = get_recommendations(class_name)
-
-                    detections.append({
-                        'class': class_name,
-                        'confidence': float(confidence),
-                        'bbox': {
-                            'x1': float(x1),
-                            'y1': float(y1),
-                            'x2': float(x2),
-                            'y2': float(y2)
-                        },
-                        'recommendations': recommendations
-                    })
-
-            all_results.append({
-                'filename': file.filename,
-                'detections': detections,
-                'total': len(detections)
-            })
-
-        return jsonify({
-            'success': True,
-            'results': all_results
-        })
-
-    except Exception as e:
-        print(f"❌ Batch Error: {str(e)}", flush=True)
         return jsonify({
             'success': False,
             'error': str(e)
@@ -727,16 +631,15 @@ def get_class_recommendations(class_name):
         }), 500
 
 if __name__ == '__main__':
-    # Check if model exists
     if not model_loaded:
         print(f"⚠️  Warning: Model not found at {MODEL_PATH}", flush=True)
         print("Service will start but detection endpoints will return 503", flush=True)
 
     print(f"\n✅ YOLO11s Detection Service Starting", flush=True)
     print(f"📂 Model path: {MODEL_PATH}", flush=True)
+    print(f"📁 Results directory: {RESULTS_DIR}", flush=True)
     print(f"🌿 Crop classes: {list(RECOMMENDATIONS_DB.keys())}", flush=True)
     print(f"🚀 Starting Flask server on http://0.0.0.0:5000\n", flush=True)
 
-    # Use environment PORT or default to 5000
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
