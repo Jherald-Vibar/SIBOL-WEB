@@ -6,8 +6,8 @@ wheel>=0.42.0
 flask==3.0.0
 flask-cors==4.0.0
 
-# YOLO and Computer Vision
-ultralytics==8.1.0
+# YOLO and Computer Vision - UPDATED for YOLO11
+ultralytics>=8.3.0
 opencv-python-headless==4.8.1.78
 pillow==10.1.0
 
