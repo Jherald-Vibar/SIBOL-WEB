@@ -392,13 +392,14 @@ class GardenController extends Controller
         ], 404);
     }
 
-    // Get latest sensor data
-    $latestData = SensorData::with('crop')
-        ->where('esp_id', $esp->id)
-        ->orderBy('created_at', 'desc')
-        ->first();
 
-    // Get historical data
+    $latestData = SensorData::with('crop')
+      ->where('esp_id', $esp->id)
+      ->where('crop_id', $cropSensor->id)
+      ->orderBy('created_at', 'desc')
+      ->first();
+
+
     $allData = SensorData::where('esp_id', $esp->id)
         ->where('crop_id', $cropSensor->id)
         ->orderBy('created_at', 'desc')
