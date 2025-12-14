@@ -552,31 +552,32 @@ class IotController extends Controller
     }
 
     public function getDataByDay(Request $request, $year, $month, $day) {
-        $user = $request->user();
-        $esp = Esp::where("user_id", $user->id)->first();
+    $user = $request->user();
 
-        if (!$esp) {
-            return response()->json([
-                'data' => [],
-                'message' => 'No ESP device found for this user'
-            ], 200);
-        }
+    // Get all ESP devices for this user
+    $espIds = Esp::where("user_id", $user->id)->pluck('id');
 
-        $selectedDay = sprintf('%04d-%02d-%02d', $year, $month, $day);
-
-        $data = SensorData::where("esp_id", $esp->id)
-            ->with('crop')
-            ->whereDate('created_at', $selectedDay)
-            ->orderBy('created_at', 'asc')
-            ->take(5)
-            ->get();
-
+    if ($espIds->isEmpty()) {
         return response()->json([
-            'data' => $data,
-            'count' => $data->count(),
-            'date' => $selectedDay
+            'data' => [],
+            'message' => 'No ESP device found for this user'
         ], 200);
     }
+
+    $selectedDay = sprintf('%04d-%02d-%02d', $year, $month, $day);
+
+    $data = SensorData::whereIn("esp_id", $espIds)
+        ->with('crop')
+        ->whereDate('created_at', $selectedDay)
+        ->orderBy('created_at', 'asc')
+        ->get();
+
+      return response()->json([
+          'data' => $data,
+          'count' => $data->count(),
+          'date' => $selectedDay
+      ], 200);
+  }
 
     public function downloadMonthlyReport(Request $request, $year, $month) {
         try {
