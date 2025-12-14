@@ -28,15 +28,30 @@ def load_model():
     """Load model with error handling"""
     global model
     try:
+        print(f"🔍 Looking for model at: {MODEL_PATH}")
+        print(f"📂 Current directory: {os.getcwd()}")
+        print(f"📁 Files in current directory: {os.listdir('.')}")
+
+        if os.path.exists('models'):
+            print(f"📁 Files in models/: {os.listdir('models')}")
+        else:
+            print("❌ models/ directory does not exist!")
+            return False
+
         if os.path.exists(MODEL_PATH):
+            print(f"✅ Model file found at {MODEL_PATH}")
+            print(f"📊 Model file size: {os.path.getsize(MODEL_PATH) / (1024*1024):.2f} MB")
             model = YOLO(MODEL_PATH)
             print(f"✅ YOLO11s Model loaded from: {MODEL_PATH}")
             return True
         else:
-            print(f"⚠️  Model not found at {MODEL_PATH}")
+            print(f"❌ Model not found at {MODEL_PATH}")
+            print(f"📂 Absolute path: {os.path.abspath(MODEL_PATH)}")
             return False
     except Exception as e:
         print(f"❌ Error loading model: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 # Load model on startup

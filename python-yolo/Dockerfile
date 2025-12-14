@@ -25,6 +25,12 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # Copy application code
 COPY . .
 
+# Debug: List files to verify model is present
+RUN echo "📁 Files copied to container:" && \
+    ls -lah && \
+    echo "📂 Contents of models/:" && \
+    ls -lah models/ || echo "❌ models/ directory not found!"
+
 # Expose port (Railway sets PORT env variable)
 EXPOSE 8080
 
