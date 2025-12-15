@@ -110,8 +110,18 @@ class GardenController extends Controller
         try {
             $validated = $validator->validated();
 
-            // Check if crop exists in CropProfile
-            $existInCropProfile = CropProfile::where("name", $validated["name"])->first();
+            $inputName = $validated["name"];
+            $baseName = preg_replace('/\s*\d+$/', '', $inputName);
+            $baseName = trim($baseName);
+
+
+            $existInCropProfile = CropProfile::all()->first(function($profile) use ($baseName) {
+                $profileBaseName = preg_replace('/\s*\d+$/', '', $profile->name);
+                $profileBaseName = trim($profileBaseName);
+
+                return $profileBaseName === $baseName;
+            });
+
 
             if (!$existInCropProfile) {
                 return response()->json([
