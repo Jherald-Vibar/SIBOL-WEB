@@ -129,7 +129,7 @@ print(f"📁 Uploads directory: {UPLOADS_DIR}", flush=True)
 # Set max content length (16MB)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
-# Recommendations database (keeping your existing one)
+# Recommendations database (UPDATED with all recommendations)
 RECOMMENDATIONS_DB = {
     'mustasa_healthy': {
         'crop_type': 'Mustasa (Mustard Greens)',
@@ -140,7 +140,9 @@ RECOMMENDATIONS_DB = {
         'recommendations': [
             'Continue current care routine - your mustasa is thriving',
             'Monitor leaves regularly for any discoloration',
-            'Maintain consistent soil moisture'
+            'Maintain consistent soil moisture',
+            'Ensure adequate sunlight (4-6 hours daily)',
+            'Keep soil well-draining to prevent root issues'
         ]
     },
     'mustasa_leaf_spot': {
@@ -148,35 +150,76 @@ RECOMMENDATIONS_DB = {
         'condition': 'Leaf Spot Disease',
         'severity': 'medium',
         'severity_level': 2,
-        'treatment': 'Fungicide application and improved sanitation'
+        'treatment': 'Fungicide application and improved sanitation',
+        'recommendations': [
+            'Apply copper-based fungicide or neem oil spray',
+            'Remove and destroy all infected leaves immediately',
+            'Improve air circulation by proper plant spacing',
+            'Avoid overhead watering - water at soil level',
+            'Apply fungicide every 7-10 days until symptoms improve',
+            'Ensure plants are not overcrowded'
+        ]
     },
     'mustasa_yellow_leaf': {
         'crop_type': 'Mustasa (Mustard Greens)',
         'condition': 'Yellow Leaf / Nutrient Deficiency',
         'severity': 'medium',
         'severity_level': 2,
-        'treatment': 'Nutrient supplementation and care adjustment'
+        'treatment': 'Nutrient supplementation and care adjustment',
+        'recommendations': [
+            'Apply nitrogen-rich fertilizer (urea or compost tea)',
+            'Check soil pH - mustasa prefers 6.0-7.5',
+            'Ensure consistent watering - avoid drought stress',
+            'Add organic matter or compost to improve soil',
+            'Monitor for pests that may cause yellowing',
+            'Consider foliar feeding for quick nutrient uptake'
+        ]
     },
     'pechay_healthy': {
         'crop_type': 'Pechay (Chinese Cabbage)',
         'condition': 'Healthy',
         'severity': 'none',
         'severity_level': 0,
-        'treatment': 'No treatment needed - Continue current care'
+        'treatment': 'No treatment needed - Continue current care',
+        'recommendations': [
+            'Continue current care routine - your pechay is thriving',
+            'Monitor leaves regularly for any discoloration',
+            'Maintain consistent soil moisture',
+            'Provide adequate sunlight (4-6 hours daily)',
+            'Fertilize every 2 weeks with balanced nutrients'
+        ]
     },
     'pechay_leaf_spot': {
         'crop_type': 'Pechay (Chinese Cabbage)',
         'condition': 'Leaf Spot Disease',
         'severity': 'medium',
         'severity_level': 2,
-        'treatment': 'Fungicide treatment and sanitation'
+        'treatment': 'Fungicide treatment and sanitation',
+        'recommendations': [
+            'Apply appropriate fungicide (copper-based or organic)',
+            'Remove and destroy infected leaves immediately',
+            'Improve air circulation around plants',
+            'Avoid overhead watering - water at base of plants',
+            'Space plants properly to reduce humidity',
+            'Apply fungicide treatment weekly until resolved',
+            'Practice crop rotation in future plantings'
+        ]
     },
     'pechay_yellow_leaf': {
         'crop_type': 'Pechay (Chinese Cabbage)',
         'condition': 'Yellow Leaf / Nutrient Deficiency',
         'severity': 'medium',
         'severity_level': 2,
-        'treatment': 'Nutrient correction and environmental adjustment'
+        'treatment': 'Nutrient correction and environmental adjustment',
+        'recommendations': [
+            'Apply balanced fertilizer with emphasis on nitrogen',
+            'Check and adjust soil pH to 6.0-7.5 range',
+            'Ensure adequate and consistent watering',
+            'Monitor for pest damage (aphids, caterpillars)',
+            'Add compost or organic matter to enrich soil',
+            'Consider micronutrient supplementation (iron, magnesium)',
+            'Avoid waterlogging which can cause yellowing'
+        ]
     }
 }
 
@@ -191,7 +234,12 @@ def get_recommendations(class_name):
         'condition': class_name.replace('_', ' ').title(),
         'severity': 'unknown',
         'severity_level': 1,
-        'treatment': 'Consult with agricultural expert'
+        'treatment': 'Consult with agricultural expert',
+        'recommendations': [
+            'Consult with a local agricultural expert',
+            'Take clear photos and share with extension services',
+            'Monitor plant condition daily for changes'
+        ]
     }
 
 def draw_bounding_boxes(image, detections, result_names):
