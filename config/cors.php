@@ -15,6 +15,7 @@ return [
 
     'allowed_origins' => [
         'https://sibol-smart-garden-web-production.up.railway.app',
+        'https://sibol-frontend.onrender.com',
         'http://localhost:5173',
         'http://localhost:3000',
     ],
