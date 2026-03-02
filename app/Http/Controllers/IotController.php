@@ -20,9 +20,9 @@ class IotController extends Controller
     {
         return new Cloudinary([
             'cloud' => [
-                'cloud_name' => env('CLOUDINARY_CLOUD_NAME', 'da02o1cvb'),
-                'api_key'    => env('CLOUDINARY_API_KEY', '484565416935298'),
-                'api_secret' => env('CLOUDINARY_API_SECRET', 'AGHIb8Z8mDBUtve43JuktPRdNYQ'),
+                'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
+                'api_key'    => env('CLOUDINARY_API_KEY'),
+                'api_secret' => env('CLOUDINARY_API_SECRET'),
             ],
             'url' => [
                 'secure' => true
