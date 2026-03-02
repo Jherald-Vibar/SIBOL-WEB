@@ -9,14 +9,17 @@ RUN apk add --no-cache \
     unzip \
     oniguruma-dev \
     libxml2-dev \
-    libpng-dev
+    libpng-dev \
+    openssl \
+    ca-certificates
 
 RUN docker-php-ext-install \
     pdo \
     pdo_mysql \
     mbstring \
     bcmath \
-    xml
+    xml && \
+    docker-php-ext-enable pdo_mysql
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
@@ -25,12 +28,6 @@ WORKDIR /var/www
 COPY . .
 
 RUN composer install --no-dev --optimize-autoloader
-
-WORKDIR /var/www/sibol-frontend
-RUN npm ci && npm run build
-RUN cp -r dist/* /var/www/public/
-
-WORKDIR /var/www
 
 RUN chmod -R 775 storage bootstrap/cache && \
     chown -R www-data:www-data storage bootstrap/cache
