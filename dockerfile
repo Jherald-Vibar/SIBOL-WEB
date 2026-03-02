@@ -42,18 +42,3 @@ RUN chmod +x /start.sh
 EXPOSE 8080
 
 CMD ["/start.sh"]
-```
-
-## Step 5 — Create `.dockerignore`
-
-In your project root, create `.dockerignore`:
-```
-node_modules
-sibol-frontend/node_modules
-.git
-.env
-storage/logs/*
-tests
-README.md
-nixpacks.toml
-Procfile
