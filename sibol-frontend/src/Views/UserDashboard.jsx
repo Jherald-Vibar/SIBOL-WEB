@@ -84,7 +84,7 @@ const UserDashboard = () => {
     const fetchWeather = async () => {
       try {
         const response = await axios.get(
-          "http://api.weatherapi.com/v1/forecast.json",
+          "https://api.weatherapi.com/v1/forecast.json",
           {
             params: {
               key: apikey,
