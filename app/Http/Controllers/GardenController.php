@@ -269,6 +269,35 @@ class GardenController extends Controller
         }
     }
 
+    public function claimEspDevice(Request $request, $gardenId) {
+      $user = $request->user();
+
+      $validator = Validator::make($request->all(), [
+        'esp-number' => 'required'
+      ]);
+
+      $garden = Garden::where('id', $gardenId)
+        ->where('user_id', $user->id)
+        ->first();
+
+      if (!$garden) {
+          return response()->json([
+              "success" => false,
+              "message" => "Garden not found or you don't have permission to access it"
+          ], 404);
+      }
+
+      $validated = $validator->validated();
+
+      $esp = Esp::create([
+        "user_id" => $user->id,
+        "garden_id" => $garden->id,
+        "serial_number" => $validated['esp-number'],
+        "status" => "inactive",
+      ]);
+
+    }
+
     public function getEsp(Request $request, $gardenId) {
         $user = $request->user();
 
