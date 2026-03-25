@@ -15,6 +15,7 @@ import AboutUs from './assets/about.jpg'
 import './homepage.css'
 import "mapbox-gl/dist/mapbox-gl.css";
 import mapboxgl from "mapbox-gl";
+import Footer from './Views/parts/Footer'
 
 const App = () => {
   const MapToken = import.meta.env.VITE_MAPS_APIKEY;
@@ -389,11 +390,7 @@ const App = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gradient-to-b from-green-950 to-green-900 text-white py-8 px-4 md:px-12">
-        <div className="text-center">
-          <p className="text-sm md:text-base opacity-80">© 2025 SIBOL. Empowering Farmers with Smart Technology.</p>
-        </div>
-      </footer>
+      <Footer/>
     </div>
   )
 }

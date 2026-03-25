@@ -65,6 +65,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete("/deleteGarden/{garden_id}", [GardenController::class, 'userGardenDelete']);
     Route::put('/updateCrop/{crop_id}', [GardenController::class, 'updateCrop']);
     Route::delete('/deleteCrop/{crop_id}', [GardenController::class, 'deleteCrop']);
+    Route::delete('/deleteEsp/{espId}',[GardenController::class, 'deleteEsp']);
 
 
     //Admin Routes

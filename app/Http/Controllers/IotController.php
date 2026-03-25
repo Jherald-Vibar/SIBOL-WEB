@@ -194,6 +194,9 @@ class IotController extends Controller
     }
 }*/
 
+
+
+
    public function getEspData(Request $request)
 {
     try {

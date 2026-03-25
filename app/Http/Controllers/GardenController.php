@@ -298,6 +298,14 @@ class GardenController extends Controller
 
     }
 
+    public function deleteEsp(Request $request, $espId) {
+      $user = $request->user();
+
+      $esp = Esp::where("user_id", $user->id)->where("id", $espId)->first();
+
+      $esp->delete();
+    }
+
     public function getEsp(Request $request, $gardenId) {
         $user = $request->user();
 
