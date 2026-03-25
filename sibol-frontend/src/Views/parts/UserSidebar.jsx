@@ -29,63 +29,49 @@ const UserSidebar = () => {
       showCancelButton: true,
       confirmButtonText: "Yes, logout",
       cancelButtonText: "Cancel",
-      confirmButtonColor: '#dc2626',
+      confirmButtonColor: '#d4840a',
       cancelButtonColor: '#6b7280',
       reverseButtons: true,
-      backdrop: true,
       customClass: {
         popup: 'rounded-2xl',
-        title: 'text-xl font-semibold',
         confirmButton: 'rounded-lg px-6 py-2.5',
         cancelButton: 'rounded-lg px-6 py-2.5'
       }
     }).then((result) => {
       if (result.isConfirmed) {
-        // Show loading state
         Swal.fire({
           title: 'Logging out...',
           allowOutsideClick: false,
           allowEscapeKey: false,
-          didOpen: () => {
-            Swal.showLoading();
-          }
+          didOpen: () => { Swal.showLoading(); }
         });
 
         const token = localStorage.getItem('authToken');
         if (token) {
           axiosClient.post('logout', {}, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           })
-            .then(response => {
+            .then(() => {
               localStorage.removeItem('authToken');
               localStorage.removeItem('username');
               localStorage.removeItem('location');
               localStorage.removeItem('role');
-
               Swal.fire({
                 title: "Logged out!",
                 text: "You have successfully logged out.",
                 icon: "success",
                 timer: 1500,
                 showConfirmButton: false,
-                customClass: {
-                  popup: 'rounded-2xl'
-                }
-              }).then(() => {
-                window.location.href = '/guest/login';
-              });
+                customClass: { popup: 'rounded-2xl' }
+              }).then(() => { window.location.href = '/guest/login'; });
             })
-            .catch(error => {
+            .catch(() => {
               Swal.fire({
                 title: "Error!",
                 text: "There was an issue logging you out.",
                 icon: "error",
-                confirmButtonColor: '#dc2626',
-                customClass: {
-                  popup: 'rounded-2xl'
-                }
+                confirmButtonColor: '#d4840a',
+                customClass: { popup: 'rounded-2xl' }
               });
             });
         }
@@ -95,36 +81,56 @@ const UserSidebar = () => {
 
   return (
     <>
-      {/* Desktop Sidebar */}
-      <div className="hidden md:flex w-64 min-h-screen bg-white shadow-xl p-6 flex-col font-['Roboto',sans-serif]">
-        {/* Header Section */}
-        <div className="mb-10 pb-4 flex flex-col items-center justify-center border-gray-700">
-          <img src={Logo} alt="Logo" className='w-32' />
-          <p className="text-xs text-gray-500 uppercase text-center tracking-widest font-medium">{userName}</p>
+      {/* ── DESKTOP SIDEBAR ── */}
+      <div className="hidden md:flex flex-col w-60 min-h-screen bg-[#0b3d1e] px-4 py-7 font-['DM_Sans',sans-serif] relative overflow-hidden shrink-0">
+
+        {/* Background orbs */}
+        <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-[radial-gradient(circle,rgba(46,139,87,0.18)_0%,transparent_70%)] pointer-events-none" />
+        <div className="absolute bottom-20 -left-10 w-44 h-44 rounded-full bg-[radial-gradient(circle,rgba(212,132,10,0.10)_0%,transparent_70%)] pointer-events-none" />
+
+        {/* Logo + username */}
+        <div className="flex flex-col items-center pb-6 mb-6 border-b border-white/10 relative z-10">
+          <img src={Logo} alt="SIBOL" className="w-24 mb-3 drop-shadow-lg" />
+          {userName && (
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#d4840a]/15 border border-[#d4840a]/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#f0a830] animate-pulse" />
+              <span className="text-[10px] font-medium tracking-widest uppercase text-[#f0a830]">
+                {userName}
+              </span>
+            </div>
+          )}
         </div>
 
-        <nav className="flex-1">
-          <ul className="space-y-1">
+        {/* Nav label */}
+        <p className="text-[9px] font-medium tracking-[2px] uppercase text-white/20 px-4 mb-2 relative z-10">
+          Navigation
+        </p>
+
+        {/* Nav links */}
+        <nav className="flex-1 relative z-10">
+          <ul className="flex flex-col gap-1">
             {sidebarMenus.map((menu, i) => (
               <li key={i}>
                 <NavLink
                   to={menu.path}
                   className={({ isActive }) =>
-                    `relative flex items-center px-6 py-4 text-[15px] font-semibold rounded-lg transition-all duration-300 group ${
-                      isActive
-                        ? "text-green-600 bg-[#00640066] rounded-md shadow-inner"
-                        : "text-gray-400 hover:text-white hover:bg-gray-800"
+                    `relative flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 overflow-hidden
+                    ${isActive
+                      ? 'text-white bg-[#2e8b57]/25 border border-[#2e8b57]/30'
+                      : 'text-white/45 hover:text-white/85 hover:bg-white/5 border border-transparent'
                     }`
                   }
                 >
                   {({ isActive }) => (
                     <>
-                      <div className={`absolute left-0 top-0 bottom-0 w-2 rounded-md transition-all duration-300 ${
-                        isActive ? "bg-green-900" : "bg-transparent group-hover:bg-gray-600"
-                      }`}></div>
-                      <img src={menu.image} alt={menu.name} className='mr-3' />
-                      <span className="tracking-wide relative z-10">{menu.name}</span>
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      {/* Amber left bar */}
+                      <span className={`absolute left-0 top-[20%] bottom-[20%] w-[3px] rounded-r-full bg-[#d4840a] transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-0'}`} />
+                      <img
+                        src={menu.image}
+                        alt={menu.name}
+                        className={`w-[18px] h-[18px] object-contain brightness-0 invert transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-40'}`}
+                      />
+                      <span>{menu.name}</span>
                     </>
                   )}
                 </NavLink>
@@ -133,58 +139,59 @@ const UserSidebar = () => {
           </ul>
         </nav>
 
-        {/* Logout Section - Matching Design */}
-        <div className="mt-auto pt-6">
+        {/* Divider + Logout */}
+        <div className="h-px bg-white/8 my-3 relative z-10" />
+        <div className="relative z-10">
           <button
             onClick={handleLogout}
-            className="relative flex items-center px-6 py-4 text-[15px] font-semibold rounded-lg transition-all duration-300 group w-full text-red-500 hover:text-white hover:bg-red-600"
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-medium text-red-400/70 hover:text-white hover:bg-red-600/20 hover:border-red-500/30 border border-transparent transition-all duration-200"
           >
-            <div className="absolute left-0 top-0 bottom-0 w-2 rounded-md bg-transparent group-hover:bg-red-800 transition-all duration-300"></div>
-            <LogOut className="mr-3 w-5 h-5" />
-            <span className="tracking-wide relative z-10">Logout</span>
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <LogOut size={16} />
+            Logout
           </button>
         </div>
       </div>
 
-      {/* Mobile Footer Navigation */}
-      <div className="md:hidden w-full bg-white shadow-2xl border-t-2 border-gray-200 font-['Roboto',sans-serif]">
-        <nav className="flex items-center justify-around px-2 py-3">
+      {/* ── MOBILE BOTTOM NAV ── */}
+      <div className="md:hidden w-full bg-[#0b3d1e] border-t border-white/10 font-['DM_Sans',sans-serif]">
+        <nav className="flex items-center justify-around px-1 py-2">
           {sidebarMenus.slice(0, 5).map((menu, i) => (
             <NavLink
               key={i}
               to={menu.path}
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center px-3 py-2 rounded-lg transition-all duration-300 relative ${
-                  isActive
-                    ? "text-green-600 bg-[#00640066]"
-                    : "text-gray-400 hover:text-gray-800 hover:bg-gray-100"
+                `relative flex flex-col items-center gap-1 px-2.5 py-2 rounded-xl transition-all duration-200
+                ${isActive
+                  ? 'text-[#f0a830] bg-[#d4840a]/12'
+                  : 'text-white/35 hover:text-white/65'
                 }`
               }
             >
               {({ isActive }) => (
                 <>
-                  <img src={menu.image} alt={menu.name} className='w-6 h-6 mb-1' />
-                  <span className="text-[10px] font-semibold text-center leading-tight">
+                  {isActive && (
+                    <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-[#d4840a]" />
+                  )}
+                  <img
+                    src={menu.image}
+                    alt={menu.name}
+                    className={`w-5 h-5 object-contain brightness-0 invert transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-35'}`}
+                    style={isActive ? { filter: 'brightness(0) saturate(100%) invert(62%) sepia(80%) saturate(600%) hue-rotate(5deg)' } : {}}
+                  />
+                  <span className="text-[9px] font-medium leading-tight">
                     {menu.name === "Account Settings" ? "Account" : menu.name}
                   </span>
-                  {isActive && (
-                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-green-900 rounded-t-md"></div>
-                  )}
                 </>
               )}
             </NavLink>
           ))}
 
-          {/* Mobile Logout Button */}
           <button
             onClick={handleLogout}
-            className="flex flex-col items-center justify-center px-3 py-2 rounded-lg transition-all duration-300 text-red-500 hover:text-red-700 hover:bg-red-50"
+            className="flex flex-col items-center gap-1 px-2.5 py-2 rounded-xl text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
           >
-            <LogOut className='w-6 h-6 mb-1' />
-            <span className="text-[10px] font-semibold text-center leading-tight">
-              Logout
-            </span>
+            <LogOut size={20} />
+            <span className="text-[9px] font-medium">Logout</span>
           </button>
         </nav>
       </div>

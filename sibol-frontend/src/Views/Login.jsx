@@ -1,6 +1,4 @@
 import React, { useState } from 'react'
-import BG from '../assets/auth_img.png'
-import '../login.css';
 import Logo from '../assets/logo-left.png'
 import { useNavigate } from 'react-router-dom'
 import axiosClient from './axios';
@@ -16,461 +14,484 @@ const Login = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    if(!email || !password) {
-        setError("Both fields are required!");
-        setIsLoading(false);
-        return;
+    if (!email || !password) {
+      setError("Both fields are required!");
+      setIsLoading(false);
+      return;
     }
     try {
-        const response = await axiosClient.post("/login", {
-            email, password,
-        });
+      const response = await axiosClient.post("/login", { email, password });
+      const data = response.data;
+      const role = data.role;
+      const token = data.token;
+      const name = data.user.name;
+      const location = data.user.location;
 
-        const data = response.data;
-        const role = data.role;
-        const token = data.token;
-        const name = data.user.name;
-        const location = data.user.location;
+      localStorage.setItem("authToken", token);
+      localStorage.setItem("role", role);
+      localStorage.setItem("username", name);
+      localStorage.setItem("location", location);
 
-        localStorage.setItem("authToken", token);
-        localStorage.setItem("role", role);
-        localStorage.setItem("username", name);
-        localStorage.setItem("location", location);
-
-        if(role == "admin") {
-             console.log('Admin');
-             navigate("/admin/crop-profile");
-        }
-
-        if(role != "user") {
-            console.log('gumagana di ka user');
-            setIsLoading(false);
-            setError("You're not a user!");
-            return;
-        }
-         navigate("/user/dashboard");
+      if (role == "admin") navigate("/admin/crop-profile");
+      if (role != "user") {
+        setIsLoading(false);
+        setError("You're not a user!");
+        return;
+      }
+      navigate("/user/dashboard");
     } catch (error) {
-        setIsLoading(false);
-        setError("Login Failed! Please check your credentials!");
-    }
-    finally {
-        setIsLoading(false);
+      setIsLoading(false);
+      setError("Login failed! Please check your credentials.");
+    } finally {
+      setIsLoading(false);
     }
   }
 
   return (
-    <div className="login min-h-screen w-full overflow-hidden bg-gradient-to-br from-green-50 via-white to-amber-50">
+    <div style={{ fontFamily: "'DM Sans', sans-serif", minHeight: '100vh', display: 'flex', background: '#f7f4ee', overflow: 'hidden' }}>
       <style>{`
-        @keyframes slideInLeft {
-          from {
-            opacity: 0;
-            transform: translateX(-100px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+
+        :root {
+          --forest: #0b3d1e;
+          --moss: #1a6636;
+          --fern: #2e8b57;
+          --cream: #f7f4ee;
+          --amber: #d4840a;
+          --amber-light: #f0a830;
         }
 
-        @keyframes slideInRight {
-          from {
-            opacity: 0;
-            transform: translateX(100px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
+        /* ── LEFT PANEL ── */
+        .auth-left {
+          width: 42%;
+          min-height: 100vh;
+          background: var(--forest);
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          overflow: hidden;
+          flex-shrink: 0;
         }
 
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+        /* Diagonal slice */
+        .auth-left::after {
+          content: '';
+          position: absolute;
+          right: -60px; top: 0;
+          width: 120px; height: 100%;
+          background: var(--cream);
+          clip-path: polygon(60px 0, 100% 0, 100% 100%, 0 100%);
+          z-index: 10;
         }
 
-        @keyframes float {
-          0%, 100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-10px);
-          }
+        .auth-left-orb {
+          position: absolute;
+          width: 500px; height: 500px; border-radius: 50%;
+          background: radial-gradient(circle, rgba(46,139,87,0.2) 0%, transparent 70%);
+          top: -100px; left: -100px; pointer-events: none;
+        }
+        .auth-left-orb2 {
+          position: absolute;
+          width: 300px; height: 300px; border-radius: 50%;
+          background: radial-gradient(circle, rgba(212,132,10,0.1) 0%, transparent 70%);
+          bottom: 50px; right: 50px; pointer-events: none;
         }
 
-        @keyframes pulse-glow {
-          0%, 100% {
-            box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
-          }
-          50% {
-            box-shadow: 0 0 40px rgba(16, 185, 129, 0.4);
-          }
+        .auth-left-content {
+          position: relative; z-index: 5;
+          display: flex; flex-direction: column;
+          align-items: center; text-align: center;
+          padding: 48px 56px 48px 48px;
+          animation: fadeUp 0.9s 0.1s ease-out both;
         }
 
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(28px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeDown {
+          from { opacity: 0; transform: translateY(-16px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes floatY {
+          0%,100%{ transform: translateY(0); }
+          50%{ transform: translateY(-10px); }
+        }
+        @keyframes livePulse {
+          0%,100%{ opacity:1; transform:scale(1); }
+          50%{ opacity:0.4; transform:scale(1.4); }
+        }
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
           10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
           20%, 40%, 60%, 80% { transform: translateX(5px); }
         }
 
-        @keyframes scaleIn {
-          from {
-            opacity: 0;
-            transform: scale(0.9);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
+        .auth-logo {
+          width: 100px; margin-bottom: 28px;
+          animation: floatY 3s ease-in-out infinite;
+          filter: drop-shadow(0 8px 24px rgba(0,0,0,0.3));
+          cursor: pointer; transition: transform 0.3s;
+        }
+        .auth-logo:hover { transform: scale(1.08) rotate(4deg); }
+
+        .auth-left-pill {
+          display: inline-flex; align-items: center; gap: 7px;
+          padding: 5px 14px;
+          border: 1px solid rgba(212,132,10,0.4);
+          border-radius: 100px;
+          color: var(--amber-light);
+          font-size: 10px; letter-spacing: 1.8px;
+          text-transform: uppercase; margin-bottom: 20px;
+        }
+        .auth-left-dot {
+          width: 5px; height: 5px; border-radius: 50%;
+          background: var(--amber);
+          animation: livePulse 1.8s ease-in-out infinite;
         }
 
-        @keyframes shimmer {
-          0% {
-            background-position: -1000px 0;
-          }
-          100% {
-            background-position: 1000px 0;
-          }
+        .auth-left-h {
+          font-family: 'Playfair Display', serif;
+          font-size: clamp(28px, 3vw, 40px);
+          font-weight: 700; line-height: 1.15;
+          color: #fff; margin-bottom: 14px;
+        }
+        .auth-left-h em { font-style: italic; color: var(--amber-light); }
+
+        .auth-left-sub {
+          font-size: 13px; color: rgba(255,255,255,0.42);
+          line-height: 1.8; max-width: 240px;
+          margin-bottom: 36px;
         }
 
-        .animate-slideInLeft {
-          animation: slideInLeft 0.8s ease-out forwards;
+        /* Mini sensor card */
+        .mini-sensor {
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 16px; padding: 16px 20px;
+          width: 100%; max-width: 260px;
+          backdrop-filter: blur(16px);
+        }
+        .ms-row {
+          display: flex; align-items: center; justify-content: space-between;
+          margin-bottom: 12px;
+        }
+        .ms-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,0.3); }
+        .ms-live { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #4ade80; }
+        .ms-dot { width: 5px; height: 5px; border-radius: 50%; background: #4ade80; animation: livePulse 1.5s infinite; }
+        .ms-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .ms-metric {
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.06);
+          border-radius: 10px; padding: 10px;
+        }
+        .ms-m-label { font-size: 9px; color: rgba(255,255,255,0.32); margin-bottom: 3px; }
+        .ms-m-val { font-size: 18px; font-weight: 500; color: #fff; }
+        .ms-m-val span { font-size: 9px; color: rgba(255,255,255,0.35); }
+        .ms-m-trend { font-size: 9px; color: #4ade80; margin-top: 2px; }
+
+        /* ── RIGHT PANEL ── */
+        .auth-right {
+          flex: 1;
+          display: flex; align-items: center; justify-content: center;
+          padding: 48px 48px 48px 80px;
+          animation: fadeUp 0.9s 0.3s ease-out both;
         }
 
-        .animate-slideInRight {
-          animation: slideInRight 0.8s ease-out forwards;
+        .auth-form-wrap {
+          width: 100%; max-width: 400px;
         }
 
-        .animate-fadeInUp {
-          animation: fadeInUp 0.6s ease-out forwards;
+        .auth-brand-mobile {
+          display: none;
+          align-items: center; gap: 10px;
+          margin-bottom: 32px;
+        }
+        .auth-brand-chip {
+          width: 36px; height: 36px; border-radius: 10px;
+          background: var(--amber);
+          display: flex; align-items: center; justify-content: center;
+        }
+        .auth-brand-chip img { width: 22px; object-fit: contain; }
+        .auth-brand-name {
+          font-family: 'Playfair Display', serif;
+          font-size: 20px; font-weight: 700;
+          color: var(--forest); letter-spacing: 2px;
         }
 
-        .animate-float {
-          animation: float 3s ease-in-out infinite;
+        .auth-eyebrow {
+          font-size: 10px; font-weight: 500; letter-spacing: 2.5px;
+          text-transform: uppercase; color: var(--fern);
+          margin-bottom: 8px;
+        }
+        .auth-title {
+          font-family: 'Playfair Display', serif;
+          font-size: clamp(32px, 4vw, 46px);
+          font-weight: 700; color: var(--forest);
+          line-height: 1.1; margin-bottom: 6px;
+        }
+        .auth-title em { font-style: italic; color: var(--fern); }
+        .auth-subtitle {
+          font-size: 13px; color: #7a8a80; margin-bottom: 36px;
         }
 
-        .animate-pulse-glow {
-          animation: pulse-glow 2s ease-in-out infinite;
+        /* Error */
+        .auth-error {
+          display: flex; align-items: flex-start; gap: 10px;
+          padding: 12px 16px;
+          background: #fef2f2;
+          border: 1px solid #fecaca;
+          border-left: 3px solid #ef4444;
+          border-radius: 10px;
+          margin-bottom: 20px;
+          animation: shake 0.45s ease;
         }
+        .auth-error svg { color: #ef4444; flex-shrink: 0; margin-top: 1px; }
+        .auth-error-text { font-size: 13px; color: #991b1b; line-height: 1.5; }
 
-        .animate-shake {
-          animation: shake 0.5s ease-in-out;
+        /* Fields */
+        .auth-fields { display: flex; flex-direction: column; gap: 14px; margin-bottom: 28px; }
+
+        .auth-field-group { display: flex; flex-direction: column; gap: 6px; }
+        .auth-field-label {
+          font-size: 11px; font-weight: 500; letter-spacing: 0.5px;
+          color: var(--forest); padding-left: 4px;
         }
-
-        .animate-scaleIn {
-          animation: scaleIn 0.4s ease-out forwards;
+        .auth-field {
+          display: flex; align-items: center; gap: 12px;
+          background: #fff;
+          border: 1.5px solid rgba(11,61,30,0.18);
+          border-radius: 12px; padding: 13px 16px;
+          transition: border-color 0.25s, box-shadow 0.25s, transform 0.2s;
         }
-
-        .input-wrapper {
-          transition: all 0.3s ease;
-        }
-
-        .input-wrapper:focus-within {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
-          border-color: #059669;
-        }
-
-        .input-wrapper input:focus {
-          outline: none;
-        }
-
-        .submit-button {
-          position: relative;
-          overflow: hidden;
-          transition: all 0.3s ease;
-        }
-
-        .submit-button::before {
-          content: '';
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          width: 0;
-          height: 0;
-          border-radius: 50%;
-          background: rgba(255, 255, 255, 0.3);
-          transform: translate(-50%, -50%);
-          transition: width 0.6s, height 0.6s;
-        }
-
-        .submit-button:hover::before {
-          width: 300px;
-          height: 300px;
-        }
-
-        .submit-button:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-        }
-
-        .submit-button:active {
+        .auth-field:focus-within {
+          border-color: var(--fern);
+          box-shadow: 0 0 0 3px rgba(46,139,87,0.1);
           transform: translateY(-1px);
         }
-
-        .link-hover {
-          transition: all 0.3s ease;
-          position: relative;
+        .auth-field svg { color: var(--fern); flex-shrink: 0; }
+        .auth-field input {
+          flex: 1; border: none; outline: none;
+          background: transparent;
+          font-size: 14px; color: var(--forest);
+          font-family: 'DM Sans', sans-serif;
         }
+        .auth-field input::placeholder { color: #b0bdb7; }
+        .auth-field button { background: none; border: none; cursor: pointer; color: var(--fern); padding: 0; display: flex; transition: color 0.2s; }
+        .auth-field button:hover { color: var(--forest); }
 
-        .link-hover::after {
+        /* Forgot */
+        .auth-forgot {
+          text-align: right; margin-top: -6px;
+          font-size: 12px; color: var(--fern);
+          text-decoration: none; font-weight: 500;
+          transition: color 0.2s;
+        }
+        .auth-forgot:hover { color: var(--amber); }
+
+        /* Submit */
+        .auth-submit {
+          width: 100%; padding: 15px;
+          background: var(--forest);
+          border: none; border-radius: 12px;
+          color: #fff;
+          font-family: 'Playfair Display', serif;
+          font-size: 16px; font-weight: 700; letter-spacing: 1px;
+          cursor: pointer;
+          transition: background 0.25s, transform 0.2s, box-shadow 0.25s;
+          position: relative; overflow: hidden;
+          display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .auth-submit::before {
           content: '';
-          position: absolute;
-          bottom: -2px;
-          left: 0;
-          width: 0;
-          height: 2px;
-          background: currentColor;
-          transition: width 0.3s ease;
+          position: absolute; inset: 0;
+          background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.06) 100%);
+        }
+        .auth-submit:hover:not(:disabled) {
+          background: var(--moss);
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(11,61,30,0.3);
+        }
+        .auth-submit:active { transform: translateY(0); }
+        .auth-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* Amber accent line */
+        .auth-submit-amber {
+          background: var(--amber);
+        }
+        .auth-submit-amber:hover:not(:disabled) {
+          background: var(--amber-light);
+          box-shadow: 0 8px 24px rgba(212,132,10,0.3);
         }
 
-        .link-hover:hover::after {
-          width: 100%;
+        /* Bottom link */
+        .auth-bottom-link {
+          text-align: center; margin-top: 22px;
+          font-size: 13px; color: #7a8a80;
         }
-
-        .link-hover:hover {
-          transform: translateX(3px);
+        .auth-bottom-link a {
+          color: var(--forest); font-weight: 600;
+          text-decoration: none; border-bottom: 1.5px solid var(--amber);
+          padding-bottom: 1px; transition: color 0.2s;
         }
+        .auth-bottom-link a:hover { color: var(--amber); }
 
-        .stagger-1 { animation-delay: 0.1s; }
-        .stagger-2 { animation-delay: 0.2s; }
-        .stagger-3 { animation-delay: 0.3s; }
-        .stagger-4 { animation-delay: 0.4s; }
-        .stagger-5 { animation-delay: 0.5s; }
-        .stagger-6 { animation-delay: 0.6s; }
-
-        .logo-hover {
-          transition: transform 0.3s ease;
+        /* Divider */
+        .auth-divider {
+          display: flex; align-items: center; gap: 14px;
+          margin: 24px 0;
         }
-
-        .logo-hover:hover {
-          transform: scale(1.1) rotate(5deg);
+        .auth-divider::before, .auth-divider::after {
+          content: ''; flex: 1; height: 1px; background: rgba(11,61,30,0.1);
         }
+        .auth-divider span { font-size: 11px; color: #b0bdb7; letter-spacing: 1px; }
 
-        .gradient-text {
-          background: linear-gradient(90deg, #14532d, #166534, #14532d);
-          background-size: 200% auto;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-          animation: shimmer 3s linear infinite;
+        /* Spinner */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spin { animation: spin 0.7s linear infinite; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+          .auth-left { display: none; }
+          .auth-right { padding: 40px 24px; }
+          .auth-brand-mobile { display: flex; }
         }
       `}</style>
 
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-4 overflow-hidden min-h-screen">
-        {/* Left Side - Branding */}
-        <div className="relative hidden md:flex flex-row h-full animate-slideInLeft">
-          <div
-            className="absolute top-0 left-6 h-full z-0"
-            style={{
-              width: "100%",
-              backgroundColor: "#0b542d",
-              opacity: 0.4,
-              clipPath: "polygon(0 0, 75% 0, 100% 50%, 75% 100%, 0 100%)",
-            }}
-          />
-
-          <div
-            className="absolute top-0 left-0 h-full flex flex-col items-center justify-center text-white z-10 p-6"
-            style={{
-              width: "100%",
-              background: "linear-gradient(135deg, #0b542d 0%, #166534 100%)",
-              clipPath: "polygon(0% 0%, 75% 0%, 100% 50%, 75% 100%, 0% 100%)",
-            }}
-          >
-            <div className="flex flex-col items-center justify-start text-center">
-              <a href="/" className="logo-hover">
-                <img src={Logo} alt="" className="w-[180px] mb-6 animate-float" />
-              </a>
-              <span className="font-serif text-2xl animate-fadeInUp stagger-1">
-                <span className="text-amber-300 text-5xl font-bold">S</span>mart Farming starts
-              </span>
-              <span className="font-serif text-2xl animate-fadeInUp stagger-2">
-                with the right <span className="text-amber-300 text-5xl font-bold">D</span>ata
-              </span>
+      {/* ── LEFT PANEL ── */}
+      <div className="auth-left">
+        <div className="auth-left-orb" />
+        <div className="auth-left-orb2" />
+        <div className="auth-left-content">
+          <a href="/"><img src={Logo} alt="SIBOL" className="auth-logo" /></a>
+          <div className="auth-left-pill">
+            <span className="auth-left-dot" />
+            IoT Crop Monitoring
+          </div>
+          <h2 className="auth-left-h">
+            Smart farming<br />starts with<br /><em>real data.</em>
+          </h2>
+          <p className="auth-left-sub">
+            Connect your fields. Monitor in real time. Make better decisions.
+          </p>
+          {/* Mini sensor card */}
+          <div className="mini-sensor">
+            <div className="ms-row">
+              <span className="ms-label">Live Feed</span>
+              <span className="ms-live"><span className="ms-dot" />Field 3</span>
+            </div>
+            <div className="ms-grid">
+              <div className="ms-metric">
+                <div className="ms-m-label">Soil Moisture</div>
+                <div className="ms-m-val">68<span>%</span></div>
+                <div className="ms-m-trend">↑ +3%</div>
+              </div>
+              <div className="ms-metric">
+                <div className="ms-m-label">Temperature</div>
+                <div className="ms-m-val">27<span>°C</span></div>
+                <div className="ms-m-trend" style={{ color: 'rgba(255,255,255,0.3)' }}>— Optimal</div>
+              </div>
+              <div className="ms-metric">
+                <div className="ms-m-label">Humidity</div>
+                <div className="ms-m-val">74<span>%</span></div>
+                <div className="ms-m-trend" style={{ color: '#f87171' }}>↓ −1%</div>
+              </div>
+              <div className="ms-metric">
+                <div className="ms-m-label">Crop Health</div>
+                <div className="ms-m-val">91<span>%</span></div>
+                <div className="ms-m-trend">↑ Good</div>
+              </div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Right Side - Form */}
-        <div className="flex flex-1 items-center justify-center min-h-screen w-full p-4 animate-slideInRight">
-          <div className='w-full max-w-md px-4 py-4 rounded-2xl border-2 border-green-800 bg-white/30 backdrop-blur-sm shadow-2xl animate-pulse-glow'>
-            <form
-              onSubmit={handleLogin}
-              className="w-full px-6 py-8 flex flex-col justify-center items-center rounded-xl bg-gradient-to-b from-green-50/50 to-white border-2 border-green-700"
-            >
-              {/* Logo */}
-              <div className="flex items-center justify-center mb-3 animate-fadeInUp">
-                <a href="/" className="logo-hover">
-                  <img src={Logo} alt="logo" className="w-16 md:w-20" />
-                </a>
-              </div>
+      {/* ── RIGHT PANEL ── */}
+      <div className="auth-right">
+        <div className="auth-form-wrap">
 
-              {/* Title */}
-              <div className="text-center mb-2 animate-fadeInUp stagger-1">
-                <h1 className="text-4xl md:text-5xl font-serif font-bold gradient-text mb-1">
-                  LOGIN
-                </h1>
-                <p className="text-sm text-green-700">Welcome back! Please login to continue</p>
-              </div>
+          {/* Mobile brand */}
+          <div className="auth-brand-mobile">
+            <div className="auth-brand-chip"><img src={Logo} alt="" /></div>
+            <span className="auth-brand-name">SIBOL</span>
+          </div>
 
-              {/* Error Alert */}
-              {error && (
-                <div
-                  className="flex items-center p-3 mb-4 mt-4 text-sm text-red-800 rounded-xl bg-red-50 w-full border-l-4 border-red-500 animate-shake"
-                  role="alert"
-                >
-                  <svg
-                    className="w-5 h-5 mr-2 shrink-0"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z" />
-                  </svg>
-                  <div>
-                    <span className="font-semibold">Error: </span>
-                    <span>{error}</span>
-                  </div>
-                </div>
-              )}
+          <div className="auth-eyebrow">Welcome back</div>
+          <h1 className="auth-title">Sign <em>in</em></h1>
+          <p className="auth-subtitle">Enter your credentials to access your farm dashboard.</p>
 
-              {/* Inputs */}
-              <div className="flex flex-col gap-5 w-full mt-6">
-                {/* Email Input */}
-                <div
-                  className="input-wrapper flex items-center gap-3 rounded-full px-4 py-3 h-[52px] border-2 border-green-800 bg-white animate-fadeInUp stagger-3"
-                  style={{ boxShadow: "4px 4px 6px rgba(0,0,0,0.1)" }}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 48 48"
-                    className="text-green-700 shrink-0"
-                  >
-                    <path
-                      fill="none"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={4}
-                      d="M24 20a7 7 0 1 0 0-14a7 7 0 0 0 0 14M6 40.8V42h36v-1.2c0-4.48 0-6.72-.872-8.432a8 8 0 0 0-3.496-3.496C35.92 28 33.68 28 29.2 28H18.8c-4.48 0-6.72 0-8.432.872a8 8 0 0 0-3.496 3.496C6 34.08 6 36.32 6 40.8"
-                    />
+          {error && (
+            <div className="auth-error">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z" />
+              </svg>
+              <span className="auth-error-text">{error}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleLogin}>
+            <div className="auth-fields">
+              <div className="auth-field-group">
+                <label className="auth-field-label">Email address</label>
+                <div className="auth-field">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 48 48" fill="none">
+                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M24 20a7 7 0 1 0 0-14a7 7 0 0 0 0 14M6 40.8V42h36v-1.2c0-4.48 0-6.72-.872-8.432a8 8 0 0 0-3.496-3.496C35.92 28 33.68 28 29.2 28H18.8c-4.48 0-6.72 0-8.432.872a8 8 0 0 0-3.496 3.496C6 34.08 6 36.32 6 40.8" />
                   </svg>
                   <input
-                    name="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={e => setEmail(e.target.value)}
                     type="text"
-                    placeholder="Email address"
-                    className="w-full outline-none bg-transparent placeholder:text-gray-500 text-green-900 font-medium"
+                    placeholder="you@example.com"
                   />
                 </div>
+              </div>
 
-                {/* Password Input */}
-                <div
-                  className="input-wrapper flex items-center gap-3 rounded-full px-4 py-3 h-[52px] border-2 border-green-800 bg-white animate-fadeInUp stagger-4"
-                  style={{ boxShadow: "4px 4px 6px rgba(0,0,0,0.1)" }}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    className="text-green-700 shrink-0"
-                  >
-                    <path
-                      fill="currentColor"
-                      d="M12 17a2 2 0 0 0 2-2a2 2 0 0 0-2-2a2 2 0 0 0-2 2a2 2 0 0 0 2 2m6-9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h1V6a5 5 0 0 1 5-5a5 5 0 0 1 5 5v2zm-6-5a3 3 0 0 0-3 3v2h6V6a3 3 0 0 0-3-3"
-                    />
+              <div className="auth-field-group">
+                <label className="auth-field-label">Password</label>
+                <div className="auth-field">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 17a2 2 0 0 0 2-2a2 2 0 0 0-2-2a2 2 0 0 0-2 2a2 2 0 0 0 2 2m6-9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h1V6a5 5 0 0 1 5-5a5 5 0 0 1 5 5v2zm-6-5a3 3 0 0 0-3 3v2h6V6a3 3 0 0 0-3-3" />
                   </svg>
                   <input
-                    name="password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={e => setPassword(e.target.value)}
                     type={showPassword ? "text" : "password"}
-                    placeholder="Password"
-                    className="w-full outline-none bg-transparent placeholder:text-gray-500 text-green-900 font-medium"
+                    placeholder="••••••••"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-green-700 hover:text-green-900 transition-colors shrink-0"
-                  >
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}>
                     {showPassword ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="22px" height="22px" viewBox="0 0 24 24">
-                        <path fill="currentColor" d="M11.83 9L15 12.16V12a3 3 0 0 0-3-3zm-4.3.8l1.55 1.55c-.05.21-.08.42-.08.65a3 3 0 0 0 3 3c.22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53a5 5 0 0 1-5-5c0-.79.2-1.53.53-2.2M2 4.27l2.28 2.28l.45.45C3.08 8.3 1.78 10 1 12c1.73 4.39 6 7.5 11 7.5c1.55 0 3.03-.3 4.38-.84l.43.42L19.73 22L21 20.73L3.27 3M12 7a5 5 0 0 1 5 5c0 .64-.13 1.26-.36 1.82l2.93 2.93c1.5-1.25 2.7-2.89 3.43-4.75c-1.73-4.39-6-7.5-11-7.5c-1.4 0-2.74.25-4 .7l2.17 2.15C10.74 7.13 11.35 7 12 7"/>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M11.83 9L15 12.16V12a3 3 0 0 0-3-3zm-4.3.8l1.55 1.55c-.05.21-.08.42-.08.65a3 3 0 0 0 3 3c.22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53a5 5 0 0 1-5-5c0-.79.2-1.53.53-2.2M2 4.27l2.28 2.28l.45.45C3.08 8.3 1.78 10 1 12c1.73 4.39 6 7.5 11 7.5c1.55 0 3.03-.3 4.38-.84l.43.42L19.73 22L21 20.73L3.27 3M12 7a5 5 0 0 1 5 5c0 .64-.13 1.26-.36 1.82l2.93 2.93c1.5-1.25 2.7-2.89 3.43-4.75c-1.73-4.39-6-7.5-11-7.5c-1.4 0-2.74.25-4 .7l2.17 2.15C10.74 7.13 11.35 7 12 7" />
                       </svg>
                     ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="22px" height="22px" viewBox="0 0 24 24">
-                        <path fill="currentColor" d="M12 9a3 3 0 0 0-3 3a3 3 0 0 0 3 3a3 3 0 0 0 3-3a3 3 0 0 0-3-3m0 8a5 5 0 0 1-5-5a5 5 0 0 1 5-5a5 5 0 0 1 5 5a5 5 0 0 1-5 5m0-12.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5"/>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 9a3 3 0 0 0-3 3a3 3 0 0 0 3 3a3 3 0 0 0 3-3a3 3 0 0 0-3-3m0 8a5 5 0 0 1-5-5a5 5 0 0 1 5-5a5 5 0 0 1 5 5a5 5 0 0 1-5 5m0-12.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5" />
                       </svg>
                     )}
                   </button>
                 </div>
+                <a href="#" className="auth-forgot">Forgot password?</a>
               </div>
+            </div>
 
-              {/* Button */}
-              <div className="flex justify-center mt-6 w-full animate-fadeInUp stagger-5">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="submit-button bg-gradient-to-r from-green-900 to-green-700 text-white font-serif text-xl font-bold px-10 py-3 rounded-full min-w-[150px] h-[54px] flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed relative z-10"
-                >
-                  {loading ? (
-                    <>
-                      <svg
-                        className="animate-spin h-5 w-5 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                        />
-                      </svg>
-                      Loading...
-                    </>
-                  ) : (
-                    "LOGIN"
-                  )}
-                </button>
-              </div>
+            <button type="submit" disabled={loading} className="auth-submit">
+              {loading ? (
+                <>
+                  <svg className="spin" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                    <path fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" opacity="0.75" />
+                  </svg>
+                  Signing in…
+                </>
+              ) : "Sign In"}
+            </button>
+          </form>
 
-              {/* Links */}
-              <div className="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-6 mt-6 animate-fadeInUp stagger-6">
-                <a
-                  href="#"
-                  className="link-hover text-sm sm:text-base font-serif font-semibold text-green-700 hover:text-green-500 transition-colors"
-                >
-                  Forgot password?
-                </a>
-                <span className="hidden sm:inline text-green-700">•</span>
-                <a
-                  href="/guest/sign_up"
-                  className="link-hover text-sm sm:text-base font-serif font-semibold text-green-700 hover:text-green-500 transition-colors"
-                >
-                  Create an account
-                </a>
-              </div>
-            </form>
-          </div>
+          <p className="auth-bottom-link">
+            Don't have an account? <a href="/guest/sign_up">Create one</a>
+          </p>
         </div>
       </div>
     </div>

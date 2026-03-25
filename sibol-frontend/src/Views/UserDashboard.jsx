@@ -4,7 +4,6 @@ import UserNavbar from "./parts/UserNavbar";
 import axios from "axios";
 import image from "../assets/first_image.png";
 import axiosClient from "./axios";
-import { Card, CardContent, Typography } from "@mui/material";
 import { Cloud, CloudRain, Sun, CloudSnow, Wind } from 'lucide-react';
 import {
   LineChart,
@@ -34,7 +33,6 @@ const UserDashboard = () => {
   const [cropAdvisory, setCropAdvisory] = useState([]);
   const navigate = useNavigate();
 
-  // Fetch sensor data
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -46,12 +44,10 @@ const UserDashboard = () => {
         setError("Failed to fetch Data!");
       }
     };
-
     fetchData();
     const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, []);
-
 
   useEffect(() => {
     const selectedId = parseInt(selectedCrop);
@@ -59,13 +55,11 @@ const UserDashboard = () => {
     setActiveCrop(crop || null);
   }, [selectedCrop, crops]);
 
-
   useEffect(() => {
     const fetchLocation = async () => {
       try {
         const response = await axiosClient.get("/getLocation");
         const locations = response.data.locations;
-
         if (locations && locations.length > 0) {
           const firstLocation = locations[0];
           setLocation(firstLocation);
@@ -75,23 +69,15 @@ const UserDashboard = () => {
         console.error("Error fetching garden locations:", error);
       }
     };
-
     fetchLocation();
   }, []);
 
-  // Fetch weather and forecast
   useEffect(() => {
     const fetchWeather = async () => {
       try {
         const response = await axios.get(
           "https://api.weatherapi.com/v1/forecast.json",
-          {
-            params: {
-              key: apikey,
-              q: location,
-              days: 3,
-            },
-          }
+          { params: { key: apikey, q: location, days: 3 } }
         );
         setWeather(response.data);
         setForecastData(response.data.forecast.forecastday);
@@ -102,509 +88,686 @@ const UserDashboard = () => {
     if (location) fetchWeather();
   }, [location, apikey]);
 
-  // Update date every minute
   useEffect(() => {
     const timer = setInterval(() => setDate(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  const fetchCrops = async () => {
-    try {
-      const response = await axiosClient.get('/getCrops');
-      setCrops(response.data.data);
-      console.log(response.data.data);
-    } catch (error) {
-      setError(error.response?.data?.message || "Something Went Wrong!");
-    }
-  };
-
   useEffect(() => {
+    const fetchCrops = async () => {
+      try {
+        const response = await axiosClient.get('/getCrops');
+        setCrops(response.data.data);
+      } catch (error) {
+        setError(error.response?.data?.message || "Something Went Wrong!");
+      }
+    };
     fetchCrops();
   }, []);
-
 
   useEffect(() => {
     const fetchCropAdvisory = async () => {
       try {
         const response = await axiosClient.get('/getCropAdvisory');
         setCropAdvisory(response.data.data);
-        console.log(response.data.data);
       } catch (error) {
         setError(error.response?.data?.message || "Error Fetching Detection Results");
       }
-    }
+    };
     fetchCropAdvisory();
   }, []);
 
   const weekday = date.toLocaleDateString("en-US", { weekday: "long" });
   const formattedDate = date
-    .toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "2-digit",
-    })
+    .toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" })
     .replace(/\//g, " / ");
 
   const handleMoreDetails = (crop) => {
-    const gardenName = crop.garden?.name;
-    const gardenLocation = crop.garden?.location;
-
-    console.log(gardenName, gardenLocation);
     navigate(`/user/crop-care/${crop.garden?.id}/${crop.name}`);
   };
 
-  // Format planted date
   const formatPlantedDate = (dateString) => {
     if (!dateString) return "—";
-
     const date = new Date(dateString);
-    const options = { month: 'short', day: 'numeric', year: 'numeric' };
-    return date.toLocaleDateString('en-US', options);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const getWeatherIcon = (condition, size = "default") => {
     const conditionLower = condition.toLowerCase();
-    const sizeClasses = size === "large" ? "w-16 h-16" : "w-12 h-12";
-
-    if (conditionLower.includes('sun') || conditionLower.includes('clear')) {
-      return <Sun className={`${sizeClasses} text-amber-400`} fill="currentColor" />;
-    } else if (conditionLower.includes('rain') || conditionLower.includes('drizzle')) {
-      return <CloudRain className={`${sizeClasses} text-blue-400`} fill="currentColor" />;
-    } else if (conditionLower.includes('cloud') || conditionLower.includes('overcast')) {
-      return <Cloud className={`${sizeClasses} text-slate-400`} fill="currentColor" />;
-    } else if (conditionLower.includes('snow')) {
-      return <CloudSnow className={`${sizeClasses} text-blue-300`} fill="currentColor" />;
-    } else if (conditionLower.includes('wind')) {
-      return <Wind className={`${sizeClasses} text-slate-500`} />;
-    }
-    return <Cloud className={`${sizeClasses} text-slate-400`} fill="currentColor" />;
+    const sizeClasses = size === "large" ? "w-14 h-14" : "w-10 h-10";
+    if (conditionLower.includes('sun') || conditionLower.includes('clear'))
+      return <Sun className={`${sizeClasses} text-amber-300`} fill="currentColor" />;
+    if (conditionLower.includes('rain') || conditionLower.includes('drizzle'))
+      return <CloudRain className={`${sizeClasses} text-blue-300`} fill="currentColor" />;
+    if (conditionLower.includes('snow'))
+      return <CloudSnow className={`${sizeClasses} text-blue-200`} fill="currentColor" />;
+    if (conditionLower.includes('wind'))
+      return <Wind className={`${sizeClasses} text-slate-300`} />;
+    return <Cloud className={`${sizeClasses} text-slate-300`} fill="currentColor" />;
   };
 
   const getShortDay = (dateStr) => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const date = new Date(dateStr);
-    return days[date.getDay()];
+    return days[new Date(dateStr).getDay()];
   };
 
-  const getTemp = (tempC, tempF) => {
-    return unit === "C" ? Math.round(tempC) : Math.round(tempF);
-  };
+  const getTemp = (tempC, tempF) => unit === "C" ? Math.round(tempC) : Math.round(tempF);
 
   return (
-    <div className="bg-[#F4F0E5] flex flex-col md:flex-row min-h-screen">
-      {/* Desktop Sidebar */}
-      <div className="hidden md:block w-64 bg-white fixed top-0 left-0 h-screen shadow-md z-40">
+    <div style={{ fontFamily: "'DM Sans', sans-serif", background: '#f7f4ee', minHeight: '100vh', overflowX: 'hidden' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+        :root {
+          --forest: #0b3d1e;
+          --moss: #1a6636;
+          --fern: #2e8b57;
+          --sage: #a8c5a0;
+          --cream: #f7f4ee;
+          --amber: #d4840a;
+          --amber-light: #f0a830;
+        }
+
+        .dash-wrapper {
+          display: flex;
+          min-height: 100vh;
+          background: var(--cream);
+        }
+
+        /* ── SIDEBAR SLOT ── */
+        .sidebar-fixed {
+          position: fixed;
+          top: 0; left: 0;
+          width: 240px;
+          height: 100vh;
+          z-index: 40;
+        }
+
+        /* ── MAIN AREA ── */
+        .dash-main {
+          margin-left: 240px;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-height: 100vh;
+        }
+
+        /* ── NAVBAR ── */
+        .dash-navbar {
+          position: sticky;
+          top: 0; z-index: 30;
+          background: rgba(247,244,238,0.85);
+          backdrop-filter: blur(12px);
+          border-bottom: 1px solid rgba(11,61,30,0.08);
+        }
+
+        /* ── CONTENT ── */
+        .dash-content {
+          flex: 1;
+          padding: 36px 40px 60px;
+        }
+
+        /* ── WELCOME HEADER ── */
+        .welcome-eyebrow {
+          font-size: 11px;
+          font-weight: 500;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          color: var(--fern);
+          margin-bottom: 6px;
+        }
+        .welcome-h1 {
+          font-family: 'Playfair Display', serif;
+          font-size: clamp(28px, 3.5vw, 44px);
+          font-weight: 700;
+          line-height: 1.1;
+          color: var(--forest);
+          margin-bottom: 32px;
+        }
+        .welcome-h1 em {
+          font-style: italic;
+          color: var(--fern);
+        }
+        .welcome-divider {
+          width: 40px; height: 2px;
+          background: var(--amber);
+          margin-bottom: 32px;
+        }
+
+        /* ── GLASS CARD (dark forest) ── */
+        .glass-dark {
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.14);
+          backdrop-filter: blur(20px);
+          border-radius: 20px;
+          overflow: hidden;
+          position: relative;
+        }
+        .glass-dark-gradient {
+          background: linear-gradient(135deg,
+            rgba(26,102,54,0.82) 0%,
+            rgba(11,61,30,0.88) 40%,
+            rgba(11,61,30,0.92) 100%
+          );
+        }
+
+        /* ── LIGHT CARD ── */
+        .card-light {
+          background: #fff;
+          border-radius: 20px;
+          border: 1px solid rgba(11,61,30,0.07);
+          overflow: hidden;
+          position: relative;
+        }
+
+        /* ── ORB DECORATIONS ── */
+        .orb-green {
+          position: absolute;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(46,139,87,0.18) 0%, transparent 70%);
+          pointer-events: none;
+        }
+        .orb-amber {
+          position: absolute;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(212,132,10,0.12) 0%, transparent 70%);
+          pointer-events: none;
+        }
+
+        /* ── SECTION LABEL ── */
+        .section-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 12px;
+          border: 1px solid rgba(11,61,30,0.12);
+          border-radius: 100px;
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 1.5px;
+          text-transform: uppercase;
+          color: var(--fern);
+          background: rgba(46,139,87,0.07);
+          margin-bottom: 14px;
+        }
+        .section-pill-dot {
+          width: 5px; height: 5px;
+          border-radius: 50%;
+          background: var(--fern);
+          animation: livePulse 1.8s ease-in-out infinite;
+        }
+
+        @keyframes livePulse {
+          0%,100%{ opacity:1; transform:scale(1); }
+          50%{ opacity:0.4; transform:scale(1.4); }
+        }
+
+        /* ── WEATHER CARD INTERNALS ── */
+        .weather-location-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 5px 14px;
+          background: rgba(255,255,255,0.12);
+          border: 1px solid rgba(255,255,255,0.2);
+          border-radius: 100px;
+          font-size: 12px;
+          font-weight: 500;
+          color: rgba(255,255,255,0.9);
+        }
+        .temp-toggle {
+          display: flex;
+          align-items: center;
+          width: 72px; height: 34px;
+          background: rgba(255,255,255,0.12);
+          border: 1px solid rgba(255,255,255,0.2);
+          border-radius: 100px;
+          cursor: pointer;
+          position: relative;
+          flex-shrink: 0;
+        }
+        .temp-toggle-thumb {
+          position: absolute;
+          width: calc(50% - 3px);
+          height: calc(100% - 6px);
+          border-radius: 100px;
+          background: #fff;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+          transition: left 0.3s ease;
+          top: 3px;
+        }
+        .temp-toggle-labels {
+          display: flex;
+          width: 100%;
+          justify-content: space-between;
+          padding: 0 10px;
+          position: relative;
+          z-index: 2;
+          pointer-events: none;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        /* ── FORECAST CARD ── */
+        .forecast-day-card {
+          background: rgba(255,255,255,0.1);
+          border: 1px solid rgba(255,255,255,0.16);
+          border-radius: 16px;
+          padding: 20px 12px;
+          text-align: center;
+          transition: background 0.25s, transform 0.25s;
+          cursor: pointer;
+        }
+        .forecast-day-card:hover {
+          background: rgba(255,255,255,0.18);
+          transform: translateY(-4px);
+        }
+
+        /* ── CHART TOOLTIP ── */
+        .custom-tooltip {
+          background: rgba(255,255,255,0.97);
+          border: none;
+          border-radius: 12px;
+          padding: 12px 16px;
+          box-shadow: 0 8px 24px rgba(11,61,30,0.12);
+          font-size: 13px;
+        }
+
+        /* ── TABLE ── */
+        .crop-table tr:hover td { background: rgba(46,139,87,0.04); }
+
+        /* ── STATUS BADGE ── */
+        .badge-planted {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          background: rgba(46,139,87,0.1);
+          color: var(--fern);
+          border: 1px solid rgba(46,139,87,0.2);
+          padding: 4px 12px;
+          border-radius: 100px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .badge-pending {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          background: rgba(0,0,0,0.04);
+          color: #9ca3af;
+          border: 1px solid rgba(0,0,0,0.08);
+          padding: 4px 12px;
+          border-radius: 100px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        /* ── CROP INFO BOXES ── */
+        .info-box {
+          border-radius: 14px;
+          padding: 16px;
+          text-align: center;
+          border: 1px solid rgba(11,61,30,0.06);
+          transition: border-color 0.2s;
+        }
+        .info-box:hover { border-color: rgba(11,61,30,0.15); }
+        .info-box-label {
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: 1.5px;
+          text-transform: uppercase;
+          color: #9ca3af;
+          margin-bottom: 5px;
+        }
+        .info-box-value {
+          font-family: 'Playfair Display', serif;
+          font-size: 14px;
+          font-weight: 700;
+          color: var(--forest);
+        }
+
+        /* ── ADVISORY ── */
+        .advisory-item {
+          background: rgba(212,132,10,0.06);
+          border-left: 3px solid var(--amber);
+          border-radius: 0 10px 10px 0;
+          padding: 10px 12px;
+          transition: background 0.2s;
+        }
+        .advisory-item:hover { background: rgba(212,132,10,0.1); }
+
+        /* ── SCROLLBAR ── */
+        .thin-scroll::-webkit-scrollbar { width: 3px; }
+        .thin-scroll::-webkit-scrollbar-track { background: transparent; }
+        .thin-scroll::-webkit-scrollbar-thumb { background: rgba(46,139,87,0.3); border-radius: 10px; }
+
+        /* ── DETAILS BTN ── */
+        .btn-amber {
+          padding: 10px 20px;
+          background: var(--amber);
+          border: none;
+          border-radius: 100px;
+          color: #fff;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.25s, transform 0.2s;
+          white-space: nowrap;
+          font-family: 'DM Sans', sans-serif;
+        }
+        .btn-amber:hover { background: var(--amber-light); transform: translateY(-1px); }
+        .btn-amber:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+        /* ── CROP SELECT ── */
+        .crop-select {
+          flex: 1;
+          border: 1.5px solid rgba(11,61,30,0.12);
+          border-radius: 100px;
+          background: #fff;
+          outline: none;
+          padding: 10px 16px;
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--forest);
+          font-family: 'DM Sans', sans-serif;
+          transition: border-color 0.2s;
+          cursor: pointer;
+        }
+        .crop-select:hover, .crop-select:focus { border-color: var(--fern); }
+
+        /* ── MOBILE ── */
+        @media (max-width: 768px) {
+          .sidebar-fixed { display: none; }
+          .dash-main { margin-left: 0; padding-bottom: 80px; }
+          .dash-content { padding: 20px 16px 40px; }
+        }
+      `}</style>
+
+      {/* ── DESKTOP SIDEBAR ── */}
+      <div className="sidebar-fixed hidden md:block">
         <UserSidebar />
       </div>
 
-      <div className="flex-1 flex flex-col pb-20 md:pb-0">
+      {/* ── MAIN ── */}
+      <div className="dash-main">
+
         {/* Navbar */}
-        <div className="shadow-md bg-white md:ml-64 sticky top-0 z-30">
+        <div className="dash-navbar">
           <UserNavbar />
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col md:ml-64 px-4 sm:px-6 lg:px-10 py-5">
-          {/* Welcome Header */}
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-5">
-            WELCOME, {name}
+        {/* Content */}
+        <div className="dash-content">
+
+          {/* ── WELCOME HEADER ── */}
+          <div className="welcome-eyebrow">Good to see you</div>
+          <h1 className="welcome-h1">
+            Welcome back, <em>{name}</em>
           </h1>
+          <div className="welcome-divider" />
 
-          <div className="flex flex-col lg:flex-row gap-6 mb-6">
-            <div className="flex flex-col gap-5 w-full lg:w-80 xl:w-96">
-              {/* Modern Weather Card - Softer Green */}
-              <div className="relative overflow-hidden rounded-3xl shadow-2xl p-6"
-                 style={{
-                  background: 'linear-gradient(135deg, rgba(144, 174, 137, 0.7) 0%, rgba(120, 150, 113, 0.75) 30%, rgba(178, 167, 124, 0.7) 70%, rgba(196, 179, 127, 0.75) 100%)',
-                  backdropFilter: 'blur(16px)',
-                  boxShadow: '0 8px 32px 0 rgba(91, 120, 95, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)'
-                }}
-              >
-                {/* Decorative Elements */}
-                <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
-                <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
+          {/* ── ROW 1: Weather + Forecast ── */}
+          <div style={{ display: 'flex', gap: '20px', marginBottom: '24px', flexWrap: 'wrap' }}>
 
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-2 backdrop-blur-sm bg-white/20 px-4 py-2 rounded-full border border-white/30">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 48 48"
-                      >
-                        <path
-                          fill="none"
-                          stroke="#fff"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={4}
-                          d="M24 44s14-10.435 14-24A14 14 0 1 0 10 20c0 13.565 14 24 14 24z"
-                        />
-                        <circle cx="24" cy="20" r="4" fill="#fff"></circle>
-                      </svg>
-                      <span className="text-white font-medium text-sm">
-                        {location || "Loading..."}
-                      </span>
+            {/* Weather Card */}
+            <div className="glass-dark glass-dark-gradient" style={{ width: '280px', flexShrink: 0, padding: '24px' }}>
+              <div className="orb-green" style={{ width: '200px', height: '200px', top: '-60px', right: '-60px' }} />
+              <div className="orb-amber" style={{ width: '120px', height: '120px', bottom: '-20px', left: '-20px' }} />
+
+              {/* Location + Toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', position: 'relative', zIndex: 2 }}>
+                <div className="weather-location-chip">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 48 48">
+                    <path fill="none" stroke="rgba(255,255,255,0.8)" strokeLinecap="round" strokeLinejoin="round" strokeWidth={4}
+                      d="M24 44s14-10.435 14-24A14 14 0 1 0 10 20c0 13.565 14 24 14 24z" />
+                    <circle cx="24" cy="20" r="4" fill="rgba(255,255,255,0.8)" />
+                  </svg>
+                  {location || "Loading..."}
+                </div>
+                <div className="temp-toggle" onClick={() => setUnit(unit === "C" ? "F" : "C")}>
+                  <div className="temp-toggle-thumb" style={{ left: unit === "C" ? '3px' : 'calc(50%)' }} />
+                  <div className="temp-toggle-labels">
+                    <span style={{ color: unit === "C" ? 'var(--forest)' : 'rgba(255,255,255,0.7)' }}>C</span>
+                    <span style={{ color: unit === "F" ? 'var(--forest)' : 'rgba(255,255,255,0.7)' }}>F</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Day */}
+              <div style={{ textAlign: 'center', marginBottom: '16px', position: 'relative', zIndex: 2 }}>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: '13px', color: 'rgba(255,255,255,0.6)', letterSpacing: '1px' }}>
+                  {weekday}
+                </div>
+                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>{formattedDate}</div>
+              </div>
+
+              {weather ? (
+                <div style={{ position: 'relative', zIndex: 2 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontFamily: "'Playfair Display', serif", fontSize: '56px', fontWeight: '700', color: '#fff', lineHeight: 1 }}>
+                        {unit === "C" ? weather.current.temp_c : weather.current.temp_f}°
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', marginTop: '4px' }}>
+                        Feels like {unit === "C" ? weather.current.feelslike_c : weather.current.feelslike_f}°
+                      </div>
                     </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <img src={weather.current.condition.icon} alt="" style={{ width: '64px', height: '64px', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.3))' }} />
+                      <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', marginTop: '4px', fontWeight: '500' }}>
+                        {weather.current.condition.text}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '13px', padding: '20px 0' }}>
+                  Fetching weather...
+                </div>
+              )}
+            </div>
 
-                    {/* Modern Temperature Toggle */}
-                    <div
-                      className="flex items-center w-20 h-9 backdrop-blur-sm bg-white/20 rounded-full cursor-pointer relative border border-white/30"
-                      onClick={() => setUnit(unit === "C" ? "F" : "C")}
-                    >
-                      <div
-                        className={`absolute w-1/2 h-[calc(100%-4px)] rounded-full bg-white shadow-lg transition-all duration-300 top-0.5 ${
-                          unit === "C" ? "left-0.5" : "left-[calc(50%-2px)]"
-                        }`}
+            {/* Forecast Card */}
+            <div className="glass-dark glass-dark-gradient" style={{ flex: 1, minWidth: '300px', padding: '24px' }}>
+              <div className="orb-green" style={{ width: '300px', height: '300px', top: '-100px', right: '-80px' }} />
+
+              <div style={{ marginBottom: '20px', position: 'relative', zIndex: 2 }}>
+                <div className="section-pill" style={{ color: 'rgba(168,197,160,0.9)', background: 'rgba(46,139,87,0.15)', borderColor: 'rgba(168,197,160,0.2)' }}>
+                  <span className="section-pill-dot" style={{ background: 'var(--sage)' }} />
+                  3-Day Forecast
+                </div>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: '22px', fontWeight: '700', color: '#fff' }}>
+                  Upcoming <em style={{ fontStyle: 'italic', color: 'var(--amber-light)' }}>Weather</em>
+                </div>
+              </div>
+
+              {forecastData && forecastData.length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', position: 'relative', zIndex: 2 }}>
+                  {forecastData.map((day, index) => (
+                    <div key={index} className="forecast-day-card">
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', letterSpacing: '0.5px', marginBottom: '12px' }}>
+                        {index === 0 ? 'Today' : getShortDay(day.date)}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+                        {getWeatherIcon(day.day.condition.text)}
+                      </div>
+                      <div style={{ fontFamily: "'Playfair Display', serif", fontSize: '28px', fontWeight: '700', color: '#fff' }}>
+                        {getTemp(day.day.maxtemp_c, day.day.maxtemp_f)}°
+                      </div>
+                      <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.5)', margin: '2px 0 6px' }}>
+                        {getTemp(day.day.mintemp_c, day.day.mintemp_f)}°
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.55)', fontWeight: '500' }}>
+                        {day.day.condition.text}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', textAlign: 'center', padding: '40px 0', position: 'relative', zIndex: 2 }}>
+                  Loading forecast...
+                </div>
+              )}
+            </div>
+
+            {/* Crop Advisory */}
+            <div className="card-light" style={{ width: '240px', flexShrink: 0, padding: '24px' }}>
+              <div className="orb-green" style={{ width: '150px', height: '150px', top: '-40px', right: '-40px' }} />
+
+              <div style={{ position: 'relative', zIndex: 2 }}>
+                <div className="section-pill">
+                  <span className="section-pill-dot" />
+                  Advisory
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                  <div style={{ fontFamily: "'Playfair Display', serif", fontSize: '18px', fontWeight: '700', color: 'var(--forest)' }}>
+                    Crop <em style={{ fontStyle: 'italic' }}>Alerts</em>
+                  </div>
+                  {cropAdvisory && cropAdvisory.length > 0 && (
+                    <span style={{ background: 'var(--amber)', color: '#fff', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '100px' }}>
+                      {cropAdvisory.length}
+                    </span>
+                  )}
+                </div>
+
+                <div className="thin-scroll" style={{ height: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {cropAdvisory && cropAdvisory.length > 0 ? (
+                    cropAdvisory.map((advisory, index) => (
+                      <div key={index} className="advisory-item">
+                        <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--forest)', marginBottom: '3px' }}>
+                          🌾 {advisory.crop?.name || 'Unknown Crop'}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#6b7280', lineHeight: '1.5' }}>
+                          {advisory.recommendations}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '8px' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(46,139,87,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg width="20" height="20" fill="none" stroke="var(--fern)" viewBox="0 0 24 24" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#9ca3af', textAlign: 'center' }}>All Systems Optimal</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── ROW 2: Chart ── */}
+          <div className="card-light" style={{ marginBottom: '24px', padding: '28px 28px 20px' }}>
+            <div className="orb-amber" style={{ width: '250px', height: '250px', top: '-80px', right: '-60px' }} />
+
+            <div style={{ position: 'relative', zIndex: 2 }}>
+              <div className="section-pill">
+                <span className="section-pill-dot" />
+                Live Sensors
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <div style={{ fontFamily: "'Playfair Display', serif", fontSize: '22px', fontWeight: '700', color: 'var(--forest)' }}>
+                    Environmental <em style={{ fontStyle: 'italic', color: 'var(--fern)' }}>Conditions</em>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '500', color: '#6b7280' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444' }} />
+                    Temperature
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '500', color: '#6b7280' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--fern)' }} />
+                    Humidity
+                  </div>
+                </div>
+              </div>
+
+              {error && <p style={{ color: '#ef4444', marginBottom: '12px', fontSize: '13px' }}>{error}</p>}
+
+              <div style={{ width: '100%', height: 300 }}>
+                {data.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={data}>
+                      <CartesianGrid stroke="rgba(11,61,30,0.06)" strokeDasharray="4 4" />
+                      <XAxis dataKey="time" stroke="#9ca3af" style={{ fontSize: '11px' }} />
+                      <YAxis yAxisId="left" stroke="#ef4444"
+                        label={{ value: "Temp (°C)", angle: -90, position: "insideLeft", style: { fontSize: '11px', fill: '#ef4444' } }}
+                        style={{ fontSize: '11px' }} />
+                      <YAxis yAxisId="right" orientation="right" stroke="var(--fern)"
+                        label={{ value: "Humidity (%)", angle: 90, position: "insideRight", style: { fontSize: '11px', fill: 'var(--fern)' } }}
+                        style={{ fontSize: '11px' }} />
+                      <Tooltip
+                        contentStyle={{ background: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 8px 24px rgba(11,61,30,0.12)', fontSize: '12px', padding: '10px 14px' }}
                       />
-                      <div className="flex w-full justify-between text-sm font-bold px-2.5 relative z-10 pointer-events-none">
-                        <span className={unit === "C" ? "text-green-600" : "text-white"}>C</span>
-                        <span className={unit === "F" ? "text-green-600" : "text-white"}>F</span>
-                      </div>
-                    </div>
+                      <Line yAxisId="left" type="monotone" dataKey="temp" stroke="#ef4444" strokeWidth={2.5}
+                        dot={{ fill: '#ef4444', r: 4 }} activeDot={{ r: 6 }} name="Temperature" />
+                      <Line yAxisId="right" type="monotone" dataKey="humidity" stroke="var(--fern)" strokeWidth={2.5}
+                        dot={{ fill: 'var(--fern)', r: 4 }} activeDot={{ r: 6 }} name="Humidity" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ width: '40px', height: '40px', border: '3px solid rgba(46,139,87,0.2)', borderTopColor: 'var(--fern)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                    <div style={{ fontSize: '13px', color: '#9ca3af', fontWeight: '500' }}>Loading sensor data...</div>
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                   </div>
-
-                  {/* Weather Info */}
-                  {weather ? (
-                    <div className="space-y-4">
-                      <div className="text-center">
-                        <h2 className="text-xl font-semibold text-white/90">{weekday}</h2>
-                        <p className="text-sm text-white/70 tracking-wide">{formattedDate}</p>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex flex-col">
-                          <h3 className="text-6xl font-bold text-white mb-1">
-                            {unit === "C" ? weather.current.temp_c : weather.current.temp_f}°
-                          </h3>
-                          <p className="text-white/80 text-sm">
-                            Feels like {unit === "C" ? weather.current.temp_c : weather.current.temp_f}°
-                          </p>
-                        </div>
-
-                        <div className="flex flex-col items-center">
-                          <img
-                            src={weather.current.condition.icon}
-                            alt={weather.current.condition.text}
-                            className="w-20 h-20 drop-shadow-lg"
-                          />
-                          <h4 className="font-semibold text-white text-sm mt-1">
-                            {weather.current.condition.text}
-                          </h4>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-white/70">Fetching Weather...</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Modern Crop Advisory Card */}
-              <div className="relative overflow-hidden bg-white rounded-3xl shadow-lg p-6 border border-gray-200">
-                {/* Subtle background decoration */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full blur-3xl opacity-40"></div>
-
-                <div className="relative z-10">
-                  {/* Header */}
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                    <h3 className="font-bold text-gray-800 text-lg">Crop Advisory</h3>
-                    {cropAdvisory && cropAdvisory.length > 0 && (
-                      <span className="ml-auto text-xs font-semibold text-white bg-red-500 px-2 py-1 rounded-full">
-                        {cropAdvisory.length}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Content Area */}
-                  <div className="h-20 overflow-y-auto pr-2 space-y-2">
-                    {cropAdvisory && cropAdvisory.length > 0 ? (
-                      cropAdvisory.map((advisory, index) => (
-                        <div
-                          key={index}
-                          className="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-3 border-l-4 border-orange-500 hover:shadow-md transition-shadow duration-200"
-                        >
-                          {/* Crop Name */}
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-lg">🌾</span>
-                            <p className="text-sm font-bold text-gray-800">
-                              {advisory.crop?.name || 'Unknown Crop'}
-                            </p>
-                          </div>
-                          {/* Recommendation */}
-                          <p className="text-xs text-gray-700 leading-relaxed pl-7">
-                            {advisory.recommendations}
-                          </p>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-full gap-2">
-                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                          <svg className="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                        <p className="text-sm font-semibold text-gray-600">All Systems Optimal</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <style>{`
-                  .overflow-y-auto::-webkit-scrollbar {
-                    width: 4px;
-                  }
-                  .overflow-y-auto::-webkit-scrollbar-track {
-                    background: #f3f4f6;
-                    border-radius: 10px;
-                  }
-                  .overflow-y-auto::-webkit-scrollbar-thumb {
-                    background: #10b981;
-                    border-radius: 10px;
-                  }
-                `}</style>
-              </div>
-            </div>
-
-            {/* 3-Day Forecast Section - Better Glassmorphism */}
-            <div className="flex-1 w-full">
-              <div
-                className="relative overflow-hidden rounded-3xl h-full p-8"
-                 style={{
-                  background: 'linear-gradient(135deg, rgba(144, 174, 137, 0.7) 0%, rgba(120, 150, 113, 0.75) 30%, rgba(178, 167, 124, 0.7) 70%, rgba(196, 179, 127, 0.75) 100%)',
-                  backdropFilter: 'blur(16px)',
-                  boxShadow: '0 8px 32px 0 rgba(91, 120, 95, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)'
-                }}
-              >
-                {/* Decorative background elements - More subtle */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
-                <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-300/10 rounded-full blur-3xl"></div>
-
-                <div className="relative z-10">
-                  <h2 className="text-2xl font-bold text-white mb-6 drop-shadow-sm">3-Day Forecast</h2>
-
-                  {forecastData && forecastData.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-4">
-                      {forecastData.map((day, index) => (
-                        <div
-                          key={index}
-                          className="backdrop-blur-md bg-white/15 rounded-2xl p-6 border border-white/25 hover:bg-white/25 transition-all duration-300 hover:scale-105 cursor-pointer"
-                          style={{
-                            boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)'
-                          }}
-                        >
-                          <div className="text-center">
-                            <p className="text-white/95 text-sm font-medium mb-4 drop-shadow-sm">
-                              {index === 0 ? 'Today' : getShortDay(day.date)}
-                            </p>
-                            <div className="flex justify-center mb-4">
-                              {getWeatherIcon(day.day.condition.text)}
-                            </div>
-                            <div className="space-y-2">
-                              <p className="text-4xl font-bold text-white drop-shadow-sm">
-                                {getTemp(day.day.maxtemp_c, day.day.maxtemp_f)}°
-                              </p>
-                              <p className="text-xl text-white/90 drop-shadow-sm">
-                                {getTemp(day.day.mintemp_c, day.day.mintemp_f)}°
-                              </p>
-                              <p className="text-sm text-white/80 mt-2">
-                                {day.day.condition.text}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-64">
-                      <p className="text-white text-lg drop-shadow-sm">Loading forecast...</p>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Modern Environmental Condition Chart */}
-          <div className="mb-6">
-            <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-gray-100">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full blur-3xl opacity-30"></div>
+          {/* ── ROW 3: Crops ── */}
+          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
 
-              <div className="relative z-10 p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-                      <span className="text-white text-xl">📊</span>
-                    </div>
-                    <h3 className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                      Environmental Condition
-                    </h3>
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                      <span className="text-sm font-medium text-gray-600">Temperature</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                      <span className="text-sm font-medium text-gray-600">Humidity</span>
-                    </div>
-                  </div>
+            {/* Available Crops Table */}
+            <div className="card-light" style={{ flex: 1, minWidth: '300px', padding: '28px' }}>
+              <div className="orb-green" style={{ width: '160px', height: '160px', top: '-40px', left: '-40px' }} />
+
+              <div style={{ position: 'relative', zIndex: 2 }}>
+                <div className="section-pill">
+                  <span className="section-pill-dot" />
+                  Garden
+                </div>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: '22px', fontWeight: '700', color: 'var(--forest)', marginBottom: '20px' }}>
+                  Available <em style={{ fontStyle: 'italic', color: 'var(--fern)' }}>Crops</em>
                 </div>
 
-                {error && <p className="text-red-500 mb-4 font-medium">{error}</p>}
-
-                <div style={{ width: "100%", height: 320 }}>
-                  {data.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={data}>
-                        <CartesianGrid stroke="#e5e7eb" strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="time"
-                          stroke="#9ca3af"
-                          style={{ fontSize: '12px', fontWeight: '500' }}
-                        />
-                        <YAxis
-                          yAxisId="left"
-                          stroke="#ef4444"
-                          label={{
-                            value: "Temperature (°C)",
-                            angle: -90,
-                            position: "insideLeft",
-                            style: { fontSize: '12px', fontWeight: '600', fill: '#ef4444' }
-                          }}
-                          style={{ fontSize: '12px', fontWeight: '500' }}
-                        />
-                        <YAxis
-                          yAxisId="right"
-                          orientation="right"
-                          stroke="#22c55e"
-                          label={{
-                            value: "Humidity (%)",
-                            angle: 90,
-                            position: "insideRight",
-                            style: { fontSize: '12px', fontWeight: '600', fill: '#22c55e' }
-                          }}
-                          style={{ fontSize: '12px', fontWeight: '500' }}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                            border: 'none',
-                            borderRadius: '12px',
-                            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                            padding: '12px'
-                          }}
-                        />
-                        <Legend
-                          wrapperStyle={{
-                            paddingTop: '20px',
-                            fontSize: '14px',
-                            fontWeight: '600'
-                          }}
-                        />
-                        <Line
-                          yAxisId="left"
-                          type="monotone"
-                          dataKey="temp"
-                          stroke="#ef4444"
-                          strokeWidth={3}
-                          dot={{ fill: '#ef4444', r: 5 }}
-                          activeDot={{ r: 7, fill: '#dc2626' }}
-                          name="Temperature"
-                        />
-                        <Line
-                          yAxisId="right"
-                          type="monotone"
-                          dataKey="humidity"
-                          stroke="#22c55e"
-                          strokeWidth={3}
-                          dot={{ fill: '#22c55e', r: 5 }}
-                          activeDot={{ r: 7, fill: '#16a34a' }}
-                          name="Humidity"
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-gray-500 font-medium">Loading sensors data...</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Modern Crops Section */}
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Modern Available Crops Table */}
-            <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-gray-100 w-full lg:w-1/2">
-              <div className="absolute top-0 left-0 w-48 h-48 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full blur-3xl opacity-40"></div>
-
-              <div className="relative z-10 p-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
-                    <span className="text-white text-xl">🌱</span>
-                  </div>
-                  <h2 className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                    Available Crops
-                  </h2>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="crop-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
-                      <tr className="border-b-2 border-gray-200">
-                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                          Crop Name
-                        </th>
-                        <th className="px-4 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
-                          Status
-                        </th>
+                      <tr style={{ borderBottom: '2px solid rgba(11,61,30,0.08)' }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '10px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#9ca3af' }}>Crop</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'center', fontSize: '10px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#9ca3af' }}>Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody>
                       {crops.length > 0 ? (
                         crops.map((crop, index) => (
-                          <tr
-                            key={index}
-                            className="hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 transition-all duration-200 group"
-                          >
-                            <td className="px-4 py-4">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                                  <span className="text-white text-sm">🌿</span>
+                          <tr key={index} style={{ borderBottom: '1px solid rgba(11,61,30,0.04)' }}>
+                            <td style={{ padding: '12px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'linear-gradient(135deg, var(--fern), var(--moss))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0 }}>
+                                  🌿
                                 </div>
-                                <span className="font-semibold text-gray-800">{crop.name}</span>
+                                <span style={{ fontWeight: '600', fontSize: '13px', color: 'var(--forest)' }}>{crop.name}</span>
                               </div>
                             </td>
-                            <td className="px-4 py-4 text-center">
+                            <td style={{ padding: '12px', textAlign: 'center' }}>
                               {crop.planted_at ? (
-                                <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full font-medium text-sm border border-green-200">
-                                  <span className="text-base">✓</span>
-                                  <span>Planted</span>
-                                </div>
+                                <span className="badge-planted">✓ Planted</span>
                               ) : (
-                                <div className="inline-flex items-center gap-2 bg-gray-100 text-gray-500 px-4 py-2 rounded-full font-medium text-sm border border-gray-200">
-                                  <span className="text-base">○</span>
-                                  <span>Pending</span>
-                                </div>
+                                <span className="badge-pending">○ Pending</span>
                               )}
                             </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="2" className="px-4 py-12">
-                            <div className="text-center">
-                              <div className="text-6xl mb-4">🌾</div>
-                              <p className="text-gray-500 font-medium">No crops available yet</p>
-                            </div>
+                          <td colSpan="2" style={{ padding: '40px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '36px', marginBottom: '8px' }}>🌾</div>
+                            <div style={{ fontSize: '13px', color: '#9ca3af', fontWeight: '500' }}>No crops available yet</div>
                           </td>
                         </tr>
                       )}
@@ -614,119 +777,95 @@ const UserDashboard = () => {
               </div>
             </div>
 
-            {/* Modern Crop Info Card */}
-            <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-gray-100 w-full lg:w-1/2">
-              <div className="absolute bottom-0 right-0 w-48 h-48 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full blur-3xl opacity-40"></div>
+            {/* Crop Detail Card */}
+            <div className="card-light" style={{ flex: 1, minWidth: '300px', overflow: 'hidden' }}>
+              <div className="orb-amber" style={{ width: '160px', height: '160px', bottom: '-40px', right: '-40px' }} />
 
-              <div className="relative">
-                {/* Modern Crop Image */}
-                <div className="relative h-72 overflow-hidden rounded-t-3xl">
-                  <img
-                    src={
-                      activeCrop?.image
-                        ? activeCrop.image
-                        : image
-                    }
-                    alt={activeCrop?.name || "Crop Background"}
-                    className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
-                </div>
+              {/* Crop Image */}
+              <div style={{ position: 'relative', height: '220px', overflow: 'hidden' }}>
+                <img
+                  src={activeCrop?.image || image}
+                  alt={activeCrop?.name || "Crop"}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease' }}
+                  onMouseOver={e => e.currentTarget.style.transform = 'scale(1.04)'}
+                  onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+                />
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(11,61,30,0.7) 0%, transparent 60%)' }} />
 
-                {/* Modern Overlay Info Box */}
-                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-[92%]">
-                  <div className="backdrop-blur-xl bg-white/95 rounded-3xl shadow-2xl border border-white/50 p-5">
-                    {/* Select Crop + More Details Button */}
-                    <div className="flex items-center gap-3 mb-4">
-                      <select
-                        name="crop"
-                        value={selectedCrop}
-                        onChange={(e) => setSelectedCrop(e.target.value)}
-                        className="flex-1 border-2 border-gray-200 rounded-2xl bg-white outline-none px-4 py-3 text-sm font-semibold text-gray-700 hover:border-green-400 focus:border-green-500 transition-colors cursor-pointer"
-                      >
-                        <option value="">🌾 Select Crop</option>
-                        {crops.map((crop, index) => (
-                          <option key={index} value={crop.id}>
-                            {crop.name}
-                          </option>
-                        ))}
-                      </select>
-
-                      <button
-                        className="px-5 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-2xl text-sm font-bold text-white shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-lg whitespace-nowrap transform hover:scale-105 disabled:hover:scale-100"
-                        disabled={!activeCrop}
-                        onClick={() => activeCrop && handleMoreDetails(activeCrop)}
-                      >
-                        Details →
-                      </button>
+                {activeCrop && (
+                  <div style={{ position: 'absolute', bottom: '14px', left: '16px' }}>
+                    <div style={{ fontFamily: "'Playfair Display', serif", fontSize: '20px', fontWeight: '700', color: '#fff', lineHeight: 1.2 }}>
+                      {activeCrop.name}
                     </div>
-
-                    {/* Modern Info Boxes */}
-                    <div className="grid grid-cols-2 gap-3">
-                      {/* Health Status Box - Dynamic Colors */}
-                      <div className={`bg-gradient-to-br ${
-                  activeCrop?.latest_detection_result?.detected_class
-                    ? (activeCrop.latest_detection_result.detected_class.toLowerCase().includes('healthy')
-                        ? "from-green-50 to-emerald-50"
-                        : "from-red-50 to-orange-50")
-                    : "from-gray-50 to-gray-100"
-                } rounded-2xl p-4 border-2 ${
-                  activeCrop?.latest_detection_result?.detected_class
-                    ? (activeCrop.latest_detection_result.detected_class.toLowerCase().includes('healthy')
-                        ? "border-green-200 hover:border-green-300"
-                        : "border-red-200 hover:border-red-300")
-                    : "border-gray-200 hover:border-gray-300"
-                } transition-colors`}>
-                  <div className="text-center">
-                      <span className="text-2xl mb-2 block">
-                          {activeCrop?.latest_detection_result?.detected_class
-                            ? (activeCrop.latest_detection_result.detected_class.toLowerCase().includes('healthy')
-                                ? "💚"
-                                : "⚠️")
-                            : "—"}
-                      </span>
-                      <h3 className="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">
-                          Health
-                      </h3>
-                      <p className={`text-sm font-bold ${
-                          activeCrop?.latest_detection_result?.detected_class
-                            ? (activeCrop.latest_detection_result.detected_class.toLowerCase().includes('healthy')
-                                ? "text-green-600"
-                                : "text-red-600")
-                            : "text-gray-800"
-                        }`}>
-                          {activeCrop?.latest_detection_result?.detected_class
-                            ? (activeCrop.latest_detection_result.detected_class.toLowerCase().includes('healthy')
-                                ? "Healthy"
-                                : "Diseased")
-                            : "No Data"}
-                      </p>
                   </div>
+                )}
+              </div>
+
+              {/* Bottom Controls */}
+              <div style={{ padding: '20px', position: 'relative', zIndex: 2 }}>
+                {/* Select + Button */}
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+                  <select
+                    className="crop-select"
+                    value={selectedCrop}
+                    onChange={(e) => setSelectedCrop(e.target.value)}
+                  >
+                    <option value="">🌾 Select a crop</option>
+                    {crops.map((crop, index) => (
+                      <option key={index} value={crop.id}>{crop.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    className="btn-amber"
+                    disabled={!activeCrop}
+                    onClick={() => activeCrop && handleMoreDetails(activeCrop)}
+                  >
+                    Details →
+                  </button>
                 </div>
 
-                      {/* Planted Date Box */}
-                      <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-4 border-2 border-blue-100 hover:border-blue-300 transition-colors">
-                        <div className="text-center">
-                          <span className="text-2xl mb-2 block">📅</span>
-                          <h3 className="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">
-                            Planted
-                          </h3>
-                          <p className="text-sm font-bold text-gray-800">
-                            {formatPlantedDate(activeCrop?.planted_at)}
-                          </p>
-                        </div>
-                      </div>
+                {/* Info Boxes */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  {/* Health */}
+                  <div className="info-box" style={{
+                    background: activeCrop?.latest_detection_result?.detected_class
+                      ? (activeCrop.latest_detection_result.detected_class.toLowerCase().includes('healthy')
+                        ? 'rgba(46,139,87,0.06)' : 'rgba(239,68,68,0.05)')
+                      : 'rgba(0,0,0,0.02)'
+                  }}>
+                    <div style={{ fontSize: '24px', marginBottom: '6px' }}>
+                      {activeCrop?.latest_detection_result?.detected_class
+                        ? (activeCrop.latest_detection_result.detected_class.toLowerCase().includes('healthy') ? '💚' : '⚠️')
+                        : '—'}
                     </div>
+                    <div className="info-box-label">Health</div>
+                    <div className="info-box-value" style={{
+                      color: activeCrop?.latest_detection_result?.detected_class
+                        ? (activeCrop.latest_detection_result.detected_class.toLowerCase().includes('healthy') ? 'var(--fern)' : '#ef4444')
+                        : 'var(--forest)'
+                    }}>
+                      {activeCrop?.latest_detection_result?.detected_class
+                        ? (activeCrop.latest_detection_result.detected_class.toLowerCase().includes('healthy') ? 'Healthy' : 'Diseased')
+                        : 'No Data'}
+                    </div>
+                  </div>
+
+                  {/* Planted Date */}
+                  <div className="info-box" style={{ background: 'rgba(212,132,10,0.05)' }}>
+                    <div style={{ fontSize: '24px', marginBottom: '6px' }}>📅</div>
+                    <div className="info-box-label">Planted</div>
+                    <div className="info-box-value">{formatPlantedDate(activeCrop?.planted_at)}</div>
                   </div>
                 </div>
               </div>
             </div>
+
           </div>
         </div>
       </div>
 
-      {/* Mobile Footer Sidebar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40">
+      {/* ── MOBILE BOTTOM NAV ── */}
+      <div className="md:hidden" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40 }}>
         <UserSidebar />
       </div>
     </div>
