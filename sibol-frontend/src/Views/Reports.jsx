@@ -1,52 +1,46 @@
 import React, { useState } from 'react';
 import UserSidebar from './parts/UserSidebar';
 import UserNavbar from './parts/UserNavbar';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from './axios';
+import Footer from './parts/Footer';
 
 const Reports = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [downloading, setDownloading] = useState(false);
   const navigate = useNavigate();
 
-  const year = currentDate.getFullYear();
+  const year  = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
 
-  const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
+  const monthNames  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const daysOfWeek  = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
-  const daysOfWeek = ["SU", "M", "T", "W", "TH", "F", "SA"];
+  const firstDay   = new Date(year, currentDate.getMonth(), 1);
+  const lastDay    = new Date(year, currentDate.getMonth() + 1, 0);
+  const startDay   = firstDay.getDay();
+  const totalDays  = lastDay.getDate();
 
-  // Calculate calendar days
-  const firstDayOfMonth = new Date(year, currentDate.getMonth(), 1);
-  const lastDayOfMonth = new Date(year, currentDate.getMonth() + 1, 0);
-  const startingDayOfWeek = firstDayOfMonth.getDay();
-  const totalDaysOfMonth = lastDayOfMonth.getDate();
-
-  // Build days array
   const days = [];
-  for (let i = 0; i < startingDayOfWeek; i++) {
-    days.push(null);
-  }
-  for (let i = 1; i <= totalDaysOfMonth; i++) {
-    days.push(i);
-  }
+  for (let i = 0; i < startDay; i++) days.push(null);
+  for (let i = 1; i <= totalDays; i++) days.push(i);
 
-  const goToPreviousMonth = () => {
-    setCurrentDate(new Date(year, currentDate.getMonth() - 1, 1));
-  };
-
-  const goToNextMonth = () => {
-    setCurrentDate(new Date(year, currentDate.getMonth() + 1, 1));
-  };
+  const goToPrev = () => setCurrentDate(new Date(year, currentDate.getMonth() - 1, 1));
+  const goToNext = () => setCurrentDate(new Date(year, currentDate.getMonth() + 1, 1));
 
   const isWeekend = (day) => {
     if (!day) return false;
-    const dayOfWeek = (startingDayOfWeek + day - 1) % 7;
-    return dayOfWeek === 0 || dayOfWeek === 6;
+    const d = (startDay + day - 1) % 7;
+    return d === 0 || d === 6;
+  };
+
+  const isToday = (day) => {
+    const t = new Date();
+    return day &&
+      t.getDate() === day &&
+      t.getMonth() === currentDate.getMonth() &&
+      t.getFullYear() === year;
   };
 
   const handleDateClick = (day) => {
@@ -54,201 +48,172 @@ const Reports = () => {
     navigate(`/user/report/daily-report/${year}/${month}/${day}`);
   };
 
-  const handleDownloadMonthlyReport = async () => {
+  const handleDownload = async () => {
     setDownloading(true);
     try {
-      const response = await axiosClient.get(`/monthly-report/${year}/${month}`, {
-        responseType: 'blob'
-      });
-
-      // Create blob link to download
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const response = await axiosClient.get(`/monthly-report/${year}/${month}`, { responseType: 'blob' });
+      const url  = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute(
-        'download',
-        `Monthly_Report_${monthNames[currentDate.getMonth()]}_${year}.pdf`
-      );
+      link.href  = url;
+      link.setAttribute('download', `Monthly_Report_${monthNames[currentDate.getMonth()]}_${year}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.parentNode.removeChild(link);
       window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error downloading report:', error);
+    } catch {
       alert('Failed to download monthly report. Please try again.');
     } finally {
       setDownloading(false);
     }
   };
 
-  const isToday = (day) => {
-    const today = new Date();
-    return (
-      day &&
-      today.getDate() === day &&
-      today.getMonth() === currentDate.getMonth() &&
-      today.getFullYear() === year
-    );
-  };
-
   return (
-    <div className='bg-[#F4F0E5] flex flex-col md:flex-row min-h-screen'>
+    <div className="bg-[#f7f4ee] min-h-screen flex font-['DM_Sans',sans-serif]">
+
       {/* Desktop Sidebar */}
-      <div className='hidden md:block w-64 bg-white fixed top-0 left-0 h-screen shadow-md z-40'>
+      <div className="hidden md:block w-60 fixed top-0 left-0 h-screen z-40">
         <UserSidebar />
       </div>
 
-      <div className='flex-1 flex flex-col pb-20 md:pb-0'>
+      {/* Main */}
+      <div className="flex-1 flex flex-col md:ml-60">
+
         {/* Navbar */}
-        <div className="shadow-md bg-white md:ml-64 sticky top-0 z-30">
+        <div className="sticky top-0 z-30">
           <UserNavbar />
         </div>
 
-        {/* Main Content */}
-        <div className='flex-1 flex flex-col md:ml-64 px-4 sm:px-6 lg:px-10 py-5'>
-          {/* Header */}
-          <div className='mb-6'>
-            <h1 className='font-bold text-2xl md:text-3xl text-black'>Calendar</h1>
+        {/* Content */}
+        <div className="flex-1 px-4 sm:px-8 lg:px-10 py-8 pb-24 md:pb-10">
+
+          {/* Page header */}
+          <div className="mb-8">
+            <p className="text-[10px] font-medium tracking-[2.5px] uppercase text-[#2e8b57] mb-1">Reports</p>
+            <h1 className="font-['Playfair_Display',serif] text-3xl md:text-4xl font-bold text-[#0b3d1e]">
+              Farm <em className="italic text-[#2e8b57]">Calendar</em>
+            </h1>
           </div>
 
-          {/* Calendar Container */}
-          <div className='flex flex-col items-center justify-center flex-1'>
-            <div className='w-full max-w-2xl'>
-              {/* Calendar Header */}
-              <div className="flex items-center justify-between mb-6 px-2">
-                <h2 className="text-2xl sm:text-3xl font-serif font-semibold text-green-900">
-                  {monthNames[currentDate.getMonth()]} {year}
+          {/* Calendar card */}
+          <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden max-w-5xl">
+
+            {/* Card header */}
+            <div className="bg-[#0b3d1e] px-6 py-5 flex items-center justify-between">
+              <div>
+                <p className="text-[9px] font-medium tracking-[2px] uppercase text-white/30 mb-0.5">
+                  Monthly View
+                </p>
+                <h2 className="font-['Playfair_Display',serif] text-2xl font-bold text-white">
+                  {monthNames[currentDate.getMonth()]}{' '}
+                  <em className="italic text-[#f0a830]">{year}</em>
                 </h2>
-                <div className="flex gap-2">
-                  <button
-                    onClick={goToPreviousMonth}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    aria-label="Previous month"
-                  >
-                    <ChevronLeft size={24} />
-                  </button>
-                  <button
-                    onClick={goToNextMonth}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    aria-label="Next month"
-                  >
-                    <ChevronRight size={24} />
-                  </button>
-                </div>
               </div>
-
-              {/* Days of Week Header */}
-              <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
-                {daysOfWeek.map((day, index) => (
-                  <div
-                    key={index}
-                    className="text-center font-serif font-semibold text-green-900 text-lg sm:text-xl md:text-2xl py-2"
-                  >
-                    {day}
-                  </div>
-                ))}
-              </div>
-
-              {/* Calendar Days Grid */}
-              <div className="grid grid-cols-7 gap-1 sm:gap-2">
-                {days.map((day, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleDateClick(day)}
-                    disabled={!day}
-                    className={`
-                      aspect-square flex items-center justify-center text-lg sm:text-2xl md:text-4xl
-                      font-medium font-serif rounded transition-all
-                      ${!day ? 'cursor-default' : 'cursor-pointer hover:scale-105'}
-                      ${isWeekend(day)
-                        ? 'bg-[#879E7F] text-white hover:bg-[#748A6D]'
-                        : 'text-green-800 hover:bg-gray-100'
-                      }
-                      ${isToday(day)
-                        ? 'ring-2 ring-green-600 ring-offset-2'
-                        : ''
-                      }
-                    `}
-                  >
-                    {day}
-                  </button>
-                ))}
-              </div>
-
-              {/* Download Button */}
-              <div className="mt-8 flex justify-center sm:justify-end">
+              <div className="flex gap-2">
                 <button
-                  onClick={handleDownloadMonthlyReport}
-                  disabled={downloading}
-                  className="w-full sm:w-auto bg-[#6B8E73] hover:bg-[#5A7862] disabled:bg-gray-400
-                           disabled:cursor-not-allowed text-white font-medium py-3 px-6 rounded
-                           uppercase text-sm tracking-wide transition-colors flex items-center
-                           justify-center gap-2 min-w-[250px]"
+                  onClick={goToPrev}
+                  className="w-8 h-8 rounded-lg bg-white/8 border border-white/10 text-white/50 hover:bg-white/15 hover:text-white flex items-center justify-center transition-all"
                 >
-                  {downloading ? (
-                    <>
-                      <svg
-                        className="animate-spin h-5 w-5 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                        />
-                      </svg>
-                      Downloading...
-                    </>
-                  ) : (
-                    <>
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="7 10 12 15 17 10" />
-                        <line x1="12" y1="15" x2="12" y2="3" />
-                      </svg>
-                      Download Monthly Report
-                    </>
-                  )}
+                  <ChevronLeft size={15} />
+                </button>
+                <button
+                  onClick={goToNext}
+                  className="w-8 h-8 rounded-lg bg-white/8 border border-white/10 text-white/50 hover:bg-white/15 hover:text-white flex items-center justify-center transition-all"
+                >
+                  <ChevronRight size={15} />
                 </button>
               </div>
+            </div>
+
+            {/* Day-of-week labels */}
+            <div className="grid grid-cols-7 border-b border-black/5 bg-[#0b3d1e]/[0.02]">
+              {daysOfWeek.map((d, i) => (
+                <div
+                  key={i}
+                  className={`text-center py-3 text-[10px] font-semibold tracking-[1.5px] uppercase
+                    ${i === 0 || i === 6 ? 'text-[#2e8b57]' : 'text-[#0b3d1e]/30'}`}
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
+
+            {/* Days grid */}
+            <div className="grid grid-cols-7 p-4 gap-1">
+              {days.map((day, i) => {
+                const weekend = isWeekend(day);
+                const today   = isToday(day);
+
+                return (
+                  <button
+                    key={i}
+                    onClick={() => handleDateClick(day)}
+                    disabled={!day}
+                    className={[
+                      'relative flex items-center justify-center rounded-xl h-10 text-sm font-medium transition-all duration-150 select-none',
+                      !day
+                        ? 'cursor-default pointer-events-none'
+                        : weekend
+                          ? 'bg-[#0b3d1e] text-white hover:bg-[#1a6636] active:scale-95'
+                          : 'text-[#0b3d1e]/70 hover:bg-[#0b3d1e]/8 hover:text-[#0b3d1e] active:scale-95',
+                      today && !weekend
+                        ? 'ring-2 ring-[#d4840a] ring-offset-1 text-[#0b3d1e] font-bold'
+                        : '',
+                      today && weekend
+                        ? 'ring-2 ring-[#f0a830] ring-offset-1'
+                        : '',
+                    ].filter(Boolean).join(' ')}
+                  >
+                    {day}
+                    {today && (
+                      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#d4840a]" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-black/5 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
 
               {/* Legend */}
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-[#879E7F]"></div>
-                  <span>Weekend</span>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-sm bg-[#0b3d1e]" />
+                  <span className="text-[11px] text-[#0b3d1e]/40">Weekend</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded ring-2 ring-green-600"></div>
-                  <span>Today</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-sm ring-2 ring-[#d4840a] ring-offset-1" />
+                  <span className="text-[11px] text-[#0b3d1e]/40">Today</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-sm bg-[#0b3d1e]/8" />
+                  <span className="text-[11px] text-[#0b3d1e]/40">Tap to view daily report</span>
                 </div>
               </div>
+
+              {/* Download */}
+              <button
+                onClick={handleDownload}
+                disabled={downloading}
+                className="flex items-center gap-2 bg-[#d4840a] hover:bg-[#f0a830] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all duration-200 shadow-md shadow-[#d4840a]/25 hover:shadow-lg hover:shadow-[#d4840a]/30 hover:-translate-y-0.5"
+              >
+                {downloading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Downloading…
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-3.5 h-3.5" />
+                    Monthly Report
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Mobile Footer Sidebar */}
+      {/* Mobile Sidebar */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40">
         <UserSidebar />
       </div>

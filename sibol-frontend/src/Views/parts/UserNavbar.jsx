@@ -55,6 +55,7 @@ const UserNavbar = () => {
     try {
       await axiosClient.delete(`/notifications/${id}`);
       setNotifications(notifications.filter(n => n.id !== id));
+      if (selectedNotification?.id === id) setSelectedNotification(null);
     } catch (e) { console.error(e); }
   };
 
@@ -65,15 +66,28 @@ const UserNavbar = () => {
 
   const getNotificationIcon = (type) => {
     switch (type) {
-      case 'soil_moisture':   return <Droplet className="w-4 h-4 text-blue-400" />;
-      case 'irrigation':      return <CheckCircle className="w-4 h-4 text-emerald-400" />;
+      case 'soil_moisture':     return <Droplet className="w-4 h-4 text-blue-400" />;
+      case 'irrigation':        return <CheckCircle className="w-4 h-4 text-emerald-400" />;
       case 'crop_alert':
-      case 'garden_alert':    return <Info className="w-4 h-4 text-sky-400" />;
+      case 'garden_alert':      return <Info className="w-4 h-4 text-sky-400" />;
       case 'disease_detection': return <AlertCircle className="w-4 h-4 text-red-400" />;
-      case 'nutrient_alert':  return <AlertCircle className="w-4 h-4 text-orange-400" />;
+      case 'nutrient_alert':    return <AlertCircle className="w-4 h-4 text-orange-400" />;
       case 'ph_alert':
-      case 'temperature':     return <AlertCircle className="w-4 h-4 text-yellow-400" />;
-      default:                return <Bell className="w-4 h-4 text-white/40" />;
+      case 'temperature':       return <AlertCircle className="w-4 h-4 text-yellow-400" />;
+      default:                  return <Bell className="w-4 h-4 text-white/40" />;
+    }
+  };
+
+  const getIconBubbleStyle = (type, isRead) => {
+    if (isRead) return 'bg-white/4 border-white/6';
+    switch (type) {
+      case 'disease_detection': return 'bg-red-500/15 border-red-500/30';
+      case 'nutrient_alert':    return 'bg-orange-500/15 border-orange-500/30';
+      case 'ph_alert':
+      case 'temperature':       return 'bg-yellow-500/15 border-yellow-500/30';
+      case 'soil_moisture':     return 'bg-blue-500/15 border-blue-500/30';
+      case 'irrigation':        return 'bg-emerald-500/15 border-emerald-500/30';
+      default:                  return 'bg-white/6 border-white/8';
     }
   };
 
@@ -107,7 +121,6 @@ const UserNavbar = () => {
 
             {/* Logo */}
             <div className="flex items-center gap-3">
-              {/* Amber chip */}
               <div className="w-9 h-9 rounded-xl bg-[#d4840a] flex items-center justify-center shrink-0">
                 <img src={Logo} alt="SIBOL" className="w-5 h-5 object-contain brightness-0 invert" />
               </div>
@@ -189,28 +202,41 @@ const UserNavbar = () => {
                             <div
                               key={notif.id}
                               onClick={() => openNotificationDetails(notif)}
-                              className={`group flex gap-3 px-5 py-4 border-b border-white/6 cursor-pointer transition-all duration-200
+                              className={`group flex gap-3 py-4 border-b border-white/6 cursor-pointer transition-all duration-200
                                 ${!notif.is_read
-                                  ? 'bg-[#2e8b57]/10 hover:bg-[#2e8b57]/15'
-                                  : 'hover:bg-white/4'
+                                  ? 'pl-4 pr-5 border-l-[3px] border-l-[#d4840a] bg-[#d4840a]/10 hover:bg-[#d4840a]/15'
+                                  : 'pl-5 pr-5 border-l-[3px] border-l-[#1d6035] bg-transparent hover:bg-white/4'
                                 }`}
                             >
                               {/* Icon bubble */}
-                              <div className="shrink-0 mt-0.5 w-8 h-8 rounded-lg bg-white/6 border border-white/8 flex items-center justify-center">
+                              <div className={`shrink-0 mt-0.5 w-8 h-8 rounded-lg border flex items-center justify-center ${getIconBubbleStyle(notif.type, notif.is_read)}`}>
                                 {getNotificationIcon(notif.type)}
                               </div>
 
                               {/* Content */}
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between gap-2 mb-0.5">
-                                  <p className="text-sm font-semibold text-white/85 truncate">{notif.title}</p>
-                                  {!notif.is_read && (
-                                    <span className="w-1.5 h-1.5 rounded-full bg-[#d4840a] shrink-0 mt-1.5" />
+                                <div className="flex items-center justify-between gap-2 mb-0.5">
+                                  {/* Title: bold + white when unread, dim when read */}
+                                  <p className={`text-sm truncate ${!notif.is_read ? 'font-bold text-white' : 'font-normal text-white/45'}`}>
+                                    {notif.title}
+                                  </p>
+                                  {/* UNREAD pill vs read checkmark */}
+                                  {!notif.is_read ? (
+                                    <span className="text-[9px] bg-[#d4840a] text-white px-1.5 py-0.5 rounded-full font-bold shrink-0 tracking-wide">
+                                      UNREAD
+                                    </span>
+                                  ) : (
+                                    <Check className="w-3.5 h-3.5 text-white/20 shrink-0" />
                                   )}
                                 </div>
-                                <p className="text-xs text-white/40 line-clamp-2 mb-2">{notif.description}</p>
+                                {/* Description: brighter when unread, very dim when read */}
+                                <p className={`text-xs line-clamp-2 mb-2 ${!notif.is_read ? 'text-white/60' : 'text-white/20'}`}>
+                                  {notif.description}
+                                </p>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-[10px] text-white/25">{formatTime(notif.created_at)}</span>
+                                  <span className={`text-[10px] ${!notif.is_read ? 'text-white/35' : 'text-white/18'}`}>
+                                    {formatTime(notif.created_at)}
+                                  </span>
                                   <span className={`text-[9px] px-2 py-0.5 rounded-full border font-medium uppercase tracking-wide ${getPriorityStyle(notif.priority)}`}>
                                     {notif.priority}
                                   </span>
@@ -254,7 +280,7 @@ const UserNavbar = () => {
             {/* Modal header */}
             <div className="sticky top-0 bg-[#0b3d1e] border-b border-white/8 px-6 py-4 flex items-center justify-between rounded-t-2xl">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-white/6 border border-white/8 flex items-center justify-center">
+                <div className={`w-8 h-8 rounded-lg border flex items-center justify-center ${getIconBubbleStyle(selectedNotification.type, selectedNotification.is_read)}`}>
                   {getNotificationIcon(selectedNotification.type)}
                 </div>
                 <h2 className="text-base font-semibold text-white/90">{selectedNotification.title}</h2>

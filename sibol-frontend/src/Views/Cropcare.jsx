@@ -15,131 +15,53 @@ const Cropcare = () => {
   const [locationLoading, setLocationLoading] = useState(false);
   const [garden, setGarden] = useState([]);
   const navigate = useNavigate();
-  const [form, setForm] = useState({
-    garden_name: "",
-    location: "",
-  });
+  const [form, setForm] = useState({ garden_name: "", location: "" });
 
-  const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value
-    });
-  };
-
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   const handleModal = () => setModalOpen(true);
-  const closeModal = () => {
-    setModalOpen(false);
-    setError("");
-  };
-
+  const closeModal = () => { setModalOpen(false); setError(""); };
   const openDeleteModal = (gardenId, gardenName) => {
     setGardenToDelete({ id: gardenId, name: gardenName });
     setDeleteModalOpen(true);
   };
+  const closeDeleteModal = () => { setDeleteModalOpen(false); setGardenToDelete(null); setError(""); };
 
-  const closeDeleteModal = () => {
-    setDeleteModalOpen(false);
-    setGardenToDelete(null);
+  const getCurrentLocation = () => {
+    setLocationLoading(true);
     setError("");
-  };
-
-  // Get user's current location
-const getCurrentLocation = () => {
-  setLocationLoading(true);
-  setError("");
-
-  if (!navigator.geolocation) {
-    setError("Geolocation is not supported by your browser");
-    setLocationLoading(false);
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(
-    async (position) => {
-      const { latitude, longitude } = position.coords;
-
-      try {
-        const response = await fetch(
-          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
-        );
-        const data = await response.json();
-
-        console.log("Location data:", data);
-
-        // Extract street and city
-        const street = data.localityInfo?.administrative?.[0]?.name || '';
-        const barangay = data.locality || '';
-        const city = data.city || data.principalSubdivision || '';
-
-        let formattedAddress = '';
-
-        if (street && city) {
-          formattedAddress = `${street}, ${city}`;
-        } else if (barangay && city) {
-          formattedAddress = `${barangay}, ${city}`;
-        } else if (street) {
-          formattedAddress = street;
-        } else if (barangay) {
-          formattedAddress = barangay;
-        } else if (city) {
-          formattedAddress = city;
-        } else {
-          // Fallback to coordinates
-          formattedAddress = `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`;
+    if (!navigator.geolocation) { setError("Geolocation is not supported by your browser"); setLocationLoading(false); return; }
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+          const data = await response.json();
+          const street = data.localityInfo?.administrative?.[0]?.name || '';
+          const barangay = data.locality || '';
+          const city = data.city || data.principalSubdivision || '';
+          let formattedAddress = street && city ? `${street}, ${city}` : barangay && city ? `${barangay}, ${city}` : street || barangay || city || `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`;
+          setForm({ ...form, location: formattedAddress });
+          setLocationLoading(false);
+        } catch (err) {
+          setForm({ ...form, location: `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}` });
+          setLocationLoading(false);
         }
-
-        setForm({
-          ...form,
-          location: formattedAddress
-        });
+      },
+      (error) => {
+        const msgs = { [error.PERMISSION_DENIED]: "Location access denied. Please enable location permissions.", [error.POSITION_UNAVAILABLE]: "Location information unavailable.", [error.TIMEOUT]: "Location request timed out." };
+        setError(msgs[error.code] || "An unknown error occurred.");
         setLocationLoading(false);
-      } catch (err) {
-        console.error("Geocoding error:", err);
-        // If reverse geocoding fails, use coordinates
-        setForm({
-          ...form,
-          location: `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`
-        });
-        setLocationLoading(false);
-      }
-    },
-    (error) => {
-      let errorMessage = "Unable to retrieve your location";
-
-      switch(error.code) {
-        case error.PERMISSION_DENIED:
-          errorMessage = "Location access denied. Please enable location permissions.";
-          break;
-        case error.POSITION_UNAVAILABLE:
-          errorMessage = "Location information unavailable.";
-          break;
-        case error.TIMEOUT:
-          errorMessage = "Location request timed out.";
-          break;
-        default:
-          errorMessage = "An unknown error occurred.";
-      }
-
-      setError(errorMessage);
-      setLocationLoading(false);
-    },
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
-    }
-  );
-};
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
 
   const fetchGarden = async () => {
     setLoading(true);
     try {
       const response = await axiosClient.get("/getGardenData");
-      console.log("Garden data:", response.data); // Debug log
       setGarden(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      console.error("Fetch error:", error);
       setError("Failed to fetch data!");
     } finally {
       setLoading(false);
@@ -155,12 +77,7 @@ const getCurrentLocation = () => {
   const addGarden = async (e) => {
     e.preventDefault();
     setError("");
-
-    if (!form.garden_name || !form.location) {
-      setError("All fields are required!");
-      return;
-    }
-
+    if (!form.garden_name || !form.location) { setError("All fields are required!"); return; }
     setLoading(true);
     try {
       await axiosClient.post("/addGarden", form);
@@ -168,8 +85,8 @@ const getCurrentLocation = () => {
       setModalOpen(false);
       fetchGarden();
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || "Failed to add garden";
-      setError(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
+      const msg = error.response?.data?.message || error.message || "Failed to add garden";
+      setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally {
       setLoading(false);
     }
@@ -177,7 +94,6 @@ const getCurrentLocation = () => {
 
   const deleteGarden = async () => {
     if (!gardenToDelete) return;
-
     setDeleteLoading(true);
     setError("");
     try {
@@ -185,353 +101,553 @@ const getCurrentLocation = () => {
       closeDeleteModal();
       fetchGarden();
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || "Failed to delete garden";
-      setError(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
+      const msg = error.response?.data?.message || error.message || "Failed to delete garden";
+      setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally {
       setDeleteLoading(false);
     }
   };
 
-  const goGarden = (gardenId) => {
-    navigate(`/user/crop-care/${encodeURIComponent(gardenId)}`);
-  };
+  const goGarden = (gardenId) => navigate(`/user/crop-care/${encodeURIComponent(gardenId)}`);
 
   return (
-    <div className='bg-[#F4F0E5] min-h-screen flex flex-col md:flex-row'>
+    <div style={{ background: '#f7f4ee', minHeight: '100vh', display: 'flex', flexDirection: 'row' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+
+        :root {
+          --forest: #0b3d1e;
+          --moss: #1a6636;
+          --fern: #2e8b57;
+          --cream: #f7f4ee;
+          --amber: #d4840a;
+          --amber-light: #f0a830;
+          --white: #ffffff;
+          --text-mid: #5a6472;
+        }
+
+        * { box-sizing: border-box; }
+
+        .cc-body { font-family: 'DM Sans', sans-serif; }
+
+        /* ── SIDEBAR ── */
+        .cc-sidebar {
+          width: 256px;
+          background: var(--forest);
+          position: fixed; top: 0; left: 0;
+          height: 100vh; z-index: 40;
+          box-shadow: 4px 0 20px rgba(11,61,30,0.15);
+        }
+
+        /* ── MAIN ── */
+        .cc-main { flex: 1; display: flex; flex-direction: column; margin-left: 256px; padding-bottom: 0; }
+
+        /* ── NAVBAR STRIP ── */
+        .cc-navbar {
+          background: var(--white);
+          border-bottom: 1px solid rgba(0,0,0,0.06);
+          position: sticky; top: 0; z-index: 30;
+        }
+
+        /* ── PAGE BODY ── */
+        .cc-content { flex: 1; padding: 32px 40px; }
+
+        /* ── PAGE HEADER ── */
+        .cc-page-header {
+          display: flex; align-items: flex-end; justify-content: space-between;
+          padding-bottom: 28px;
+          border-bottom: 1px solid rgba(11,61,30,0.1);
+          margin-bottom: 28px;
+        }
+        .cc-page-title {
+          font-family: 'Playfair Display', serif;
+          font-size: clamp(22px, 3vw, 34px);
+          font-weight: 700; color: var(--forest);
+          line-height: 1.15;
+        }
+        .cc-page-title em { font-style: italic; color: var(--fern); }
+        .cc-page-sub {
+          font-size: 13px; color: var(--text-mid); margin-top: 4px;
+        }
+
+        /* ── CREATE BTN ── */
+        .btn-create {
+          display: inline-flex; align-items: center; gap: 8px;
+          padding: 11px 22px;
+          background: var(--forest); color: var(--white);
+          border: none; border-radius: 100px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 13px; font-weight: 500;
+          cursor: pointer; transition: all 0.25s;
+          white-space: nowrap; flex-shrink: 0;
+        }
+        .btn-create:hover { background: var(--moss); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(11,61,30,0.25); }
+        .btn-create-plus {
+          width: 18px; height: 18px; border-radius: 50%;
+          background: var(--amber);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 14px; line-height: 1; font-weight: 300;
+        }
+
+        /* ── GARDEN GRID ── */
+        .garden-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 20px;
+        }
+
+        /* ── GARDEN CARD ── */
+        .garden-card {
+          background: var(--white);
+          border-radius: 18px;
+          overflow: hidden;
+          border: 1px solid rgba(0,0,0,0.05);
+          transition: transform 0.3s, box-shadow 0.3s;
+          cursor: pointer;
+        }
+        .garden-card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px rgba(11,61,30,0.12); }
+
+        .garden-card-img {
+          width: 100%; height: 180px;
+          object-fit: cover;
+          transition: transform 0.5s ease;
+          display: block;
+        }
+        .garden-card:hover .garden-card-img { transform: scale(1.05); }
+        .garden-card-img-wrap { overflow: hidden; position: relative; }
+        .garden-card-img-wrap::after {
+          content: '';
+          position: absolute; inset: 0;
+          background: linear-gradient(to bottom, transparent 50%, rgba(11,61,30,0.35) 100%);
+          pointer-events: none;
+        }
+
+        .garden-card-body {
+          padding: 16px 18px;
+          display: flex; align-items: center; justify-content: space-between;
+          border-top: 1px solid rgba(0,0,0,0.04);
+        }
+        .garden-card-name {
+          font-family: 'Playfair Display', serif;
+          font-size: 17px; font-weight: 700;
+          color: var(--forest);
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          max-width: 180px;
+        }
+        .garden-card-actions { display: flex; align-items: center; gap: 4px; }
+        .card-icon-btn {
+          width: 36px; height: 36px; border-radius: 10px;
+          border: 1px solid rgba(0,0,0,0.07);
+          background: transparent;
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer; transition: all 0.2s;
+        }
+        .card-icon-btn:hover { background: #f0fdf4; border-color: var(--fern); }
+        .card-icon-btn.danger:hover { background: #fff1f2; border-color: #ef4444; }
+
+        /* ── EMPTY STATE ── */
+        .empty-state {
+          grid-column: 1 / -1;
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          padding: 80px 24px; text-align: center;
+        }
+        .empty-icon {
+          width: 80px; height: 80px; border-radius: 50%;
+          background: rgba(11,61,30,0.06);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 32px; margin-bottom: 20px;
+        }
+        .empty-title {
+          font-family: 'Playfair Display', serif;
+          font-size: 22px; color: var(--forest); margin-bottom: 8px;
+        }
+        .empty-sub { font-size: 14px; color: var(--text-mid); max-width: 280px; line-height: 1.6; }
+
+        /* ── MODAL BACKDROP ── */
+        .modal-backdrop {
+          position: fixed; inset: 0;
+          background: rgba(0,0,0,0.45);
+          backdrop-filter: blur(6px);
+          z-index: 50;
+          display: flex; align-items: center; justify-content: center;
+          padding: 16px;
+          animation: backdropIn 0.25s ease-out;
+        }
+        @keyframes backdropIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* ── MODAL ── */
+        .modal {
+          background: var(--white);
+          border-radius: 22px;
+          width: 100%; max-width: 440px;
+          box-shadow: 0 32px 80px rgba(0,0,0,0.25);
+          animation: modalIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+          overflow: hidden;
+        }
+        @keyframes modalIn { from { opacity:0; transform:scale(0.9) translateY(16px); } to { opacity:1; transform:scale(1) translateY(0); } }
+
+        .modal-header {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 22px 24px 20px;
+          border-bottom: 1px solid rgba(0,0,0,0.06);
+        }
+        .modal-title {
+          font-family: 'Playfair Display', serif;
+          font-size: 22px; font-weight: 700; color: var(--forest);
+        }
+        .modal-close {
+          width: 34px; height: 34px; border-radius: 50%;
+          border: 1px solid rgba(0,0,0,0.1);
+          background: transparent; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          transition: background 0.2s;
+        }
+        .modal-close:hover { background: #f3f4f6; }
+
+        /* ── FORM ── */
+        .modal-form { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+        .form-label { font-size: 12px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-mid); margin-bottom: 6px; display: block; }
+        .form-input {
+          width: 100%; padding: 11px 14px;
+          border: 1.5px solid rgba(0,0,0,0.1);
+          border-radius: 12px;
+          font-family: 'DM Sans', sans-serif; font-size: 14px;
+          color: var(--forest); background: var(--cream);
+          outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-input:focus { border-color: var(--fern); box-shadow: 0 0 0 3px rgba(46,139,87,0.12); background: var(--white); }
+        .form-input::placeholder { color: rgba(90,100,114,0.5); }
+
+        .location-row { display: flex; gap: 8px; }
+        .btn-locate {
+          width: 44px; height: 44px; border-radius: 12px;
+          background: var(--forest); border: none;
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+        }
+        .btn-locate:hover { background: var(--moss); }
+        .btn-locate:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .form-hint { font-size: 11px; color: rgba(90,100,114,0.6); margin-top: 4px; }
+
+        /* ── ERROR ALERT ── */
+        .error-alert {
+          display: flex; align-items: flex-start; gap: 10px;
+          padding: 12px 14px;
+          background: #fff1f2;
+          border: 1px solid #fecdd3;
+          border-radius: 12px;
+          font-size: 13px; color: #be123c;
+          margin: 0 24px;
+        }
+
+        /* ── MODAL FOOTER ── */
+        .modal-footer {
+          display: flex; justify-content: flex-end; gap: 10px;
+          padding: 16px 24px;
+          border-top: 1px solid rgba(0,0,0,0.05);
+        }
+        .btn-cancel {
+          padding: 10px 20px; border-radius: 100px;
+          border: 1.5px solid rgba(0,0,0,0.12);
+          background: transparent; color: var(--text-mid);
+          font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+          cursor: pointer; transition: all 0.2s;
+        }
+        .btn-cancel:hover { background: #f3f4f6; }
+        .btn-save {
+          padding: 10px 24px; border-radius: 100px;
+          background: var(--forest); border: none;
+          color: var(--white);
+          font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+          cursor: pointer; transition: all 0.2s;
+          display: flex; align-items: center; gap: 7px;
+        }
+        .btn-save:hover { background: var(--moss); }
+        .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-delete-confirm {
+          padding: 10px 24px; border-radius: 100px;
+          background: #dc2626; border: none;
+          color: var(--white);
+          font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+          cursor: pointer; transition: all 0.2s;
+          display: flex; align-items: center; gap: 7px;
+        }
+        .btn-delete-confirm:hover { background: #b91c1c; }
+        .btn-delete-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ── DELETE MODAL ── */
+        .delete-modal-body { padding: 28px 24px 8px; text-align: center; }
+        .delete-icon-ring {
+          width: 72px; height: 72px; border-radius: 50%;
+          background: #fff1f2; border: 2px solid #fecdd3;
+          display: flex; align-items: center; justify-content: center;
+          margin: 0 auto 18px; font-size: 30px;
+        }
+        .delete-modal-text { font-size: 14px; color: var(--text-mid); line-height: 1.6; }
+        .delete-modal-name { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--forest); font-weight: 700; margin: 8px 0; }
+        .delete-modal-warn { font-size: 12px; color: #9ca3af; margin-top: 8px; }
+
+        /* ── SPINNER ── */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner { animation: spin 0.8s linear infinite; }
+
+        /* ── MOBILE ── */
+        @media (max-width: 768px) {
+          .cc-sidebar { display: none; }
+          .cc-main { margin-left: 0; padding-bottom: 72px; }
+          .cc-content { padding: 20px 16px; }
+          .cc-page-header { flex-direction: column; align-items: flex-start; gap: 14px; }
+          .cc-mobile-sidebar { display: block; position: fixed; bottom: 0; left: 0; right: 0; background: var(--white); z-index: 40; box-shadow: 0 -2px 12px rgba(0,0,0,0.08); }
+        }
+        @media (min-width: 769px) {
+          .cc-mobile-sidebar { display: none; }
+        }
+      `}</style>
+
       {/* Desktop Sidebar */}
-      <div className='hidden md:block w-64 bg-white fixed top-0 left-0 h-screen shadow-md z-40'>
+      <div className="cc-sidebar">
         <UserSidebar />
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col md:ml-64 pb-20 md:pb-0">
+      {/* Main */}
+      <div className="cc-main cc-body">
         {/* Navbar */}
-        <div className="shadow-md bg-white sticky top-0 z-30">
+        <div className="cc-navbar">
           <UserNavbar />
         </div>
 
         {/* Content */}
-        <div className='flex-1 flex flex-col px-4 sm:px-6 lg:px-10 py-4'>
-          {/* Header */}
-          <div className='flex flex-col justify-center w-full py-6 border-b-2 border-gray-500'>
-            <h1 className='text-xl sm:text-2xl md:text-4xl font-semibold'>
-              Which garden would you like to monitor?
-            </h1>
-          </div>
+        <div className="cc-content">
 
-          {/* Create Button */}
-          <div className='flex justify-end w-full py-4'>
-            <button
-              onClick={handleModal}
-              type='button'
-              className='bg-[#114320BA] hover:bg-[#114320] transition-colors px-4 py-2 rounded-md text-white font-serif text-sm md:text-base'
-            >
-              CREATE NEW
+          {/* Page Header */}
+          <div className="cc-page-header">
+            <div>
+              <h1 className="cc-page-title">
+                Your <em>Gardens</em>
+              </h1>
+              <p className="cc-page-sub">Select a garden to begin monitoring crop health.</p>
+            </div>
+            <button className="btn-create" onClick={handleModal}>
+              <span className="btn-create-plus">+</span>
+              New Garden
             </button>
           </div>
 
           {/* Garden Grid */}
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full'>
-            {garden.map((gard) => (
-              <div key={gard.id} className='flex flex-col bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow'>
-                <div className='w-full h-48 overflow-hidden'>
-                  <img src={Pic} alt={gard.name || gard.garden_name || 'Garden'} className='w-full h-full object-cover' />
+          <div className="garden-grid">
+            {loading && garden.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">
+                  <svg style={{ animation: 'spin 1s linear infinite' }} xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#2e8b57" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
                 </div>
-                <div className='flex flex-row'>
-                  <div className='flex-1 px-4 py-3 border-r-2 border-gray-200'>
-                    <h2 className='font-serif text-lg md:text-xl font-semibold truncate'>
-                      {gard.name || gard.garden_name || 'Unnamed Garden'}
-                    </h2>
-                  </div>
-                  <div className='flex items-center justify-evenly px-3 py-3 gap-2'>
-                    <button
-                      onClick={() => goGarden(gard.id)}
-                      disabled={loading}
-                      className='hover:bg-gray-100 p-2 rounded transition-colors disabled:opacity-50'
-                      aria-label="View garden"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 512 512">
-                        <path fill="none" stroke="#000" strokeLinecap="round" strokeLinejoin="round" strokeWidth={32} d="M176 176v-40a40 40 0 0 1 40-40h208a40 40 0 0 1 40 40v240a40 40 0 0 1-40 40H216a40 40 0 0 1-40-40v-40" />
-                        <path fill="none" stroke="#000" strokeLinecap="round" strokeLinejoin="round" strokeWidth={32} d="m272 336l80-80l-80-80M48 256h288" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => openDeleteModal(gard.id, gard.name || gard.garden_name || 'Unnamed Garden')}
-                      className='hover:bg-red-50 p-2 rounded transition-colors'
-                      aria-label="Delete garden"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-                        <path fill="none" stroke="#e61010" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 11v6m-4-6v6M6 7v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7M4 7h16M7 7l2-4h6l2 4" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
+                <p className="empty-title">Loading gardens…</p>
               </div>
-            ))}
+            ) : garden.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">🌱</div>
+                <p className="empty-title">No gardens yet</p>
+                <p className="empty-sub">Create your first garden to start monitoring crop health in real time.</p>
+              </div>
+            ) : (
+              garden.map((gard) => (
+                <div className="garden-card" key={gard.id}>
+                  <div className="garden-card-img-wrap">
+                    <img
+                      src={Pic}
+                      alt={gard.name || gard.garden_name || 'Garden'}
+                      className="garden-card-img"
+                    />
+                  </div>
+                  <div className="garden-card-body">
+                    <span className="garden-card-name">
+                      {gard.name || gard.garden_name || 'Unnamed Garden'}
+                    </span>
+                    <div className="garden-card-actions">
+                      <button
+                        className="card-icon-btn"
+                        onClick={() => goGarden(gard.id)}
+                        disabled={loading}
+                        aria-label="Open garden"
+                        title="Open garden"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 512 512" fill="none">
+                          <path stroke="#1a6636" strokeLinecap="round" strokeLinejoin="round" strokeWidth={36} d="M176 176v-40a40 40 0 0 1 40-40h208a40 40 0 0 1 40 40v240a40 40 0 0 1-40 40H216a40 40 0 0 1-40-40v-40" />
+                          <path stroke="#1a6636" strokeLinecap="round" strokeLinejoin="round" strokeWidth={36} d="m272 336l80-80l-80-80M48 256h288" />
+                        </svg>
+                      </button>
+                      <button
+                        className="card-icon-btn danger"
+                        onClick={() => openDeleteModal(gard.id, gard.name || gard.garden_name || 'Unnamed Garden')}
+                        aria-label="Delete garden"
+                        title="Delete garden"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                          <path d="M10 11v6M14 11v6" />
+                          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
 
-      {/* Mobile Footer Sidebar */}
-      <div className='md:hidden fixed bottom-0 left-0 right-0 bg-white shadow-lg z-40'>
+      {/* Mobile Sidebar */}
+      <div className="cc-mobile-sidebar">
         <UserSidebar />
       </div>
 
-      {/* Add Garden Modal */}
+      {/* ── ADD GARDEN MODAL ── */}
       {isModalOpen && (
-        <div className='fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50 p-4 animate-fadeIn'>
-          <div className='flex flex-col bg-white rounded-lg shadow-xl w-full max-w-md transform transition-all'>
-            {/* Modal Header */}
-            <div className='flex items-center justify-between px-6 py-4 border-b'>
-              <h2 className='text-xl md:text-2xl font-bold'>Add Garden</h2>
-              <button
-                onClick={closeModal}
-                className='hover:bg-gray-100 p-2 rounded-full transition-colors'
-                aria-label="Close modal"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32">
-                  <path fill="#151212" d="M16 2C8.2 2 2 8.2 2 16s6.2 14 14 14s14-6.2 14-14S23.8 2 16 2m0 26C9.4 28 4 22.6 4 16S9.4 4 16 4s12 5.4 12 12s-5.4 12-12 12" />
-                  <path fill="#151212" d="M21.4 23L16 17.6L10.6 23L9 21.4l5.4-5.4L9 10.6L10.6 9l5.4 5.4L21.4 9l1.6 1.6l-5.4 5.4l5.4 5.4z" />
+        <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && closeModal()}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">New Garden</span>
+              <button className="modal-close" onClick={closeModal} aria-label="Close">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
               </button>
             </div>
 
-            {/* Error Alert */}
             {error && (
-              <div className="flex items-center p-4 mx-6 mt-4 text-sm text-red-800 rounded-lg bg-red-50" role="alert">
-                <svg className="shrink-0 inline w-4 h-4 me-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z" />
+              <div className="error-alert" style={{ marginTop: 16 }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                 </svg>
-                <div>
-                  <span className="font-medium">Error!</span> {error}
-                </div>
+                <span>{error}</span>
               </div>
             )}
 
-            {/* Modal Form */}
-            <form onSubmit={addGarden} className='flex flex-col gap-4 px-6 py-6'>
-              <div className='flex flex-col gap-2'>
-                <label className='text-sm md:text-base font-semibold'>Garden Name</label>
+            <form onSubmit={addGarden} className="modal-form">
+              <div>
+                <label className="form-label">Garden name</label>
                 <input
                   type="text"
-                  name='garden_name'
+                  name="garden_name"
                   value={form.garden_name}
                   onChange={handleChange}
-                  placeholder='Enter garden name'
-                  className='px-3 py-2 border-2 border-gray-300 rounded-md focus:outline-none focus:border-[#114320BA] transition-colors'
+                  placeholder="e.g. North Field, Rooftop Plot…"
+                  className="form-input"
                 />
               </div>
 
-              <div className='flex flex-col gap-2'>
-                <label className='text-sm md:text-base font-semibold'>Location</label>
-                <div className='flex gap-2'>
+              <div>
+                <label className="form-label">Location</label>
+                <div className="location-row">
                   <input
                     type="text"
-                    name='location'
+                    name="location"
                     value={form.location}
                     onChange={handleChange}
-                    placeholder='Enter location or use current'
-                    className='flex-1 px-3 py-2 border-2 border-gray-300 rounded-md focus:outline-none focus:border-[#114320BA] transition-colors'
+                    placeholder="Enter address or use GPS"
+                    className="form-input"
+                    style={{ flex: 1 }}
                   />
                   <button
-                    type='button'
+                    type="button"
+                    className="btn-locate"
                     onClick={getCurrentLocation}
                     disabled={locationLoading}
-                    className='bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shrink-0'
-                    title='Use current location'
+                    title="Use current location"
                   >
                     {locationLoading ? (
-                      <svg
-                        className="animate-spin h-5 w-5 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                        />
+                      <svg className="spinner" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
                       </svg>
                     ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
                         <circle cx="12" cy="10" r="3"/>
                       </svg>
                     )}
                   </button>
                 </div>
-                <p className='text-xs text-gray-500 mt-1'>
-                  Click the location icon to use your current location
-                </p>
-              </div>
-
-              <div className='flex justify-end gap-3 pt-2'>
-                <button
-                  type='button'
-                  onClick={closeModal}
-                  className='px-4 py-2 border-2 border-gray-300 rounded-md font-semibold hover:bg-gray-50 transition-colors'
-                >
-                  Cancel
-                </button>
-                <button
-                  type='submit'
-                  disabled={loading}
-                  className='bg-[#114320BA] hover:bg-[#114320] transition-colors px-6 py-2 rounded-md font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2'
-                >
-                  {loading ? (
-                    <>
-                      <svg
-                        className="animate-spin h-5 w-5 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                        />
-                      </svg>
-                      Saving...
-                    </>
-                  ) : (
-                    "Save"
-                  )}
-                </button>
+                <p className="form-hint">Tap the pin icon to auto-fill with your current location.</p>
               </div>
             </form>
+
+            <div className="modal-footer">
+              <button className="btn-cancel" type="button" onClick={closeModal}>Cancel</button>
+              <button
+                className="btn-save"
+                type="button"
+                onClick={addGarden}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <svg className="spinner" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                    </svg>
+                    Saving…
+                  </>
+                ) : 'Save Garden'}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* ── DELETE MODAL ── */}
       {isDeleteModalOpen && (
-        <div className='fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50 p-4 animate-fadeIn'>
-          <div className='flex flex-col bg-white rounded-lg shadow-xl w-full max-w-md transform transition-all'>
-            {/* Modal Header */}
-            <div className='flex items-center justify-between px-6 py-4 border-b border-red-200 bg-red-50'>
-              <h2 className='text-xl md:text-2xl font-bold text-red-700'>Delete Garden</h2>
-              <button
-                onClick={closeDeleteModal}
-                className='hover:bg-red-100 p-2 rounded-full transition-colors'
-                aria-label="Close modal"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32">
-                  <path fill="#dc2626" d="M16 2C8.2 2 2 8.2 2 16s6.2 14 14 14s14-6.2 14-14S23.8 2 16 2m0 26C9.4 28 4 22.6 4 16S9.4 4 16 4s12 5.4 12 12s-5.4 12-12 12" />
-                  <path fill="#dc2626" d="M21.4 23L16 17.6L10.6 23L9 21.4l5.4-5.4L9 10.6L10.6 9l5.4 5.4L21.4 9l1.6 1.6l-5.4 5.4l5.4 5.4z" />
+        <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && closeDeleteModal()}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title" style={{ color: '#dc2626' }}>Delete Garden</span>
+              <button className="modal-close" onClick={closeDeleteModal} aria-label="Close">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
               </button>
             </div>
 
-            {/* Error Alert */}
             {error && (
-              <div className="flex items-center p-4 mx-6 mt-4 text-sm text-red-800 rounded-lg bg-red-50" role="alert">
-                <svg className="shrink-0 inline w-4 h-4 me-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z" />
+              <div className="error-alert" style={{ marginTop: 16 }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                 </svg>
-                <div>
-                  <span className="font-medium">Error!</span> {error}
-                </div>
+                <span>{error}</span>
               </div>
             )}
 
-            {/* Modal Content */}
-            <div className='px-6 py-6'>
-              <div className='flex items-center justify-center mb-4'>
-                <div className='bg-red-100 rounded-full p-3'>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24">
-                    <path fill="#dc2626" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2m0 11c-.55 0-1-.45-1-1V8c0-.55.45-1 1-1s1 .45 1 1v4c0 .55-.45 1-1 1m1 4h-2v-2h2z" />
-                  </svg>
-                </div>
-              </div>
-
-              <p className='text-center text-gray-700 mb-2'>
-                Are you sure you want to delete
-              </p>
-              <p className='text-center font-bold text-lg text-gray-900 mb-4'>
-                "{gardenToDelete?.name || 'this garden'}"?
-              </p>
-              <p className='text-center text-sm text-gray-600'>
-                This action cannot be undone. All data associated with this garden will be permanently deleted.
-              </p>
+            <div className="delete-modal-body">
+              <div className="delete-icon-ring">🗑️</div>
+              <p className="delete-modal-text">You are about to permanently delete</p>
+              <p className="delete-modal-name">"{gardenToDelete?.name || 'this garden'}"</p>
+              <p className="delete-modal-text">All sensor data and records linked to this garden will be lost.</p>
+              <p className="delete-modal-warn">This action cannot be undone.</p>
             </div>
 
-            {/* Modal Actions */}
-            <div className='flex justify-end gap-3 px-6 py-4 border-t'>
+            <div className="modal-footer" style={{ marginTop: 8 }}>
+              <button className="btn-cancel" type="button" onClick={closeDeleteModal} disabled={deleteLoading}>Cancel</button>
               <button
-                type='button'
-                onClick={closeDeleteModal}
-                disabled={deleteLoading}
-                className='px-4 py-2 border-2 border-gray-300 rounded-md font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50'
-              >
-                Cancel
-              </button>
-              <button
-                type='button'
+                className="btn-delete-confirm"
+                type="button"
                 onClick={deleteGarden}
                 disabled={deleteLoading}
-                className='bg-red-600 hover:bg-red-700 transition-colors px-6 py-2 rounded-md font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2'
               >
                 {deleteLoading ? (
                   <>
-                    <svg
-                      className="animate-spin h-5 w-5 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                      />
+                    <svg className="spinner" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
                     </svg>
-                    Deleting...
+                    Deleting…
                   </>
-                ) : (
-                  "Delete Garden"
-                )}
+                ) : 'Yes, delete'}
               </button>
             </div>
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
-        }
-
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out forwards;
-        }
-      `}</style>
     </div>
   );
 };

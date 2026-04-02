@@ -257,7 +257,7 @@ class GardenController extends Controller
                 "status" => "inactive",
             ]);
 
-            return response()->json([
+            return response()->dljson([
                 "status" => "Success",
                 "data" => $esp,
             ], 201);
