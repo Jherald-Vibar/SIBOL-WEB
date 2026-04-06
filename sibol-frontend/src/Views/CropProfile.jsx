@@ -45,19 +45,10 @@ const CropProfile = () => {
   return (
     <div className="bg-[#f7f4ee] min-h-screen flex">
 
-      {/* Desktop Sidebar */}
-      <div className="hidden md:block w-60 fixed top-0 left-0 h-screen shadow-md z-40">
-        <UserSidebar />
-      </div>
-
-      <div className="flex-1 flex flex-col md:ml-60">
-        {/* Navbar */}
-        <div className="bg-white shadow-sm sticky top-0 z-30">
-          <UserNavbar />
-        </div>
+      <div className="flex-1 flex flex-col">
 
         {/* Content */}
-        <div className="flex-1 px-4 sm:px-8 lg:px-10 py-8 pb-24 md:pb-10">
+        <div className="px-4 sm:px-8 lg:px-16 py-10 pb-24 md:pb-12 flex flex-col">
 
           {/* Page header */}
           <div className="mb-6">

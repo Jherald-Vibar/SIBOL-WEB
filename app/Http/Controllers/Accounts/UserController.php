@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Accounts;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use GuzzleHttp\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Laravel\Socialite\Socialite;
 
 class UserController extends Controller
 {
@@ -147,6 +149,47 @@ class UserController extends Controller
                 'status' => 'success',
                 'message' => 'Logged out successfully',
             ]);
+        }
+    }
+
+
+    public function redirect() {
+      $httpClient = new Client(['verify' => false]);
+      return Socialite::driver('google')
+          ->setHttpClient($httpClient)
+          ->stateless()
+          ->redirect();
+    }
+
+    public function googleAuth() {
+        try {
+            $httpClient = new Client(['verify' => false]);
+            $google_user = Socialite::driver('google')
+                ->setHttpClient($httpClient)
+                ->stateless()
+                ->user();
+
+            $user = User::where('email', $google_user->getEmail())->first();
+
+            if ($user) {
+                if (!$user->google_id) {
+                    $user->update([
+                        'google_id' => $google_user->getId(),
+                    ]);
+                }
+            } else {
+                $user = User::create([
+                    'name' => $google_user->getName(),
+                    'email' => $google_user->getEmail(),
+                    'google_id' => $google_user->getId(),
+                    'image' => $google_user->getAvatar(),
+                ]);
+            }
+
+            Auth::login($user);
+
+        } catch (\Throwable $e) {
+            return redirect()->route('registrationForm')->with('error', 'Something went wrong! ' . $e->getMessage());
         }
     }
 }

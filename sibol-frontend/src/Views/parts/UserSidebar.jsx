@@ -1,136 +1,122 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import axiosClient from '../axios';
-import Swal from 'sweetalert2';
 import Logo from '../../assets/logo-left.png';
 import dashboard from '../../assets/sidebar-icons/dashboard.png';
 import reports from '../../assets/sidebar-icons/reports.png';
 import cropcare from '../../assets/sidebar-icons/crop-care.png';
 import crophealth from '../../assets/sidebar-icons/crop-health.png';
 import accountSettings from '../../assets/sidebar-icons/account-settings.png';
-import { LogOut } from 'lucide-react';
+import { LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import LogoutModal from './LogoutModal';
 
-const UserSidebar = () => {
+const UserSidebar = ({
+  collapsed = false,
+  onToggleCollapse,
+  showLogout = false,
+  onLogoutOpen,
+  onLogoutClose,
+}) => {
   const userName = localStorage.getItem('username');
 
   const sidebarMenus = [
-    { name: "Dashboard", image: dashboard, path: "/user/dashboard" },
-    { name: "Crop Care", image: cropcare, path: "/user/crop-care" },
-    { name: "Report", image: reports, path: "/user/report" },
-    { name: "Crop Profile", image: crophealth, path: "/user/crop-profile" },
-    { name: "Account Settings", image: accountSettings, path: "/user/account-settings" },
+    { name: 'Dashboard',        image: dashboard,       path: '/user/dashboard'        },
+    { name: 'Crop Care',        image: cropcare,        path: '/user/crop-care'        },
+    { name: 'Report',           image: reports,         path: '/user/report'           },
+    { name: 'Crop Profile',     image: crophealth,      path: '/user/crop-profile'     },
+    { name: 'Account Settings', image: accountSettings, path: '/user/account-settings' },
   ];
-
-  const handleLogout = () => {
-    Swal.fire({
-      title: "Logout",
-      text: "Are you sure you want to logout?",
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "Yes, logout",
-      cancelButtonText: "Cancel",
-      confirmButtonColor: '#d4840a',
-      cancelButtonColor: '#6b7280',
-      reverseButtons: true,
-      customClass: {
-        popup: 'rounded-2xl',
-        confirmButton: 'rounded-lg px-6 py-2.5',
-        cancelButton: 'rounded-lg px-6 py-2.5'
-      }
-    }).then((result) => {
-      if (result.isConfirmed) {
-        Swal.fire({
-          title: 'Logging out...',
-          allowOutsideClick: false,
-          allowEscapeKey: false,
-          didOpen: () => { Swal.showLoading(); }
-        });
-
-        const token = localStorage.getItem('authToken');
-        if (token) {
-          axiosClient.post('logout', {}, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-            .then(() => {
-              localStorage.removeItem('authToken');
-              localStorage.removeItem('username');
-              localStorage.removeItem('location');
-              localStorage.removeItem('role');
-              Swal.fire({
-                title: "Logged out!",
-                text: "You have successfully logged out.",
-                icon: "success",
-                timer: 1500,
-                showConfirmButton: false,
-                customClass: { popup: 'rounded-2xl' }
-              }).then(() => { window.location.href = '/guest/login'; });
-            })
-            .catch(() => {
-              Swal.fire({
-                title: "Error!",
-                text: "There was an issue logging you out.",
-                icon: "error",
-                confirmButtonColor: '#d4840a',
-                customClass: { popup: 'rounded-2xl' }
-              });
-            });
-        }
-      }
-    });
-  };
 
   return (
     <>
-      {/* ── DESKTOP SIDEBAR ── */}
-      <div className="hidden md:flex flex-col w-60 min-h-screen bg-[#0b3d1e] px-4 py-7 font-['DM_Sans',sans-serif] relative overflow-hidden shrink-0">
+      <LogoutModal isOpen={showLogout} onClose={onLogoutClose} />
 
+      {/* ── DESKTOP SIDEBAR ──
+          sticky + h-screen = sidebar is always viewport height, never page height.
+          This is the fix: logout is always near the bottom of the *screen*,
+          not the bottom of the scrollable page content.
+      */}
+      <div
+        className="hidden md:flex flex-col sticky top-0 h-screen bg-[#0b3d1e] py-7 font-['DM_Sans',sans-serif] relative overflow-hidden shrink-0"
+        style={{
+          width:        collapsed ? '68px' : '240px',
+          paddingLeft:  collapsed ? '0'    : '16px',
+          paddingRight: collapsed ? '0'    : '16px',
+          transition:   'width 0.28s cubic-bezier(0.4,0,0.2,1), padding 0.28s cubic-bezier(0.4,0,0.2,1)',
+        }}
+      >
         {/* Background orbs */}
-        <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-[radial-gradient(circle,rgba(46,139,87,0.18)_0%,transparent_70%)] pointer-events-none" />
-        <div className="absolute bottom-20 -left-10 w-44 h-44 rounded-full bg-[radial-gradient(circle,rgba(212,132,10,0.10)_0%,transparent_70%)] pointer-events-none" />
+        <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full pointer-events-none bg-[radial-gradient(circle,rgba(46,139,87,0.18)_0%,transparent_70%)]" />
+        <div className="absolute bottom-20 -left-10 w-44 h-44 rounded-full pointer-events-none bg-[radial-gradient(circle,rgba(212,132,10,0.10)_0%,transparent_70%)]" />
 
-        {/* Logo + username */}
-        <div className="flex flex-col items-center pb-6 mb-6 border-b border-white/10 relative z-10">
-          <img src={Logo} alt="SIBOL" className="w-24 mb-3 drop-shadow-lg" />
-          {userName && (
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#d4840a]/15 border border-[#d4840a]/30">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#f0a830] animate-pulse" />
-              <span className="text-[10px] font-medium tracking-widest uppercase text-[#f0a830]">
-                {userName}
-              </span>
+        {/* ── Logo / username ── */}
+        <div className="relative z-10 flex flex-col items-center pb-6 mb-6 border-b border-white/10 shrink-0">
+          {collapsed ? (
+            <div className="w-[38px] h-[38px] rounded-full bg-[rgba(46,139,87,0.20)] border border-[rgba(212,132,10,0.25)] flex items-center justify-center">
+              <img src={Logo} alt="SIBOL" className="w-[26px] object-contain" />
             </div>
+          ) : (
+            <>
+              <img src={Logo} alt="SIBOL" className="w-24 mb-3 drop-shadow-lg" />
+              {userName && (
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[rgba(212,132,10,0.15)] border border-[rgba(212,132,10,0.30)]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#f0a830] animate-pulse" />
+                  <span className="text-[10px] font-medium tracking-widest uppercase text-[#f0a830] whitespace-nowrap overflow-hidden max-w-[130px] text-ellipsis">
+                    {userName}
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </div>
 
         {/* Nav label */}
-        <p className="text-[9px] font-medium tracking-[2px] uppercase text-white/20 px-4 mb-2 relative z-10">
-          Navigation
-        </p>
+        {!collapsed && (
+          <p className="text-[9px] font-medium tracking-[2px] uppercase px-4 mb-2 relative z-10 text-white/20 shrink-0">
+            Navigation
+          </p>
+        )}
 
-        {/* Nav links */}
-        <nav className="flex-1 relative z-10">
+        {/* ── Nav links — shrink-0 so they don't stretch ── */}
+        <nav className="relative z-10 shrink-0">
           <ul className="flex flex-col gap-1">
             {sidebarMenus.map((menu, i) => (
               <li key={i}>
                 <NavLink
                   to={menu.path}
+                  title={collapsed ? menu.name : undefined}
                   className={({ isActive }) =>
-                    `relative flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 overflow-hidden
-                    ${isActive
-                      ? 'text-white bg-[#2e8b57]/25 border border-[#2e8b57]/30'
-                      : 'text-white/45 hover:text-white/85 hover:bg-white/5 border border-transparent'
-                    }`
+                    `relative flex items-center rounded-xl text-[13px] font-medium transition-all duration-200 overflow-hidden border
+                     ${isActive
+                       ? 'text-white border-[#2e8b57]/30 bg-[rgba(46,139,87,0.22)]'
+                       : 'text-white/60 border-transparent hover:text-white/90 hover:bg-white/5'
+                     }`
                   }
+                  style={({ isActive }) => ({
+                    gap:            collapsed ? 0 : '12px',
+                    padding:        collapsed ? '10px 0' : '10px 16px',
+                    justifyContent: collapsed ? 'center' : 'flex-start',
+                  })}
                 >
                   {({ isActive }) => (
                     <>
-                      {/* Amber left bar */}
-                      <span className={`absolute left-0 top-[20%] bottom-[20%] w-[3px] rounded-r-full bg-[#d4840a] transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-0'}`} />
+                      {!collapsed && (
+                        <span
+                          className="absolute left-0 rounded-r-[4px] bg-[#d4840a] transition-opacity duration-200"
+                          style={{ top: '20%', bottom: '20%', width: '3px', opacity: isActive ? 1 : 0 }}
+                        />
+                      )}
                       <img
                         src={menu.image}
                         alt={menu.name}
-                        className={`w-[18px] h-[18px] object-contain brightness-0 invert transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-40'}`}
+                        className="shrink-0 brightness-0 invert transition-opacity duration-200"
+                        style={{ width: '18px', height: '18px', objectFit: 'contain', opacity: isActive ? 1 : 0.55 }}
                       />
-                      <span>{menu.name}</span>
+                      <span
+                        className="whitespace-nowrap overflow-hidden transition-all duration-300"
+                        style={{ maxWidth: collapsed ? '0px' : '160px', opacity: collapsed ? 0 : 1 }}
+                      >
+                        {menu.name}
+                      </span>
                     </>
                   )}
                 </NavLink>
@@ -139,21 +125,55 @@ const UserSidebar = () => {
           </ul>
         </nav>
 
-        {/* Divider + Logout */}
-        <div className="h-px bg-white/8 my-3 relative z-10" />
-        <div className="relative z-10">
+        {/* ── This spacer fills remaining space, pushing logout to the bottom ── */}
+        <div className="flex-1 min-h-0" />
+
+        {/* ── Divider ── */}
+        <div className="relative z-10 h-px bg-white/[0.08] mb-3 shrink-0" />
+
+        {/* ── Logout ── */}
+        <div className="relative z-10 shrink-0">
           <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-medium text-red-400/70 hover:text-white hover:bg-red-600/20 hover:border-red-500/30 border border-transparent transition-all duration-200"
+            onClick={onLogoutOpen}
+            title={collapsed ? 'Logout' : undefined}
+            className="w-full flex items-center rounded-xl text-[13px] font-medium transition-all duration-200 border border-transparent text-red-400/65 hover:text-white hover:bg-red-500/[0.18] hover:border-red-500/[0.28]"
+            style={{
+              gap:            collapsed ? 0 : '12px',
+              padding:        collapsed ? '10px 0' : '10px 16px',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+            }}
           >
-            <LogOut size={16} />
-            Logout
+            <LogOut size={16} className="shrink-0" />
+            <span
+              className="whitespace-nowrap overflow-hidden transition-all duration-300"
+              style={{ maxWidth: collapsed ? '0px' : '120px', opacity: collapsed ? 0 : 1 }}
+            >
+              Logout
+            </span>
           </button>
         </div>
+
+        {/* ── Collapse toggle ── */}
+        <button
+          onClick={onToggleCollapse}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="relative z-10 mt-3 flex items-center justify-center rounded-xl transition-all duration-200 border border-white/[0.07] bg-white/[0.03] text-white/30 hover:text-white/70 hover:bg-white/[0.07] shrink-0"
+          style={{
+            width:     collapsed ? '38px' : '100%',
+            padding:   '8px',
+            margin:    collapsed ? '12px auto 0' : '12px 0 0',
+            alignSelf: collapsed ? 'center' : 'stretch',
+          }}
+        >
+          {collapsed
+            ? <ChevronRight size={14} />
+            : <><ChevronLeft size={14} /><span className="text-[11px] ml-1.5 font-medium">Collapse</span></>
+          }
+        </button>
       </div>
 
       {/* ── MOBILE BOTTOM NAV ── */}
-      <div className="md:hidden w-full bg-[#0b3d1e] border-t border-white/10 font-['DM_Sans',sans-serif]">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 w-full bg-[#0b3d1e] border-t border-white/10 font-['DM_Sans',sans-serif]">
         <nav className="flex items-center justify-around px-1 py-2">
           {sidebarMenus.slice(0, 5).map((menu, i) => (
             <NavLink
@@ -161,34 +181,31 @@ const UserSidebar = () => {
               to={menu.path}
               className={({ isActive }) =>
                 `relative flex flex-col items-center gap-1 px-2.5 py-2 rounded-xl transition-all duration-200
-                ${isActive
-                  ? 'text-[#f0a830] bg-[#d4840a]/12'
-                  : 'text-white/35 hover:text-white/65'
-                }`
+                 ${isActive ? 'text-[#f0a830]' : 'text-white/50 hover:text-white/75'}`
               }
             >
               {({ isActive }) => (
                 <>
-                  {isActive && (
-                    <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-[#d4840a]" />
-                  )}
+                  {isActive && <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-[#d4840a]" />}
                   <img
                     src={menu.image}
                     alt={menu.name}
-                    className={`w-5 h-5 object-contain brightness-0 invert transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-35'}`}
-                    style={isActive ? { filter: 'brightness(0) saturate(100%) invert(62%) sepia(80%) saturate(600%) hue-rotate(5deg)' } : {}}
+                    className="w-5 h-5 object-contain brightness-0 invert transition-opacity duration-200"
+                    style={{
+                      opacity: isActive ? 1 : 0.5,
+                      filter: isActive ? 'brightness(0) saturate(100%) invert(62%) sepia(80%) saturate(600%) hue-rotate(5deg)' : undefined,
+                    }}
                   />
                   <span className="text-[9px] font-medium leading-tight">
-                    {menu.name === "Account Settings" ? "Account" : menu.name}
+                    {menu.name === 'Account Settings' ? 'Account' : menu.name}
                   </span>
                 </>
               )}
             </NavLink>
           ))}
-
           <button
-            onClick={handleLogout}
-            className="flex flex-col items-center gap-1 px-2.5 py-2 rounded-xl text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
+            onClick={onLogoutOpen}
+            className="flex flex-col items-center gap-1 px-2.5 py-2 rounded-xl transition-all duration-200 text-red-400/60 hover:text-red-400"
           >
             <LogOut size={20} />
             <span className="text-[9px] font-medium">Logout</span>
