@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Logo from '../assets/logo-left.png'
 import { useNavigate } from 'react-router-dom'
-import axiosClient from './axios';
+import axiosClient, { API_BASE_URL } from './axios';
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -24,28 +24,38 @@ const Login = () => {
       const data = response.data;
       const role = data.role;
       const token = data.token;
-      const name = data.user.name;
-      const location = data.user.location;
 
       localStorage.setItem("authToken", token);
       localStorage.setItem("role", role);
-      localStorage.setItem("username", name);
-      localStorage.setItem("location", location);
+      localStorage.setItem("username", data.user.name || '');
+      localStorage.setItem("email", data.user.email || '');
+      localStorage.setItem("location", data.user.location || '');
+      localStorage.setItem("image", data.user.image || '');
+      localStorage.setItem("userId", data.user.id);
+      localStorage.setItem("google_id", data.user.google_id || '');
 
-      if (role == "admin") navigate("/admin/crop-profile");
-      if (role != "user") {
-        setIsLoading(false);
-        setError("You're not a user!");
-        return;
-      }
-      navigate("/user/dashboard");
+      if (role === "admin") { navigate("/admin/crop-profile"); return; }
+      if (role === "user")  { navigate("/user/dashboard");    return; }
+
+      setIsLoading(false);
+      setError("Unrecognized role.");
     } catch (error) {
       setIsLoading(false);
       setError("Login failed! Please check your credentials.");
     } finally {
       setIsLoading(false);
     }
-  }
+  };
+
+  const handleGoogleSignIn = () => {
+    window.location.href = "http://127.0.0.1:8000/api/auth/google";
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get('error');
+    if (err) setError(decodeURIComponent(err));
+  }, []);
 
   return (
     <div style={{ fontFamily: "'DM Sans', sans-serif", minHeight: '100vh', display: 'flex', background: '#f7f4ee', overflow: 'hidden' }}>
@@ -61,7 +71,6 @@ const Login = () => {
           --amber-light: #f0a830;
         }
 
-        /* ── LEFT PANEL ── */
         .auth-left {
           width: 42%;
           min-height: 100vh;
@@ -74,8 +83,6 @@ const Login = () => {
           overflow: hidden;
           flex-shrink: 0;
         }
-
-        /* Diagonal slice */
         .auth-left::after {
           content: '';
           position: absolute;
@@ -85,7 +92,6 @@ const Login = () => {
           clip-path: polygon(60px 0, 100% 0, 100% 100%, 0 100%);
           z-index: 10;
         }
-
         .auth-left-orb {
           position: absolute;
           width: 500px; height: 500px; border-radius: 50%;
@@ -98,7 +104,6 @@ const Login = () => {
           background: radial-gradient(circle, rgba(212,132,10,0.1) 0%, transparent 70%);
           bottom: 50px; right: 50px; pointer-events: none;
         }
-
         .auth-left-content {
           position: relative; z-index: 5;
           display: flex; flex-direction: column;
@@ -109,10 +114,6 @@ const Login = () => {
 
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(28px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fadeDown {
-          from { opacity: 0; transform: translateY(-16px); }
           to   { opacity: 1; transform: translateY(0); }
         }
         @keyframes floatY {
@@ -128,6 +129,7 @@ const Login = () => {
           10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
           20%, 40%, 60%, 80% { transform: translateX(5px); }
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         .auth-logo {
           width: 100px; margin-bottom: 28px;
@@ -151,7 +153,6 @@ const Login = () => {
           background: var(--amber);
           animation: livePulse 1.8s ease-in-out infinite;
         }
-
         .auth-left-h {
           font-family: 'Playfair Display', serif;
           font-size: clamp(28px, 3vw, 40px);
@@ -159,50 +160,19 @@ const Login = () => {
           color: #fff; margin-bottom: 14px;
         }
         .auth-left-h em { font-style: italic; color: var(--amber-light); }
-
         .auth-left-sub {
           font-size: 13px; color: rgba(255,255,255,0.42);
           line-height: 1.8; max-width: 240px;
-          margin-bottom: 36px;
         }
 
-        /* Mini sensor card */
-        .mini-sensor {
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 16px; padding: 16px 20px;
-          width: 100%; max-width: 260px;
-          backdrop-filter: blur(16px);
-        }
-        .ms-row {
-          display: flex; align-items: center; justify-content: space-between;
-          margin-bottom: 12px;
-        }
-        .ms-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,0.3); }
-        .ms-live { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #4ade80; }
-        .ms-dot { width: 5px; height: 5px; border-radius: 50%; background: #4ade80; animation: livePulse 1.5s infinite; }
-        .ms-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .ms-metric {
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.06);
-          border-radius: 10px; padding: 10px;
-        }
-        .ms-m-label { font-size: 9px; color: rgba(255,255,255,0.32); margin-bottom: 3px; }
-        .ms-m-val { font-size: 18px; font-weight: 500; color: #fff; }
-        .ms-m-val span { font-size: 9px; color: rgba(255,255,255,0.35); }
-        .ms-m-trend { font-size: 9px; color: #4ade80; margin-top: 2px; }
-
-        /* ── RIGHT PANEL ── */
+        /* RIGHT */
         .auth-right {
           flex: 1;
           display: flex; align-items: center; justify-content: center;
           padding: 48px 48px 48px 80px;
           animation: fadeUp 0.9s 0.3s ease-out both;
         }
-
-        .auth-form-wrap {
-          width: 100%; max-width: 400px;
-        }
+        .auth-form-wrap { width: 100%; max-width: 400px; }
 
         .auth-brand-mobile {
           display: none;
@@ -233,9 +203,39 @@ const Login = () => {
           line-height: 1.1; margin-bottom: 6px;
         }
         .auth-title em { font-style: italic; color: var(--fern); }
-        .auth-subtitle {
-          font-size: 13px; color: #7a8a80; margin-bottom: 36px;
+        .auth-subtitle { font-size: 13px; color: #7a8a80; margin-bottom: 28px; }
+
+        /* Google button */
+        .google-btn {
+          width: 100%;
+          display: flex; align-items: center; justify-content: center; gap: 10px;
+          padding: 13px 20px;
+          background: #fff;
+          border: 1.5px solid rgba(11,61,30,0.15);
+          border-radius: 12px;
+          font-size: 14px; font-weight: 500;
+          color: #0b3d1e;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-family: 'DM Sans', sans-serif;
+          margin-bottom: 22px;
         }
+        .google-btn:hover {
+          background: #f9fafb;
+          border-color: rgba(11,61,30,0.3);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.07);
+          transform: translateY(-1px);
+        }
+
+        /* Divider */
+        .auth-divider {
+          display: flex; align-items: center; gap: 14px;
+          margin-bottom: 22px;
+        }
+        .auth-divider::before, .auth-divider::after {
+          content: ''; flex: 1; height: 1px; background: rgba(11,61,30,0.1);
+        }
+        .auth-divider span { font-size: 11px; color: #b0bdb7; letter-spacing: 1px; }
 
         /* Error */
         .auth-error {
@@ -252,8 +252,7 @@ const Login = () => {
         .auth-error-text { font-size: 13px; color: #991b1b; line-height: 1.5; }
 
         /* Fields */
-        .auth-fields { display: flex; flex-direction: column; gap: 14px; margin-bottom: 28px; }
-
+        .auth-fields { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
         .auth-field-group { display: flex; flex-direction: column; gap: 6px; }
         .auth-field-label {
           font-size: 11px; font-weight: 500; letter-spacing: 0.5px;
@@ -282,12 +281,11 @@ const Login = () => {
         .auth-field button { background: none; border: none; cursor: pointer; color: var(--fern); padding: 0; display: flex; transition: color 0.2s; }
         .auth-field button:hover { color: var(--forest); }
 
-        /* Forgot */
         .auth-forgot {
-          text-align: right; margin-top: -6px;
+          text-align: right; margin-top: -2px;
           font-size: 12px; color: var(--fern);
           text-decoration: none; font-weight: 500;
-          transition: color 0.2s;
+          transition: color 0.2s; display: block;
         }
         .auth-forgot:hover { color: var(--amber); }
 
@@ -301,58 +299,27 @@ const Login = () => {
           font-size: 16px; font-weight: 700; letter-spacing: 1px;
           cursor: pointer;
           transition: background 0.25s, transform 0.2s, box-shadow 0.25s;
-          position: relative; overflow: hidden;
           display: flex; align-items: center; justify-content: center; gap: 8px;
-        }
-        .auth-submit::before {
-          content: '';
-          position: absolute; inset: 0;
-          background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.06) 100%);
         }
         .auth-submit:hover:not(:disabled) {
           background: var(--moss);
           transform: translateY(-2px);
           box-shadow: 0 8px 24px rgba(11,61,30,0.3);
         }
-        .auth-submit:active { transform: translateY(0); }
         .auth-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+        .spin { animation: spin 0.7s linear infinite; }
 
-        /* Amber accent line */
-        .auth-submit-amber {
-          background: var(--amber);
-        }
-        .auth-submit-amber:hover:not(:disabled) {
-          background: var(--amber-light);
-          box-shadow: 0 8px 24px rgba(212,132,10,0.3);
-        }
-
-        /* Bottom link */
         .auth-bottom-link {
           text-align: center; margin-top: 22px;
           font-size: 13px; color: #7a8a80;
         }
         .auth-bottom-link a {
-          color: var(--forest); font-weight: 600;
-          text-decoration: none; border-bottom: 1.5px solid var(--amber);
-          padding-bottom: 1px; transition: color 0.2s;
+          color: var(--amber); font-weight: 600;
+          text-decoration: none;
+          transition: color 0.2s;
         }
-        .auth-bottom-link a:hover { color: var(--amber); }
+        .auth-bottom-link a:hover { color: var(--amber-light); }
 
-        /* Divider */
-        .auth-divider {
-          display: flex; align-items: center; gap: 14px;
-          margin: 24px 0;
-        }
-        .auth-divider::before, .auth-divider::after {
-          content: ''; flex: 1; height: 1px; background: rgba(11,61,30,0.1);
-        }
-        .auth-divider span { font-size: 11px; color: #b0bdb7; letter-spacing: 1px; }
-
-        /* Spinner */
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .spin { animation: spin 0.7s linear infinite; }
-
-        /* Responsive */
         @media (max-width: 768px) {
           .auth-left { display: none; }
           .auth-right { padding: 40px 24px; }
@@ -376,35 +343,6 @@ const Login = () => {
           <p className="auth-left-sub">
             Connect your fields. Monitor in real time. Make better decisions.
           </p>
-          {/* Mini sensor card */}
-          <div className="mini-sensor">
-            <div className="ms-row">
-              <span className="ms-label">Live Feed</span>
-              <span className="ms-live"><span className="ms-dot" />Field 3</span>
-            </div>
-            <div className="ms-grid">
-              <div className="ms-metric">
-                <div className="ms-m-label">Soil Moisture</div>
-                <div className="ms-m-val">68<span>%</span></div>
-                <div className="ms-m-trend">↑ +3%</div>
-              </div>
-              <div className="ms-metric">
-                <div className="ms-m-label">Temperature</div>
-                <div className="ms-m-val">27<span>°C</span></div>
-                <div className="ms-m-trend" style={{ color: 'rgba(255,255,255,0.3)' }}>— Optimal</div>
-              </div>
-              <div className="ms-metric">
-                <div className="ms-m-label">Humidity</div>
-                <div className="ms-m-val">74<span>%</span></div>
-                <div className="ms-m-trend" style={{ color: '#f87171' }}>↓ −1%</div>
-              </div>
-              <div className="ms-metric">
-                <div className="ms-m-label">Crop Health</div>
-                <div className="ms-m-val">91<span>%</span></div>
-                <div className="ms-m-trend">↑ Good</div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -422,6 +360,21 @@ const Login = () => {
           <h1 className="auth-title">Sign <em>in</em></h1>
           <p className="auth-subtitle">Enter your credentials to access your farm dashboard.</p>
 
+          {/* Google Sign In */}
+          <button type="button" className="google-btn" onClick={handleGoogleSignIn}>
+            <svg width="18" height="18" viewBox="0 0 48 48">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.35-8.16 2.35-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+            </svg>
+            Sign in with Google
+          </button>
+
+          {/* Divider */}
+          <div className="auth-divider"><span>or</span></div>
+
+          {/* Error */}
           {error && (
             <div className="auth-error">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
@@ -436,14 +389,15 @@ const Login = () => {
               <div className="auth-field-group">
                 <label className="auth-field-label">Email address</label>
                 <div className="auth-field">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 48 48" fill="none">
-                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M24 20a7 7 0 1 0 0-14a7 7 0 0 0 0 14M6 40.8V42h36v-1.2c0-4.48 0-6.72-.872-8.432a8 8 0 0 0-3.496-3.496C35.92 28 33.68 28 29.2 28H18.8c-4.48 0-6.72 0-8.432.872a8 8 0 0 0-3.496 3.496C6 34.08 6 36.32 6 40.8" />
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2m0 4l-8 5l-8-5V6l8 5l8-5z"/>
                   </svg>
                   <input
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    type="text"
+                    type="email"
                     placeholder="you@example.com"
+                    autoComplete="email"
                   />
                 </div>
               </div>
@@ -459,6 +413,7 @@ const Login = () => {
                     onChange={e => setPassword(e.target.value)}
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
+                    autoComplete="current-password"
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}>
                     {showPassword ? (
@@ -485,17 +440,17 @@ const Login = () => {
                   </svg>
                   Signing in…
                 </>
-              ) : "Sign In"}
+              ) : "Sign in"}
             </button>
           </form>
 
           <p className="auth-bottom-link">
-            Don't have an account? <a href="/guest/sign_up">Create one</a>
+            Don't have an account? <a href="/guest/sign_up">Sign up.</a>
           </p>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Login
+export default Login;

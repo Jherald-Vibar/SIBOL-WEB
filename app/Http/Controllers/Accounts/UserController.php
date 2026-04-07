@@ -183,13 +183,26 @@ class UserController extends Controller
                     'email' => $google_user->getEmail(),
                     'google_id' => $google_user->getId(),
                     'image' => $google_user->getAvatar(),
+                    'password'  => \Illuminate\Support\Facades\Hash::make(uniqid()),
                 ]);
             }
 
-            Auth::login($user);
+            $token = $user->createToken('user')->plainTextToken;
+
+            return redirect(
+                "http://localhost:5173/auth/callback?" . http_build_query([
+                    'token' => $token,
+                    'role'  => 'user',
+                    'name'  => $user->name,
+                    'email' => $user->email,
+                    'image' => $user->image,
+                    'google_id' => $user->google_id,
+                ])
+            );
 
         } catch (\Throwable $e) {
-            return redirect()->route('registrationForm')->with('error', 'Something went wrong! ' . $e->getMessage());
+            return redirect("http://localhost:5173/guest/login?error=" . urlencode($e->getMessage()));
+
         }
     }
 }

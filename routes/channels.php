@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Broadcast;
 
-Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
-    return (int) $user->id === (int) $id;
+// Match the private channel used in React
+Broadcast::channel('notifications.{userId}', function ($user, $userId) {
+    // Only allow the authenticated user to listen to their own notifications
+    return (int) $user->id === (int) $userId;
 });

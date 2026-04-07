@@ -15,7 +15,9 @@ return new class extends Migration
             $table->id();
             $table->string('email')->unique();
             $table->string('name');
-            $table->string('cp_number');
+            $table->string('google_id')->nullable();
+            $table->string('image')->nullable();
+            $table->string('cp_number')->nullable();
             $table->string('password');
             $table->timestamps();
         });

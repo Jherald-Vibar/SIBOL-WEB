@@ -3,7 +3,7 @@
 namespace App\Events;
 
 use App\Models\Notification;
-use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\PrivateChannel; // ← change this import
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -14,15 +14,13 @@ class NotificationCreated implements ShouldBroadcast
 
     public function __construct(public Notification $notification) {}
 
-    public function broadcastOn(): Channel
+    public function broadcastOn(): PrivateChannel // ← and this return type
     {
-        // Private channel scoped to the user — e.g. "notifications.42"
-        return new Channel('notifications.' . $this->notification->user_id);
+        return new PrivateChannel('notifications.' . $this->notification->user_id); // ← and this
     }
 
     public function broadcastAs(): string
     {
-        // React listens for ".notification.created"
         return 'notification.created';
     }
 

@@ -1,17 +1,38 @@
 <?php
 
+use App\Events\NotificationCreated;
 use App\Http\Controllers\Accounts\UserController;
 use App\Http\Controllers\DetectionResultController;
 use App\Http\Controllers\GardenController;
 use App\Http\Controllers\IotController;
 use App\Http\Controllers\NotificationController;
+use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Broadcast;
 
 
-Route::get('/test', function () {
-    return ['message' => 'API IS WORKING!'];
+// routes/api.php
+Route::get('/test-notification', function () {
+    $userId = auth()->id() ?? 3; // use logged-in user if available
+    $user = \App\Models\User::find($userId);
+
+    $notification = Notification::create([
+        'user_id'     => $user->id,
+        'type'        => 'soil_moisture',
+        'title'       => 'WebSocket Test',
+        'description' => 'If you see this in real-time, WebSocket is working!',
+        'is_read'     => false,
+        'priority'    => 'normal',
+        'metadata'    => [],
+    ]);
+
+    broadcast(new NotificationCreated($notification));
+
+    return response()->json(['message' => 'Notification sent!', 'user_id' => $user->id]);
 });
+
+Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
 // In routes/api.php or routes/web.php
 Route::get('/test-cloudinary-direct', function () {
@@ -31,6 +52,8 @@ Route::post('/send', [IotController::class, 'getEspData']);
 
 Route::post('/register', [UserController::class, 'userRegister']);
 Route::post('/login', [UserController::class, 'userLogin']);
+Route::get('auth/google', [UserController::class, 'redirect']);
+Route::get('auth/google/callback', [UserController::class, 'googleAuth']);
 
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -93,6 +116,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
     Route::delete('/notifications/{id}', [NotificationController::class, 'delete']);
+
+
 
 });
 

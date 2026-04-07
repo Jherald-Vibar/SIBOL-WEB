@@ -3,29 +3,81 @@ import { Bell, X, Check, Info, AlertCircle, Droplet, CheckCircle } from 'lucide-
 import { useNavigate } from 'react-router-dom'
 import Logo from '../../assets/logo-left.png'
 import axiosClient from '../axios'
+import echo from '../echo'
 
 const UserNavbar = () => {
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [selectedNotification, setSelectedNotification] = useState(null);
+  const [wsConnected, setWsConnected] = useState(false);
   const notificationRef = useRef(null);
 
+  // ── Helper: prepend new notification without duplicates ──
+  const addNotification = (notif) => {
+    setNotifications(prev =>
+      prev.some(n => n.id === notif.id) ? prev : [notif, ...prev]
+    );
+  };
+
+  // ── Fetch all notifications from REST API ──
   const fetchNotifications = async () => {
     try {
       const response = await axiosClient.get('/notifications');
       setNotifications(response.data.data || response.data);
     } catch (error) {
-      console.error("Error fetching notifications:", error);
+      console.error('Error fetching notifications:', error);
     }
   };
 
+  // ── Initial fetch on mount ──
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 10000);
+    // Fallback polling every 30s (WS handles real-time, polling is a safety net)
+    const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
   }, []);
 
+  // ── WebSocket subscription via Laravel Echo ──
+  useEffect(() => {
+    // userId must be stored in localStorage at login time:
+    // localStorage.setItem('userId', response.data.user.id)
+    const userId = localStorage.getItem('userId');
+
+    if (!userId) {
+      console.warn('UserNavbar: userId not found in localStorage. WebSocket subscription skipped.');
+      return;
+    }
+
+    const channelName = `notifications.${userId}`;
+
+    const channel = echo.private(channelName);
+
+    channel
+      .listen('.notification.created', (data) => {
+        // broadcastWith() returns { notification: { ...fields } }
+        const notif = data.notification;
+        if (notif) {
+          addNotification(notif);
+        }
+      })
+      .subscribed(() => {
+        setWsConnected(true);
+        console.log(`[Echo] Subscribed to private channel: ${channelName}`);
+      })
+      .error((error) => {
+        setWsConnected(false);
+        console.error('[Echo] Channel subscription error:', error);
+      });
+
+    return () => {
+      echo.leave(channelName);
+      setWsConnected(false);
+      console.log(`[Echo] Left channel: ${channelName}`);
+    };
+  }, []); // runs once on mount
+
+  // ── Close panel on outside click ──
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (notificationRef.current && !notificationRef.current.contains(e.target))
@@ -35,28 +87,38 @@ const UserNavbar = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // ── Derived state ──
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
+  // ── API actions ──
   const markAsRead = async (id) => {
     try {
       await axiosClient.post(`/notifications/${id}/read`);
-      setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: true } : n));
-    } catch (e) { console.error(e); }
+      setNotifications(prev =>
+        prev.map(n => n.id === id ? { ...n, is_read: true } : n)
+      );
+    } catch (e) {
+      console.error('markAsRead error:', e);
+    }
   };
 
   const markAllAsRead = async () => {
     try {
       await axiosClient.post('/notifications/mark-all-read');
-      setNotifications(notifications.map(n => ({ ...n, is_read: true })));
-    } catch (e) { console.error(e); }
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    } catch (e) {
+      console.error('markAllAsRead error:', e);
+    }
   };
 
   const deleteNotification = async (id) => {
     try {
       await axiosClient.delete(`/notifications/${id}`);
-      setNotifications(notifications.filter(n => n.id !== id));
+      setNotifications(prev => prev.filter(n => n.id !== id));
       if (selectedNotification?.id === id) setSelectedNotification(null);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error('deleteNotification error:', e);
+    }
   };
 
   const openNotificationDetails = (notif) => {
@@ -64,6 +126,7 @@ const UserNavbar = () => {
     setSelectedNotification(notif);
   };
 
+  // ── Icon helpers ──
   const getNotificationIcon = (type) => {
     switch (type) {
       case 'soil_moisture':     return <Droplet className="w-4 h-4 text-blue-400" />;
@@ -101,7 +164,7 @@ const UserNavbar = () => {
   };
 
   const formatTime = (dateString) => {
-    const diff = Date.now() - new Date(dateString);
+    const diff  = Date.now() - new Date(dateString);
     const mins  = Math.floor(diff / 60000);
     const hours = Math.floor(mins / 60);
     const days  = Math.floor(hours / 24);
@@ -112,6 +175,7 @@ const UserNavbar = () => {
     return new Date(dateString).toLocaleDateString();
   };
 
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <>
       {/* ── NAVBAR ── */}
@@ -132,6 +196,12 @@ const UserNavbar = () => {
             {/* Right actions */}
             <div className="flex items-center gap-2">
 
+              {/* WebSocket status dot (small, subtle) */}
+              <span
+                title={wsConnected ? 'Live updates connected' : 'Live updates disconnected'}
+                className={`w-1.5 h-1.5 rounded-full shrink-0 transition-colors duration-500 ${wsConnected ? 'bg-emerald-400' : 'bg-white/20'}`}
+              />
+
               {/* Bell */}
               <div className="relative" ref={notificationRef}>
                 <button
@@ -141,7 +211,7 @@ const UserNavbar = () => {
                   <Bell className="w-5 h-5" />
                   {unreadCount > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 bg-[#d4840a] text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                      {unreadCount}
+                      {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
                 </button>
@@ -168,6 +238,13 @@ const UserNavbar = () => {
                               {unreadCount} new
                             </span>
                           )}
+                          {/* Live indicator pill */}
+                          {wsConnected && (
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                              <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                              <span className="text-[9px] text-emerald-400 font-medium">Live</span>
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           {unreadCount > 0 && (
@@ -187,7 +264,7 @@ const UserNavbar = () => {
                         </div>
                       </div>
 
-                      {/* List */}
+                      {/* Notification list */}
                       <div className="overflow-y-auto flex-1">
                         {notifications.length === 0 ? (
                           <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
@@ -216,11 +293,9 @@ const UserNavbar = () => {
                               {/* Content */}
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-2 mb-0.5">
-                                  {/* Title: bold + white when unread, dim when read */}
                                   <p className={`text-sm truncate ${!notif.is_read ? 'font-bold text-white' : 'font-normal text-white/45'}`}>
                                     {notif.title}
                                   </p>
-                                  {/* UNREAD pill vs read checkmark */}
                                   {!notif.is_read ? (
                                     <span className="text-[9px] bg-[#d4840a] text-white px-1.5 py-0.5 rounded-full font-bold shrink-0 tracking-wide">
                                       UNREAD
@@ -229,7 +304,6 @@ const UserNavbar = () => {
                                     <Check className="w-3.5 h-3.5 text-white/20 shrink-0" />
                                   )}
                                 </div>
-                                {/* Description: brighter when unread, very dim when read */}
                                 <p className={`text-xs line-clamp-2 mb-2 ${!notif.is_read ? 'text-white/60' : 'text-white/20'}`}>
                                   {notif.description}
                                 </p>
@@ -243,7 +317,7 @@ const UserNavbar = () => {
                                 </div>
                               </div>
 
-                              {/* Delete */}
+                              {/* Delete button */}
                               <button
                                 onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}
                                 className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-white/8 text-white/30 hover:text-white/70 shrink-0 self-start"
