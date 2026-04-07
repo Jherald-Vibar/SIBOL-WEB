@@ -31,11 +31,15 @@ const UserNavbar = () => {
   };
 
   // ── Initial fetch on mount ──
+  // useEffect(() => {
+  //   fetchNotifications();
+  //   // Fallback polling every 30s (WS handles real-time, polling is a safety net)
+  //   const interval = setInterval(fetchNotifications, 30000);
+  //   return () => clearInterval(interval);
+  // }, []);
+
   useEffect(() => {
     fetchNotifications();
-    // Fallback polling every 30s (WS handles real-time, polling is a safety net)
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   // ── WebSocket subscription via Laravel Echo ──
