@@ -14,6 +14,7 @@ const AuthCallback = () => {
     const email    = params.get('email');
     const image    = params.get('image');
     const googleId = params.get('google_id');
+    const id = params.get('id');
 
     if (error) {
       setStatus('Something went wrong. Redirecting...');
@@ -28,6 +29,7 @@ const AuthCallback = () => {
       localStorage.setItem('email',      email    || '');
       localStorage.setItem('image',      image    || '');
       localStorage.setItem('google_id',  googleId || '');
+      localStorage.setItem('userId', id);
 
       setStatus('Welcome back! Redirecting...');
       setTimeout(() => {

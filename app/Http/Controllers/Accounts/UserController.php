@@ -197,6 +197,7 @@ class UserController extends Controller
                     'email' => $user->email,
                     'image' => $user->image,
                     'google_id' => $user->google_id,
+                    'id' => $user->id,
                 ])
             );
 
