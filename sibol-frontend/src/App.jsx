@@ -15,7 +15,7 @@ import "mapbox-gl/dist/mapbox-gl.css"
 import mapboxgl from "mapbox-gl"
 import Footer from './Views/parts/Footer'
 
-// ─── Crop config (Restored) ────────────────────────────────────────────────────
+// ─── Crop config ───────────────────────────────────────────────────────────────
 const CROPS = {
   mustasa: {
     name: 'Mustasa',
@@ -23,7 +23,7 @@ const CROPS = {
     optimalTemp: [22, 30],
     optimalHumidity: [65, 80],
     optimalPh: [6.0, 7.0],
-    conditions: ['Mustasa Healthy', 'Mustasa Healthy'],
+    conditions: ['Mustasa Healthy', 'Mustasa Healthy', 'Mustasa Healthy', 'Mustasa Healthy'],
   },
   pechay: {
     name: 'Pechay',
@@ -31,7 +31,7 @@ const CROPS = {
     optimalTemp: [18, 28],
     optimalHumidity: [60, 75],
     optimalPh: [6.5, 7.5],
-    conditions: ['Pechay Healthy', 'Pechay Needs Water'],
+    conditions: ['Pechay Healthy', 'Pechay Healthy', 'Pechay Needs Water', 'Pechay Healthy'],
   },
 }
 
@@ -39,7 +39,7 @@ function rand(min, max, dec = 1) {
   return parseFloat((Math.random() * (max - min) + min).toFixed(dec))
 }
 
-// ─── Live Sensor Card (Restored Logic + New Design) ────────────────────────────
+// ─── Live Sensor Card ──────────────────────────────────────────────────────────
 const LiveSensorCard = () => {
   const [currentCrop, setCurrentCrop] = useState('mustasa')
   const [data, setData] = useState(null)
@@ -61,83 +61,149 @@ const LiveSensorCard = () => {
       
       setData({ moisture, temp, humidity, ph, health, isCritical, isLow, isOptimal })
     }
-    
-    generate() // Initial load
-    const id = setInterval(generate, 2500) // Poll every 2.5s
+    generate()
+    const id = setInterval(generate, 2500)
     return () => clearInterval(id)
   }, [currentCrop])
 
   if (!data) return null
 
-  const { moisture, temp, humidity, health, isCritical, isLow } = data
+  const { moisture, temp, humidity, ph, health, isCritical, isLow, isOptimal } = data
   const crop = CROPS[currentCrop]
 
-  const healthColor = health >= 80 ? 'text-green-400' : health >= 60 ? 'text-amber-400' : 'text-red-400'
-  const moistureColor = isCritical ? 'bg-red-500' : isLow ? 'bg-amber-400' : 'bg-[#f0a830]'
+  const barColor = isCritical ? 'bg-red-500' : isLow ? 'bg-[#f0a830]' : 'bg-green-500'
+  const healthBarColor = health >= 80 ? 'bg-green-500' : health >= 60 ? 'bg-[#f0a830]' : 'bg-red-500'
+  
+  const badge = isCritical
+    ? { label: 'Needs Water', cls: 'bg-red-500/20 text-red-300 border-red-500/30' }
+    : isLow
+    ? { label: 'Low Moisture', cls: 'bg-amber-500/20 text-amber-300 border-amber-500/30' }
+    : { label: 'Profile Active', cls: 'bg-green-500/20 text-green-300 border-green-500/30' }
 
   return (
-    <div className="w-full max-w-[360px] glass-panel rounded-2xl p-6 shadow-2xl anim-fadeUp-d text-white flex flex-col">
+    <div className="w-full max-w-[360px] glass-panel rounded-2xl overflow-hidden shadow-2xl anim-fadeUp-d text-white pb-3">
       {/* Header */}
-      <div className="flex justify-between items-center mb-4">
-        <span className="text-[11px] uppercase tracking-widest text-white/60 font-bold">Live Sensor Feed</span>
-        <span className="flex items-center gap-2 text-[11px] text-green-400 font-medium">
-          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-          Active • Field 3
+      <div className="flex items-center justify-between px-5 pt-4 pb-3">
+        <span className="text-[10px] uppercase tracking-widest text-white/50 font-bold">Live Sensor Feed</span>
+        <span className="flex items-center gap-1.5 text-[10px] text-green-400 font-medium">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+          Active — Field 3
         </span>
       </div>
 
-      {/* Interactive Crop Switcher */}
-      <div className="flex gap-2 mb-6">
+      {/* Crop switcher */}
+      <div className="flex gap-2 px-5 pb-3">
         {Object.entries(CROPS).map(([key, val]) => (
-          <button 
-            key={key} 
-            onClick={() => setCurrentCrop(key)}
+          <button key={key} onClick={() => setCurrentCrop(key)}
             className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all border
-              ${currentCrop === key 
-                ? 'bg-[#f0a830] text-black border-[#f0a830]' 
-                : 'bg-transparent text-white/60 border-white/20 hover:border-white/40'}`}>
+              ${currentCrop === key
+                ? 'bg-[#f0a830] text-[#0b3d1e] border-[#f0a830]'
+                : 'bg-white/5 text-white/60 border-white/10 hover:border-white/30 hover:text-white'}`}>
             {val.name}
           </button>
         ))}
       </div>
 
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-6 mb-6">
-        <div>
-          <p className="text-[11px] text-white/60 mb-1">Soil Moisture</p>
-          <p className="text-2xl font-semibold">{moisture.toFixed(0)}<span className="text-sm text-white/60">%</span></p>
-          <p className={`text-[10px] mt-1 ${isCritical ? 'text-red-400' : isLow ? 'text-amber-400' : 'text-green-400'}`}>
-            {isCritical ? '↓ Critical' : isLow ? '↓ Low' : '↑ Optimal'}
-          </p>
+      {/* Crop name + badge */}
+      <div className="flex items-center justify-between px-5 pb-4">
+        <span className="text-[14px] font-bold text-white">{crop.name} — Field 3</span>
+        <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${badge.cls}`}>
+          {badge.label}
+        </span>
+      </div>
+
+      {/* Metrics row (Now includes pH) */}
+      <div className="grid grid-cols-2 gap-2 px-5 pb-4">
+        {[
+          { label: 'Moisture', val: `${moisture.toFixed(1)}%` },
+          { label: 'Temp', val: `${temp.toFixed(1)}°C` },
+          { label: 'Humidity', val: `${humidity.toFixed(1)}%` },
+          { label: 'pH Level', val: ph.toFixed(2) },
+        ].map(({ label, val }) => (
+          <div key={label} className="rounded-xl px-3 py-2 bg-white/5 border border-white/10">
+            <p className="text-[10px] text-white/50 mb-0.5 uppercase tracking-wider">{label}</p>
+            <p className="text-[16px] font-semibold text-white leading-none">{val}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Moisture bar */}
+      <div className="px-5 pb-4">
+        <div className="flex justify-between items-center mb-1.5">
+          <span className="text-[10px] text-white/50 uppercase tracking-wider">Soil Moisture</span>
+          <span className={`text-[11px] font-bold ${isCritical ? 'text-red-400' : isLow ? 'text-amber-400' : 'text-green-400'}`}>
+            {moisture.toFixed(1)}%
+          </span>
         </div>
-        <div>
-          <p className="text-[11px] text-white/60 mb-1">Temperature</p>
-          <p className="text-2xl font-semibold">{temp.toFixed(1)}<span className="text-sm text-white/60">°C</span></p>
-          <p className="text-[10px] text-green-400 mt-1">
-             {temp > crop.optimalTemp[1] ? '↑ High' : temp < crop.optimalTemp[0] ? '↓ Low' : 'Optimal'}
-          </p>
+        <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+          <div className={`h-full rounded-full transition-all duration-700 ${barColor}`}
+            style={{ width: `${Math.min(moisture, 100)}%` }} />
         </div>
-        <div>
-          <p className="text-[11px] text-white/60 mb-1">Humidity</p>
-          <p className="text-2xl font-semibold">{humidity.toFixed(0)}<span className="text-sm text-white/60">%</span></p>
-          <p className="text-[10px] text-white/40 mt-1">Target: {crop.optimalHumidity[0]}%</p>
+        <p className="text-[9px] text-white/40 mt-1.5 font-medium">
+          {isCritical ? 'Critical — Needs Water · ' : ''}
+          Optimal Range: {crop.optimalMoisture[0]}–{crop.optimalMoisture[1]}%
+        </p>
+      </div>
+
+      {/* AI Leaf Condition */}
+      <div className="mx-5 mb-4 rounded-xl overflow-hidden bg-white/5 border border-white/10">
+        <div className="flex items-center justify-between px-3 pt-2 pb-1.5">
+          <span className="text-[9px] uppercase tracking-widest text-white/50 font-bold">Leaf Condition</span>
+          <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[8px] font-bold px-1.5 py-0.5 rounded">AI</span>
         </div>
-        <div>
-          <p className="text-[11px] text-white/60 mb-1">Crop Health (AI)</p>
-          <p className="text-2xl font-semibold">{health}<span className="text-sm text-white/60">%</span></p>
-          <p className={`text-[10px] mt-1 ${healthColor}`}>
-            {health >= 80 ? '↑ Good' : health >= 60 ? '— Fair' : '↓ Poor'}
-          </p>
+        <div className="flex flex-wrap gap-1.5 px-3 pb-3 pt-1">
+          {crop.conditions.map((c, i) => (
+            <span key={i} className="flex items-center gap-1 bg-green-500/20 border border-green-500/20 text-green-300 text-[10px] font-medium px-2 py-0.5 rounded-full">
+              <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
+                <path d="M2 6l3 3 5-5" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {c}
+            </span>
+          ))}
         </div>
       </div>
 
-      {/* Dynamic Bar Chart simulating historical data ending on current reading */}
-      <div className="flex items-end gap-1.5 h-12 mt-auto">
-        {[40, 60, 45, 70, 50, 80, 65].map((h, i) => (
-          <div key={i} className="flex-1 rounded-sm bg-white/10 transition-all duration-500" style={{ height: `${h}%` }}></div>
-        ))}
-        {/* Current live reading bar */}
-        <div className={`flex-1 rounded-sm transition-all duration-700 ${moistureColor}`} style={{ height: `${moisture}%` }}></div>
+      {/* Health + Alerts */}
+      <div className="flex gap-2 px-5 pb-1">
+        {/* Alerts Box */}
+        <div className="flex-1 rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 bg-white/5 border border-white/10">
+          <p className="text-[9px] uppercase tracking-widest text-white/50 mb-0.5 font-bold">Alerts</p>
+          {isCritical ? (
+            <>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L2 20h20L12 2z" fill="rgba(239,68,68,0.2)" stroke="#ef4444" strokeWidth="1.5" />
+                <path d="M12 9v5M12 16.5v.5" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <span className="text-[10px] font-bold text-red-400">Critical</span>
+              <span className="text-[9px] text-white/40 text-center leading-tight">Irrigation needed</span>
+            </>
+          ) : (
+            <>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="3" width="18" height="18" rx="4" fill="rgba(34,197,94,0.15)" />
+                <path d="M8 12l3 3 5-5" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="text-[10px] font-bold text-green-400">No alerts</span>
+              <span className="text-[9px] text-white/40 text-center leading-tight">Crop optimal</span>
+            </>
+          )}
+        </div>
+
+        {/* Health Box */}
+        <div className="flex-1 rounded-xl p-2.5 flex flex-col justify-between bg-white/5 border border-white/10">
+          <p className="text-[9px] uppercase tracking-widest text-white/50 mb-1 font-bold">Crop Health</p>
+          <div className="flex items-baseline gap-0.5">
+            <span className="text-2xl font-semibold text-white">{health}</span>
+            <span className="text-[10px] text-white/50">%</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mt-1 mb-1.5">
+            <div className={`h-full rounded-full transition-all duration-700 ${healthBarColor}`}
+              style={{ width: `${health}%` }} />
+          </div>
+          <span className={`text-[9px] font-bold ${health >= 80 ? 'text-green-400' : health >= 60 ? 'text-[#f0a830]' : 'text-red-400'}`}>
+            {health >= 80 ? '↑ Good' : health >= 60 ? '— Fair' : '↓ Poor'}
+          </span>
+        </div>
       </div>
     </div>
   )
