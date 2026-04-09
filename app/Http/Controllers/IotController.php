@@ -14,6 +14,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Cloudinary\Cloudinary;
 use Illuminate\Support\Facades\Log;
 
+
 class IotController extends Controller
 {
     private function getCloudinaryInstance()
@@ -503,6 +504,11 @@ class IotController extends Controller
 
         // Update ESP status
         $esp->update(['status' => 'active']);
+
+        broadcast(new \App\Events\SensorDataReceived(
+            sensorData: $sensorData,
+            gardenId: $esp->garden_id
+        ));
 
         return response()->json([
             'status' => 'success',

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\GardenUpdated;
 use App\Models\Crop;
 use App\Models\CropProfile;
 use App\Models\Esp;
@@ -16,19 +17,26 @@ use Illuminate\Support\Facades\Log;
 
 class GardenController extends Controller
 {
-    private function getCloudinaryInstance()
-    {
-        return new Cloudinary([
-            'cloud' => [
-                'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
-                'api_key'    => env('CLOUDINARY_API_KEY'),
-                'api_secret' => env('CLOUDINARY_API_SECRET'),
+    protected function getCloudinaryInstance()
+{
+    return new \Cloudinary\Cloudinary([
+        'cloud' => [
+            'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
+            'api_key'    => env('CLOUDINARY_API_KEY'),
+            'api_secret' => env('CLOUDINARY_API_SECRET'),
+        ],
+        'url' => [
+            'secure' => true,
+        ],
+        'http' => [
+            'verify'  => false,
+            'curl'    => [
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false,
             ],
-            'url' => [
-                'secure' => true
-            ]
-        ]);
-    }
+        ],
+    ]);
+}
 
     public function addGarden(Request $request) {
         $user = $request->user();
@@ -53,6 +61,7 @@ class GardenController extends Controller
                 'location' => $validated['location'],
             ]);
 
+            event(new GardenUpdated($user->id, 'created', $garden));
             $notificationService = new NotificationService();
             $notificationService->addGarden($garden, $user);
 
@@ -90,130 +99,125 @@ class GardenController extends Controller
     }
 
     public function addCrop(Request $request, $gardenId)
-    {
-        $user = $request->user();
+{
+    $user = $request->user();
 
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'variety' => 'required|string|max:255',
-            'planted_date' => 'required|date',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
-        ]);
+    $validator = Validator::make($request->all(), [
+        'name' => 'required|string|max:255',
+        'variety' => 'required|string|max:255',
+        'planted_date' => 'required|date',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+    ]);
 
-        if ($validator->fails()) {
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => 'Validation failed',
+            'errors' => $validator->errors()
+        ], 422);
+    }
+
+    try {
+        $validated = $validator->validated();
+
+        $inputName = $validated["name"];
+        $baseName = preg_replace('/\s*\d+$/', '', $inputName);
+        $baseName = trim($baseName);
+
+        $existInCropProfile = CropProfile::all()->first(function($profile) use ($baseName) {
+            $profileBaseName = preg_replace('/\s*\d+$/', '', $profile->name);
+            $profileBaseName = trim($profileBaseName);
+            return $profileBaseName === $baseName;
+        });
+
+        if (!$existInCropProfile) {
             return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                "message" => "Can't add because it doesn't exist in Crop Profile",
             ], 422);
         }
 
-        try {
-            $validated = $validator->validated();
+        // Handle image upload
+        $imageUrl = null;
+        if ($request->hasFile('image')) {
+            try {
+                Log::info('Starting Cloudinary upload for addCrop');
 
-            $inputName = $validated["name"];
-            $baseName = preg_replace('/\s*\d+$/', '', $inputName);
-            $baseName = trim($baseName);
+                $uploadedFile = $request->file('image');
 
-
-            $existInCropProfile = CropProfile::all()->first(function($profile) use ($baseName) {
-                $profileBaseName = preg_replace('/\s*\d+$/', '', $profile->name);
-                $profileBaseName = trim($profileBaseName);
-
-                return $profileBaseName === $baseName;
-            });
-
-
-            if (!$existInCropProfile) {
-                return response()->json([
-                    "message" => "Can't add because it doesn't exist in Crop Profile",
-                ], 422);
-            }
-
-            // Handle image upload
-            $imageUrl = null;
-            if ($request->hasFile('image')) {
-                try {
-                    Log::info('Starting Cloudinary upload for addCrop');
-
-                    $uploadedFile = $request->file('image');
-
-                    if (!$uploadedFile->isValid()) {
-                        throw new \Exception('Uploaded file is not valid');
-                    }
-
-                    Log::info('File details', [
-                        'name' => $uploadedFile->getClientOriginalName(),
-                        'size' => $uploadedFile->getSize(),
-                        'mime' => $uploadedFile->getMimeType()
-                    ]);
-
-                    // Get Cloudinary instance
-                    $cloudinary = $this->getCloudinaryInstance();
-
-                    // Upload to Cloudinary
-                    $result = $cloudinary->uploadApi()->upload(
-                        $uploadedFile->getRealPath(),
-                        [
-                            'folder' => 'crops_images',
-                            'public_id' => 'crop_' . time() . '_' . uniqid(),
-                        ]
-                    );
-
-                    $imageUrl = $result['secure_url'];
-
-                    Log::info('Cloudinary upload successful', [
-                        'url' => $imageUrl,
-                        'public_id' => $result['public_id']
-                    ]);
-
-                } catch (\Exception $e) {
-                    Log::error('Cloudinary upload failed', [
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
-                    ]);
-
-                    return response()->json([
-                        'message' => 'Failed to upload image to Cloudinary',
-                        'error' => $e->getMessage()
-                    ], 500);
+                if (!$uploadedFile->isValid()) {
+                    throw new \Exception('Uploaded file is not valid');
                 }
+
+                Log::info('File details', [
+                    'name' => $uploadedFile->getClientOriginalName(),
+                    'size' => $uploadedFile->getSize(),
+                    'mime' => $uploadedFile->getMimeType()
+                ]);
+
+                $cloudinary = $this->getCloudinaryInstance();
+
+                $result = $cloudinary->uploadApi()->upload(
+                    $uploadedFile->getRealPath(),
+                    [
+                        'folder' => 'crops_images',
+                        'public_id' => 'crop_' . time() . '_' . uniqid(),
+                    ]
+                );
+
+                $imageUrl = $result['secure_url'];
+
+                Log::info('Cloudinary upload successful', [
+                    'url' => $imageUrl,
+                    'public_id' => $result['public_id']
+                ]);
+
+            } catch (\Exception $e) {
+                Log::error('Cloudinary upload failed', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+
+                return response()->json([
+                    'message' => 'Failed to upload image to Cloudinary',
+                    'error' => $e->getMessage()
+                ], 500);
             }
-
-            // Create crop
-            $crop = Crop::create([
-                'user_id' => $user->id,
-                'garden_id' => $gardenId,
-                'crop_profile_id' => $existInCropProfile->id,
-                'name' => $validated['name'],
-                'variety' => $validated['variety'],
-                'image' => $imageUrl,
-                'planted_at' => $validated['planted_date']
-            ]);
-
-            $garden = Garden::find($gardenId);
-
-            $notificationService = new \App\Services\NotificationService();
-            $notificationService->checkCrop($crop, $user, $garden);
-
-            Log::info('Crop created successfully', ['crop_id' => $crop->id]);
-
-            return response()->json([
-                'message' => 'Crop created successfully',
-                'data' => $crop,
-            ], 201);
-
-        } catch (\Exception $e) {
-            Log::error('Failed to create crop', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'message' => 'Failed to create crop',
-                'error' => $e->getMessage()
-            ], 500);
         }
+
+        // Create crop
+        $crop = Crop::create([
+            'user_id' => $user->id,
+            'garden_id' => $gardenId,
+            'crop_profile_id' => $existInCropProfile->id,
+            'name' => $validated['name'],
+            'variety' => $validated['variety'],
+            'image' => $imageUrl,
+            'planted_at' => $validated['planted_date']
+        ]);
+
+        $garden = Garden::find($gardenId);
+
+        $notificationService = new \App\Services\NotificationService();
+        $notificationService->checkCrop($crop, $user, $garden);
+
+        Log::info('Crop created successfully', ['crop_id' => $crop->id]);
+
+        return response()->json([
+            'message' => 'Crop created successfully',
+            'data' => $crop,
+        ], 201);
+
+    } catch (\Exception $e) {
+        Log::error('Failed to create crop', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return response()->json([
+            'message' => 'Failed to create crop',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
 
     public function getCropData(Request $request, $garden_id) {
         $crops = Crop::where('garden_id', $garden_id)->get();

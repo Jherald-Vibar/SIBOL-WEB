@@ -4,13 +4,12 @@ import axios from 'axios';
 import image from '../assets/first_image.png';
 import axiosClient from './axios';
 import { Cloud, CloudRain, Sun, CloudSnow, Wind } from 'lucide-react';
+import { useSensorData } from '../hooks/useSensorData';
 import {
   LineChart, Line, CartesianGrid, XAxis, YAxis,
   Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
-
-// ── tiny reusable pieces ──────────────────────────────────────────────────────
 
 const SectionPill = ({ label }) => (
   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[#2e8b57]/20 bg-[#2e8b57]/[0.07] text-[10px] font-semibold tracking-[1.5px] uppercase text-[#2e8b57] mb-3.5">
@@ -23,82 +22,104 @@ const Orb = ({ className }) => (
   <div className={`absolute rounded-full pointer-events-none ${className}`} />
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 const UserDashboard = () => {
-  const name    = localStorage.getItem('username');
-  const apikey  = import.meta.env.VITE_WEATHER_APIKEY;
+  const name = localStorage.getItem('username');
+  const apikey = import.meta.env.VITE_WEATHER_APIKEY;
 
-  const [location,     setLocation]     = useState(null);
-  const [weather,      setWeather]      = useState(null);
+  const [location, setLocation] = useState(null);
+  const [weather, setWeather] = useState(null);
   const [forecastData, setForecastData] = useState(null);
-  const [unit,         setUnit]         = useState('C');
-  const [date,         setDate]         = useState(new Date());
-  const [data,         setData]         = useState([]);
-  const [error,        setError]        = useState('');
+  const [unit, setUnit] = useState('C');
+  const [date, setDate] = useState(new Date());
+  const [error, setError] = useState('');
   const [selectedCrop, setSelectedCrop] = useState('');
-  const [activeCrop,   setActiveCrop]   = useState(null);
-  const [crops,        setCrops]        = useState([]);
+  const [activeCrop, setActiveCrop] = useState(null);
+  const [crops, setCrops] = useState([]);
   const [cropAdvisory, setCropAdvisory] = useState([]);
+  const [gardenId, setGardenId] = useState(null);
+
   const navigate = useNavigate();
 
-  /* sensor data */
+  // Custom hook for live websocket data
+  // Ensure your useSensorData hook returns { ..., airHumidityHistory, setAirHumidityHistory, isConnected }
+  const { airHumidityHistory, isConnected, setAirHumidityHistory } = useSensorData(gardenId);
+
+  // 1. Fetch historical data on mount and seed the hook's state
   useEffect(() => {
-    const fetch = async () => {
+    const fetchHistory = async () => {
       try {
         const res = await axiosClient.get('/getAirHumidity');
-        setData(Array.isArray(res.data) ? res.data : []);
-        setError(null);
-      } catch { setError('Failed to fetch Data!'); }
-    };
-    fetch();
-    const id = setInterval(fetch, 5000);
-    return () => clearInterval(id);
-  }, []);
+        const formattedData = Array.isArray(res.data) ? res.data : (res.data.data || []);
 
-  /* active crop */
+        // Push database history into the hook so live data appends to it
+        if (typeof setAirHumidityHistory === 'function') {
+          setAirHumidityHistory(formattedData);
+        }
+      } catch (err) {
+        console.error("Fetch history error:", err);
+        setError('Database connection error.');
+      }
+    };
+
+    if (gardenId) {
+        fetchHistory();
+    }
+  }, [gardenId, setAirHumidityHistory]);
+
+  // Use the history from the hook directly as the chart data
+  const chartData = airHumidityHistory;
+
   useEffect(() => {
     const crop = crops.find(c => c.id === parseInt(selectedCrop));
     setActiveCrop(crop || null);
   }, [selectedCrop, crops]);
 
-  /* location */
   useEffect(() => {
     axiosClient.get('/getLocation').then(res => {
       const locs = res.data.locations;
-      if (locs?.length) { setLocation(locs[0]); localStorage.setItem('location', locs[0]); }
+      if (locs?.length) {
+        setLocation(locs[0]);
+        localStorage.setItem('location', locs[0]);
+      }
     }).catch(console.error);
   }, []);
 
-  /* weather */
   useEffect(() => {
     if (!location) return;
-    axios.get('https://api.weatherapi.com/v1/forecast.json', { params: { key: apikey, q: location, days: 3 } })
-      .then(res => { setWeather(res.data); setForecastData(res.data.forecast.forecastday); })
+    axios.get('https://api.weatherapi.com/v1/forecast.json', {
+      params: { key: apikey, q: location, days: 3 }
+    })
+      .then(res => {
+        setWeather(res.data);
+        setForecastData(res.data.forecast.forecastday);
+      })
       .catch(console.error);
   }, [location, apikey]);
 
-  /* clock */
   useEffect(() => {
     const id = setInterval(() => setDate(new Date()), 60000);
     return () => clearInterval(id);
   }, []);
 
-  /* crops */
   useEffect(() => {
     axiosClient.get('/getCrops')
-      .then(res => setCrops(res.data.data))
+      .then(res => {
+        const cropList = res.data.data;
+        setCrops(cropList);
+        if (cropList?.length > 0) {
+          setGardenId(cropList[0].garden?.id);
+        }
+      })
       .catch(err => setError(err.response?.data?.message || 'Something Went Wrong!'));
   }, []);
 
-  /* advisory */
   useEffect(() => {
     axiosClient.get('/getCropAdvisory')
       .then(res => setCropAdvisory(res.data.data))
       .catch(err => setError(err.response?.data?.message || 'Error Fetching Detection Results'));
   }, []);
 
-  const weekday      = date.toLocaleDateString('en-US', { weekday: 'long' });
+  const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
   const formattedDate = date
     .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
     .replace(/\//g, ' / ');
@@ -112,17 +133,16 @@ const UserDashboard = () => {
   const getWeatherIcon = (condition, large = false) => {
     const c = condition.toLowerCase();
     const cls = large ? 'w-14 h-14' : 'w-10 h-10';
-    if (c.includes('sun') || c.includes('clear'))   return <Sun  className={`${cls} text-amber-300`}  fill="currentColor" />;
-    if (c.includes('rain') || c.includes('drizzle')) return <CloudRain className={`${cls} text-blue-300`}  fill="currentColor" />;
-    if (c.includes('snow'))                          return <CloudSnow className={`${cls} text-blue-200`}  fill="currentColor" />;
-    if (c.includes('wind'))                          return <Wind className={`${cls} text-slate-300`} />;
+    if (c.includes('sun') || c.includes('clear')) return <Sun className={`${cls} text-amber-300`} fill="currentColor" />;
+    if (c.includes('rain') || c.includes('drizzle')) return <CloudRain className={`${cls} text-blue-300`} fill="currentColor" />;
+    if (c.includes('snow')) return <CloudSnow className={`${cls} text-blue-200`} fill="currentColor" />;
+    if (c.includes('wind')) return <Wind className={`${cls} text-slate-300`} />;
     return <Cloud className={`${cls} text-slate-300`} fill="currentColor" />;
   };
 
-  const getShortDay  = d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(d).getDay()];
-  const getTemp      = (c, f) => unit === 'C' ? Math.round(c) : Math.round(f);
+  const getShortDay = d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(d).getDay()];
+  const getTemp = (c, f) => unit === 'C' ? Math.round(c) : Math.round(f);
 
-  // ── render ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#f7f4ee] font-['DM_Sans',sans-serif] overflow-x-hidden">
       <style>{`
@@ -130,17 +150,13 @@ const UserDashboard = () => {
         .playfair { font-family: 'Playfair Display', serif; }
         .forecast-card:hover { background: rgba(255,255,255,0.18) !important; transform: translateY(-4px); }
         .crop-row:hover td { background: rgba(46,139,87,0.04); }
-        .thin-scroll::-webkit-scrollbar       { width: 3px; }
+        .thin-scroll::-webkit-scrollbar { width: 3px; }
         .thin-scroll::-webkit-scrollbar-track { background: transparent; }
         .thin-scroll::-webkit-scrollbar-thumb { background: rgba(46,139,87,0.3); border-radius: 10px; }
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
-
-      {/* ── Page content ── */}
       <div className="px-6 md:px-10 py-9 pb-20 md:pb-14">
-
-        {/* Welcome header */}
         <p className="text-[11px] font-medium tracking-[2px] uppercase text-[#2e8b57] mb-1.5">
           Good to see you
         </p>
@@ -149,26 +165,19 @@ const UserDashboard = () => {
         </h1>
         <div className="w-10 h-0.5 bg-[#d4840a] mb-8" />
 
-        {/* ── ROW 1: Weather + Forecast + Advisory ── */}
         <div className="flex flex-wrap gap-5 mb-6">
-
           {/* Weather card */}
           <div className="relative w-[280px] shrink-0 rounded-[20px] overflow-hidden border border-white/14 bg-gradient-to-br from-[rgba(26,102,54,0.82)] via-[rgba(11,61,30,0.88)] to-[rgba(11,61,30,0.92)] p-6">
             <Orb className="w-[200px] h-[200px] -top-[60px] -right-[60px] bg-[radial-gradient(circle,rgba(46,139,87,0.18)_0%,transparent_70%)]" />
             <Orb className="w-[120px] h-[120px] -bottom-5 -left-5 bg-[radial-gradient(circle,rgba(212,132,10,0.12)_0%,transparent_70%)]" />
-
-            {/* Location + toggle */}
             <div className="relative z-10 flex items-center justify-between mb-5">
               <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-[12px] font-medium text-white/90">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 48 48">
-                  <path fill="none" stroke="rgba(255,255,255,0.8)" strokeLinecap="round" strokeLinejoin="round" strokeWidth={4}
-                    d="M24 44s14-10.435 14-24A14 14 0 1 0 10 20c0 13.565 14 24 14 24z" />
+                  <path fill="none" stroke="rgba(255,255,255,0.8)" strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M24 44s14-10.435 14-24A14 14 0 1 0 10 20c0 13.565 14 24 14 24z" />
                   <circle cx="24" cy="20" r="4" fill="rgba(255,255,255,0.8)" />
                 </svg>
                 {location || 'Loading...'}
               </div>
-
-              {/* °C / °F pill toggle */}
               <button
                 onClick={() => setUnit(u => u === 'C' ? 'F' : 'C')}
                 className="relative flex items-center w-[72px] h-[34px] rounded-full bg-white/10 border border-white/20 cursor-pointer shrink-0"
@@ -183,14 +192,10 @@ const UserDashboard = () => {
                 </div>
               </button>
             </div>
-
-            {/* Day/date */}
             <div className="relative z-10 text-center mb-4">
               <div className="playfair text-[13px] text-white/60 tracking-wider">{weekday}</div>
               <div className="text-[11px] text-white/40 mt-0.5">{formattedDate}</div>
             </div>
-
-            {/* Temp */}
             {weather ? (
               <div className="relative z-10 flex items-center justify-between">
                 <div>
@@ -214,7 +219,6 @@ const UserDashboard = () => {
           {/* Forecast card */}
           <div className="relative flex-1 min-w-[300px] rounded-[20px] overflow-hidden bg-gradient-to-br from-[rgba(26,102,54,0.82)] via-[rgba(11,61,30,0.88)] to-[rgba(11,61,30,0.92)] border border-white/14 p-6">
             <Orb className="w-[300px] h-[300px] -top-[100px] -right-[80px] bg-[radial-gradient(circle,rgba(46,139,87,0.13)_0%,transparent_70%)]" />
-
             <div className="relative z-10 mb-5">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[rgba(168,197,160,0.2)] bg-[rgba(46,139,87,0.15)] text-[10px] font-semibold tracking-[1.5px] uppercase text-[rgba(168,197,160,0.9)] mb-3">
                 <span className="w-[5px] h-[5px] rounded-full bg-[#a8c5a0] animate-pulse" />
@@ -224,7 +228,6 @@ const UserDashboard = () => {
                 Upcoming <em className="text-[#f0a830]">Weather</em>
               </div>
             </div>
-
             {forecastData?.length ? (
               <div className="relative z-10 grid grid-cols-3 gap-3">
                 {forecastData.map((day, i) => (
@@ -257,7 +260,6 @@ const UserDashboard = () => {
           {/* Crop advisory */}
           <div className="relative w-[240px] shrink-0 rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-6">
             <Orb className="w-[150px] h-[150px] -top-10 -right-10 bg-[radial-gradient(circle,rgba(46,139,87,0.13)_0%,transparent_70%)]" />
-
             <div className="relative z-10">
               <SectionPill label="Advisory" />
               <div className="flex items-center justify-between mb-3.5">
@@ -270,7 +272,6 @@ const UserDashboard = () => {
                   </span>
                 )}
               </div>
-
               <div className="thin-scroll h-40 overflow-y-auto flex flex-col gap-2">
                 {cropAdvisory?.length > 0 ? (
                   cropAdvisory.map((adv, i) => (
@@ -296,12 +297,16 @@ const UserDashboard = () => {
           </div>
         </div>
 
-        {/* ── ROW 2: Chart ── */}
+        {/* Chart Section */}
         <div className="relative rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-7 mb-6">
           <Orb className="w-[250px] h-[250px] -top-[80px] -right-[60px] bg-[radial-gradient(circle,rgba(212,132,10,0.12)_0%,transparent_70%)]" />
-
           <div className="relative z-10">
-            <SectionPill label="Live Sensors" />
+            <div className="flex items-center gap-2 mb-1">
+              <SectionPill label="Live Sensors" />
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full mb-3.5 ${isConnected ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                {isConnected ? '● Connected' : '○ Waiting...'}
+              </span>
+            </div>
             <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
               <div className="playfair text-[22px] font-bold text-[#0b3d1e]">
                 Environmental <em className="text-[#2e8b57]">Conditions</em>
@@ -315,49 +320,43 @@ const UserDashboard = () => {
                 </div>
               </div>
             </div>
-
             {error && <p className="text-red-500 text-[13px] mb-3">{error}</p>}
-
             <div className="w-full h-[300px]">
-              {data.length > 0 ? (
+              {chartData && chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data}>
+                  <LineChart data={chartData}>
                     <CartesianGrid stroke="rgba(11,61,30,0.06)" strokeDasharray="4 4" />
                     <XAxis dataKey="time" stroke="#9ca3af" style={{ fontSize: '11px' }} />
-                    <YAxis yAxisId="left"  stroke="#ef4444" style={{ fontSize: '11px' }}
+                    <YAxis yAxisId="left" stroke="#ef4444" style={{ fontSize: '11px' }}
                       label={{ value: 'Temp (°C)', angle: -90, position: 'insideLeft', style: { fontSize: '11px', fill: '#ef4444' } }} />
                     <YAxis yAxisId="right" orientation="right" stroke="#2e8b57" style={{ fontSize: '11px' }}
                       label={{ value: 'Humidity (%)', angle: 90, position: 'insideRight', style: { fontSize: '11px', fill: '#2e8b57' } }} />
                     <Tooltip
                       contentStyle={{ background: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 8px 24px rgba(11,61,30,0.12)', fontSize: '12px', padding: '10px 14px' }}
                     />
-                    <Line yAxisId="left"  type="monotone" dataKey="temp"     stroke="#ef4444" strokeWidth={2.5} dot={{ fill: '#ef4444', r: 4 }} activeDot={{ r: 6 }} name="Temperature" />
+                    <Line yAxisId="left" type="monotone" dataKey="temp" stroke="#ef4444" strokeWidth={2.5} dot={{ fill: '#ef4444', r: 4 }} activeDot={{ r: 6 }} name="Temperature" />
                     <Line yAxisId="right" type="monotone" dataKey="humidity" stroke="#2e8b57" strokeWidth={2.5} dot={{ fill: '#2e8b57', r: 4 }} activeDot={{ r: 6 }} name="Humidity" />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full gap-3">
                   <div className="w-10 h-10 rounded-full border-[3px] border-[#2e8b57]/20 border-t-[#2e8b57]" style={{ animation: 'spin 1s linear infinite' }} />
-                  <div className="text-[13px] text-gray-400 font-medium">Loading sensor data...</div>
+                  <div className="text-[13px] text-gray-400 font-medium">Initialising sensor trends...</div>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* ── ROW 3: Crops ── */}
+        {/* Crops Section */}
         <div className="flex flex-wrap gap-5">
-
-          {/* Crops table */}
           <div className="relative flex-1 min-w-[300px] rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-7">
             <Orb className="w-40 h-40 -top-10 -left-10 bg-[radial-gradient(circle,rgba(46,139,87,0.13)_0%,transparent_70%)]" />
-
             <div className="relative z-10">
               <SectionPill label="Garden" />
               <div className="playfair text-[22px] font-bold text-[#0b3d1e] mb-5">
                 Available <em className="text-[#2e8b57]">Crops</em>
               </div>
-
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
@@ -405,11 +404,8 @@ const UserDashboard = () => {
             </div>
           </div>
 
-          {/* Crop detail card */}
           <div className="relative flex-1 min-w-[300px] rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07]">
             <Orb className="w-40 h-40 -bottom-10 -right-10 bg-[radial-gradient(circle,rgba(212,132,10,0.12)_0%,transparent_70%)]" />
-
-            {/* Crop image */}
             <div className="relative h-[220px] overflow-hidden">
               <img
                 src={activeCrop?.image || image}
@@ -423,8 +419,6 @@ const UserDashboard = () => {
                 </div>
               )}
             </div>
-
-            {/* Controls */}
             <div className="relative z-10 p-5">
               <div className="flex gap-2.5 mb-4">
                 <select
@@ -443,10 +437,7 @@ const UserDashboard = () => {
                   Details →
                 </button>
               </div>
-
-              {/* Info boxes */}
               <div className="grid grid-cols-2 gap-2.5">
-                {/* Health */}
                 <div
                   className="rounded-2xl p-4 text-center border border-[#0b3d1e]/[0.06] transition-colors duration-200 hover:border-[#0b3d1e]/15"
                   style={{
@@ -475,8 +466,6 @@ const UserDashboard = () => {
                       : 'No Data'}
                   </div>
                 </div>
-
-                {/* Planted date */}
                 <div className="rounded-2xl p-4 text-center border border-[#0b3d1e]/[0.06] bg-[rgba(212,132,10,0.05)] transition-colors duration-200 hover:border-[#0b3d1e]/15">
                   <div className="text-2xl mb-1.5">📅</div>
                   <div className="text-[9px] font-bold tracking-[1.5px] uppercase text-gray-400 mb-1">Planted</div>
@@ -487,7 +476,6 @@ const UserDashboard = () => {
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>
