@@ -48,7 +48,7 @@ const Login = () => {
   };
 
   const handleGoogleSignIn = () => {
-    window.location.href = "http://127.0.0.1:8000/api/auth/google";
+    window.location.href = "https://sibol-frontend.onrender.com/auth/google";
   };
 
   useEffect(() => {

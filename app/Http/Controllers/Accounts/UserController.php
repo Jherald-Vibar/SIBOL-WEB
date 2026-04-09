@@ -190,7 +190,7 @@ class UserController extends Controller
             $token = $user->createToken('user')->plainTextToken;
 
             return redirect(
-                "http://localhost:5173/auth/callback?" . http_build_query([
+                "https://sibol-frontend.onrender.com/auth/callback?" . http_build_query([
                     'token' => $token,
                     'role'  => 'user',
                     'name'  => $user->name,
@@ -202,7 +202,7 @@ class UserController extends Controller
             );
 
         } catch (\Throwable $e) {
-            return redirect("http://localhost:5173/guest/login?error=" . urlencode($e->getMessage()));
+            return redirect("https://sibol-frontend.onrender.com/guest/login?error=" . urlencode($e->getMessage()));
 
         }
     }
