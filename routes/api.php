@@ -32,6 +32,42 @@ Route::get('/test-notification', function () {
     return response()->json(['message' => 'Notification sent!', 'user_id' => $user->id]);
 });
 
+Route::get('/debug-broadcast', function () {
+    \Log::error('DEBUG: About to broadcast');
+
+    try {
+        $user = \App\Models\User::find(2);
+        \Log::error('DEBUG: User found: ' . ($user ? 'yes' : 'no'));
+
+        $notification = \App\Models\Notification::create([
+            'user_id'     => 2,
+            'type'        => 'test',
+            'title'       => 'Test',
+            'description' => 'Test',
+            'is_read'     => false,
+            'priority'    => 'normal',
+            'metadata'    => [],
+        ]);
+
+        \Log::error('DEBUG: Notification created: ' . $notification->id);
+
+        broadcast(new \App\Events\NotificationCreated($notification));
+
+        \Log::error('DEBUG: Broadcast called successfully');
+
+        return response()->json([
+            'broadcast_driver' => config('broadcasting.default'),
+            'pusher_key'       => config('broadcasting.connections.pusher.key'),
+            'pusher_cluster'   => config('broadcasting.connections.pusher.options.cluster'),
+            'pusher_secret_set'=> !empty(config('broadcasting.connections.pusher.secret')),
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('DEBUG ERROR: ' . $e->getMessage());
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+});
+
 Route::post('/broadcasting/auth', function (Request $request) {
     $user = $request->user();
 
