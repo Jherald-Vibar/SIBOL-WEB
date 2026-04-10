@@ -1,85 +1,111 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import axiosClient from '../axios';
-import Swal from 'sweetalert2';
 import Logo from '../../assets/logo-left.png';
 import crophealth from '../../assets/sidebar-icons/crop-health.png';
 import accountSettings from '../../assets/sidebar-icons/account-settings.png';
-import { LogOut } from 'lucide-react';
+import { LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import LogoutModal from './LogoutModal';
 
 const AdminSidebar = () => {
   const userName = localStorage.getItem('username');
+  const [collapsed, setCollapsed] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
 
   const sidebarMenus = [
-    { name: "Crop Profile", image: crophealth, path: "/admin/crop-profile" },
-    { name: "Account Settings", image: accountSettings, path: "/admin/account-settings" },
+    { name: 'Crop Profile',       image: crophealth,      path: '/admin/crop-profile'     },
+    { name: 'Account Settings',   image: accountSettings, path: '/admin/account-settings' },
+    { name: 'User Activity Logs', image: accountSettings, path: '/admin/activity-logs'    },
   ];
-
-  const handleLogout = () => {
-    Swal.fire({
-      title: "Do you want to Logout?",
-      showDenyButton: true,
-      confirmButtonText: "Yes",
-      denyButtonText: `No`,
-    }).then((result) => {
-      if (result.isConfirmed) {
-        const token = localStorage.getItem('authToken');
-        if (token) {
-          axiosClient.post('logout', {}, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          })
-          .then(response => {
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('username');
-            localStorage.removeItem('location');
-            localStorage.removeItem('role');
-            window.location.href = '/guest/login';
-            Swal.fire("Logged out!", "You have successfully logged out.", "success");
-          })
-          .catch(error => {
-            Swal.fire("Error!", "There was an issue logging you out.", "error");
-          });
-        }
-      } else if (result.isDenied) {
-        Swal.fire("User Still Logged in!");
-      }
-    });
-  };
 
   return (
     <>
-      {/* Desktop Sidebar */}
-      <div className="hidden md:flex w-64 min-h-screen bg-white shadow-xl p-6 flex-col">
-        {/* Header Section */}
-        <div className="mb-10 pb-4 flex flex-col items-center justify-center border-gray-700">
-          <img src={Logo} alt="Logo" className='w-32' />
-          <p className="text-xs text-gray-500 uppercase text-center tracking-widest font-medium">{userName}</p>
+      <LogoutModal isOpen={showLogout} onClose={() => setShowLogout(false)} />
+
+      {/* ── DESKTOP SIDEBAR ── */}
+      <div
+        className="hidden md:flex flex-col sticky top-0 h-screen bg-[#0b3d1e] py-7 font-['DM_Sans',sans-serif] relative overflow-hidden shrink-0"
+        style={{
+          width:        collapsed ? '68px' : '240px',
+          paddingLeft:  collapsed ? '0'    : '16px',
+          paddingRight: collapsed ? '0'    : '16px',
+          transition:   'width 0.28s cubic-bezier(0.4,0,0.2,1), padding 0.28s cubic-bezier(0.4,0,0.2,1)',
+        }}
+      >
+        {/* Background orbs */}
+        <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full pointer-events-none bg-[radial-gradient(circle,rgba(46,139,87,0.18)_0%,transparent_70%)]" />
+        <div className="absolute bottom-20 -left-10 w-44 h-44 rounded-full pointer-events-none bg-[radial-gradient(circle,rgba(212,132,10,0.10)_0%,transparent_70%)]" />
+
+        {/* ── Logo / username ── */}
+        <div className="relative z-10 flex flex-col items-center pb-6 mb-6 border-b border-white/10 shrink-0">
+          {collapsed ? (
+            <div className="w-[38px] h-[38px] rounded-full bg-[rgba(46,139,87,0.20)] border border-[rgba(212,132,10,0.25)] flex items-center justify-center">
+              <img src={Logo} alt="SIBOL" className="w-[26px] object-contain" />
+            </div>
+          ) : (
+            <>
+              <img src={Logo} alt="SIBOL" className="w-24 mb-3 drop-shadow-lg" />
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[rgba(212,132,10,0.15)] border border-[rgba(212,132,10,0.30)] mb-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#f0a830]" />
+                <span className="text-[9px] font-bold tracking-[2px] uppercase text-[#f0a830]">Admin</span>
+              </div>
+              {userName && (
+                <span className="text-[11px] text-white/40 font-medium whitespace-nowrap overflow-hidden max-w-[160px] text-ellipsis text-center">
+                  {userName}
+                </span>
+              )}
+            </>
+          )}
         </div>
 
-        <nav className="flex-1">
-          <ul className="space-y-1">
+        {/* Nav label */}
+        {!collapsed && (
+          <p className="text-[9px] font-medium tracking-[2px] uppercase px-4 mb-2 relative z-10 text-white/20 shrink-0">
+            Navigation
+          </p>
+        )}
+
+        {/* ── Nav links ── */}
+        <nav className="relative z-10 shrink-0">
+          <ul className="flex flex-col gap-1">
             {sidebarMenus.map((menu, i) => (
               <li key={i}>
                 <NavLink
                   to={menu.path}
+                  title={collapsed ? menu.name : undefined}
                   className={({ isActive }) =>
-                    `relative flex items-center px-6 py-4 text-[15px] font-semibold rounded-lg transition-all duration-300 group ${
-                      isActive
-                        ? "text-green-600 bg-[#00640066] rounded-md shadow-inner"
-                        : "text-gray-400 hover:text-white hover:bg-gray-800"
-                    }`
+                    `relative flex items-center rounded-xl text-[13px] font-medium transition-all duration-200 overflow-hidden border
+                     ${isActive
+                       ? 'text-white border-[#2e8b57]/30 bg-[rgba(46,139,87,0.22)]'
+                       : 'text-white/60 border-transparent hover:text-white/90 hover:bg-white/5'
+                     }`
                   }
+                  style={() => ({
+                    gap:            collapsed ? 0 : '12px',
+                    padding:        collapsed ? '10px 0' : '10px 16px',
+                    justifyContent: collapsed ? 'center' : 'flex-start',
+                  })}
                 >
                   {({ isActive }) => (
                     <>
-                      <div className={`absolute left-0 top-0 bottom-0 w-2 rounded-md transition-all duration-300 ${
-                        isActive ? "bg-green-900" : "bg-transparent group-hover:bg-gray-600"
-                      }`}></div>
-                      <img src={menu.image} alt={menu.name} className='mr-3 w-5 h-5' />
-                      <span className="tracking-wide relative z-10">{menu.name}</span>
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      {!collapsed && (
+                        <span
+                          className="absolute left-0 rounded-r-[4px] bg-[#d4840a] transition-opacity duration-200"
+                          style={{ top: '20%', bottom: '20%', width: '3px', opacity: isActive ? 1 : 0 }}
+                        />
+                      )}
+                      <img
+                        src={menu.image}
+                        alt={menu.name}
+                        className="shrink-0 brightness-0 invert transition-opacity duration-200"
+                        style={{ width: '18px', height: '18px', objectFit: 'contain', opacity: isActive ? 1 : 0.55 }}
+                      />
+                      <span
+                        className="whitespace-nowrap overflow-hidden transition-all duration-300"
+                        style={{ maxWidth: collapsed ? '0px' : '160px', opacity: collapsed ? 0 : 1 }}
+                      >
+                        {menu.name}
+                      </span>
                     </>
                   )}
                 </NavLink>
@@ -88,58 +114,96 @@ const AdminSidebar = () => {
           </ul>
         </nav>
 
-        {/* Logout Section */}
-        <div className="mt-auto pt-6">
+        {/* Spacer */}
+        <div className="flex-1 min-h-0" />
+
+        {/* Divider */}
+        <div className="relative z-10 h-px bg-white/[0.08] mb-3 shrink-0" />
+
+        {/* ── Logout — now uses LogoutModal like UserSidebar ── */}
+        <div className="relative z-10 shrink-0">
           <button
-            onClick={handleLogout}
-            className="relative flex items-center px-6 py-4 text-[15px] font-semibold rounded-lg transition-all duration-300 group w-full text-red-500 hover:text-white hover:bg-red-600"
+            onClick={() => setShowLogout(true)}
+            title={collapsed ? 'Logout' : undefined}
+            className="w-full flex items-center rounded-xl text-[13px] font-medium transition-all duration-200 border border-transparent text-red-400/65 hover:text-white hover:bg-red-500/[0.18] hover:border-red-500/[0.28]"
+            style={{
+              gap:            collapsed ? 0 : '12px',
+              padding:        collapsed ? '10px 0' : '10px 16px',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+            }}
           >
-            <div className="absolute left-0 top-0 bottom-0 w-2 rounded-md bg-transparent group-hover:bg-red-800 transition-all duration-300"></div>
-            <LogOut className="mr-3 w-5 h-5" />
-            <span className="tracking-wide relative z-10">Logout</span>
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <LogOut size={16} className="shrink-0" />
+            <span
+              className="whitespace-nowrap overflow-hidden transition-all duration-300"
+              style={{ maxWidth: collapsed ? '0px' : '120px', opacity: collapsed ? 0 : 1 }}
+            >
+              Logout
+            </span>
           </button>
         </div>
+
+        {/* Collapse toggle */}
+        <button
+          onClick={() => setCollapsed(v => !v)}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="relative z-10 mt-3 flex items-center justify-center rounded-xl transition-all duration-200 border border-white/[0.07] bg-white/[0.03] text-white/30 hover:text-white/70 hover:bg-white/[0.07] shrink-0"
+          style={{
+            width:     collapsed ? '38px' : '100%',
+            padding:   '8px',
+            margin:    collapsed ? '12px auto 0' : '12px 0 0',
+            alignSelf: collapsed ? 'center' : 'stretch',
+          }}
+        >
+          {collapsed
+            ? <ChevronRight size={14} />
+            : <><ChevronLeft size={14} /><span className="text-[11px] ml-1.5 font-medium">Collapse</span></>
+          }
+        </button>
       </div>
 
-      {/* Mobile Footer Navigation */}
-      <div className="md:hidden w-full bg-white shadow-2xl border-t-2 border-gray-200">
-        <nav className="flex items-center justify-around px-2 py-3">
+      {/* ── MOBILE BOTTOM NAV ── */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 w-full bg-[#0b3d1e] border-t border-white/10 font-['DM_Sans',sans-serif]">
+        <nav className="flex items-center justify-around px-1 py-2">
           {sidebarMenus.map((menu, i) => (
             <NavLink
               key={i}
               to={menu.path}
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center px-3 py-2 rounded-lg transition-all duration-300 relative ${
-                  isActive
-                    ? "text-green-600 bg-[#00640066]"
-                    : "text-gray-400 hover:text-gray-800 hover:bg-gray-100"
-                }`
+                `relative flex flex-col items-center gap-1 px-2.5 py-2 rounded-xl transition-all duration-200
+                 ${isActive ? 'text-[#f0a830]' : 'text-white/50 hover:text-white/75'}`
               }
             >
               {({ isActive }) => (
                 <>
-                  <img src={menu.image} alt={menu.name} className='w-6 h-6 mb-1' />
-                  <span className="text-[10px] font-semibold text-center leading-tight">
-                    {menu.name === "Account Settings" ? "Account" : menu.name}
+                  {isActive && <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-[#d4840a]" />}
+                  <img
+                    src={menu.image}
+                    alt={menu.name}
+                    className="w-5 h-5 object-contain brightness-0 invert transition-opacity duration-200"
+                    style={{
+                      opacity: isActive ? 1 : 0.5,
+                      filter: isActive
+                        ? 'brightness(0) saturate(100%) invert(62%) sepia(80%) saturate(600%) hue-rotate(5deg)'
+                        : undefined,
+                    }}
+                  />
+                  <span className="text-[9px] font-medium leading-tight">
+                    {menu.name === 'Account Settings' ? 'Account'
+                      : menu.name === 'User Activity Logs' ? 'Logs'
+                      : menu.name}
                   </span>
-                  {isActive && (
-                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-green-900 rounded-t-md"></div>
-                  )}
                 </>
               )}
             </NavLink>
           ))}
 
-          {/* Mobile Logout Button */}
+          {/* ── Logout — same modal trigger ── */}
           <button
-            onClick={handleLogout}
-            className="flex flex-col items-center justify-center px-3 py-2 rounded-lg transition-all duration-300 text-red-500 hover:text-red-700 hover:bg-red-50"
+            onClick={() => setShowLogout(true)}
+            className="flex flex-col items-center gap-1 px-2.5 py-2 rounded-xl transition-all duration-200 text-red-400/60 hover:text-red-400"
           >
-            <LogOut className='w-6 h-6 mb-1' />
-            <span className="text-[10px] font-semibold text-center leading-tight">
-              Logout
-            </span>
+            <LogOut size={20} />
+            <span className="text-[9px] font-medium">Logout</span>
           </button>
         </nav>
       </div>

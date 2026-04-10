@@ -18,6 +18,7 @@ import CropCareConfig from "./Views/CropCareConfig.jsx";
 import CropCarePlant from "./Views/CropCarePlant.jsx";
 import AboutUs from "./Views/AboutUs.jsx";
 import AuthCallback from "./Views/parts/AuthCallback.jsx";
+import AdminActivityLog from "./Views/AdminActivityLog.jsx";
 
 const router = createBrowserRouter ([
 
@@ -57,6 +58,10 @@ const router = createBrowserRouter ([
                     {
                         path: "/admin/account-settings",
                         element: <AdminAccountSettings/>
+                    },
+                    {
+                        path: "/admin/activity-logs",
+                        element: <AdminActivityLog/>
                     },
                 ],
             },

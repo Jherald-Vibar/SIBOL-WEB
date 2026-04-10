@@ -1,41 +1,109 @@
-import React from 'react'
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, X, Check, Info, AlertCircle, Droplet, CheckCircle, RotateCcw } from 'lucide-react';
+import Logo from '../../assets/logo-left.png';
 
 const AdminNavbar = () => {
+  const navigate = useNavigate();
+
+  // State
+  const [selectedNotification, setSelectedNotification] = useState(null);
+
+  // Dummy functions (replace with your real logic)
+  const markAsRead = (id) => console.log("Mark as read:", id);
+  const deleteNotification = (id) => console.log("Delete:", id);
+
+  const getNotificationIcon = (type) => {
+    switch (type) {
+      case 'info': return <Info className="w-4 h-4" />;
+      case 'alert': return <AlertCircle className="w-4 h-4" />;
+      case 'success': return <CheckCircle className="w-4 h-4" />;
+      case 'water': return <Droplet className="w-4 h-4" />;
+      default: return <Bell className="w-4 h-4" />;
+    }
+  };
+
+  const getIconBubbleStyle = () => "bg-white/10 text-white";
+
+  const getPriorityStyle = (priority) => {
+    switch (priority) {
+      case 'high': return 'text-red-400 border-red-400/30';
+      case 'medium': return 'text-yellow-400 border-yellow-400/30';
+      case 'low': return 'text-green-400 border-green-400/30';
+      default: return 'text-white/40 border-white/20';
+    }
+  };
+
   return (
-    <div className="max-w-screen px-3 py-3 bg-white ">
-      <div className="flex flex-row items-center justify-between px-3 py-3">
+    <>
+      {/* NAVBAR */}
+      <nav className="bg-[#0b3d1e] border-b border-white/8 sticky top-0 z-50 font-['DM_Sans',sans-serif]">
+        <div className="px-5 sm:px-8">
+          <div className="flex items-center justify-between h-16">
 
-        {/* Search Bar */}
-        <div className="flex rounded-full border-2 border-green-700 overflow-hidden w-full">
-          <input
-            type="text"
-            placeholder="Search Something..."
-            className="w-full outline-none bg-white text-sm px-5 py-3"
-          />
-          <button
-            type="button"
-            className="flex items-center justify-center bg-green-700 hover:bg-green-800 px-6 transition"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 192.904 192.904"
-              width="18px"
-              className="fill-white"
+            {/* Logo */}
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#d4840a] flex items-center justify-center shrink-0">
+                <img src={Logo} alt="SIBOL" className="w-5 h-5 object-contain brightness-0 invert" />
+              </div>
+              <span className="hidden sm:block font-['Playfair_Display',serif] text-xl font-bold text-white tracking-widest">
+                SIBOL
+              </span>
+            </div>
+
+            {/* Right actions */}
+            <button
+              onClick={() => navigate('/user/about-us')}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#d4840a] hover:bg-[#f0a830] text-white text-xs font-semibold tracking-wide transition-all duration-200 border border-[#d4840a]/50 shadow-lg shadow-[#d4840a]/20"
             >
-              <path d="m190.707 180.101-47.078-47.077c11.702-14.072 18.752-32.142 18.752-51.831C162.381 36.423 125.959 0 81.191 0 36.422 0 0 36.423 0 81.193c0 44.767 36.422 81.187 81.191 81.187 19.688 0 37.759-7.049 51.831-18.751l47.079 47.078a7.474 7.474 0 0 0 5.303 2.197 7.498 7.498 0 0 0 5.303-12.803zM15 81.193C15 44.694 44.693 15 81.191 15c36.497 0 66.189 29.694 66.189 66.193 0 36.496-29.692 66.187-66.189 66.187C44.693 147.38 15 117.689 15 81.193z"></path>
-            </svg>
-          </button>
-        </div>
+              <span className="hidden sm:inline">About Us</span>
+              <span className="sm:hidden">About</span>
+            </button>
 
-        {/* About Us Button */}
-        <div className="ml-4">
-          <button className="rounded-md px-3 py-2 text-white bg-green-800 w-24 hover:bg-green-900 text-[.9rem] font-sans font-semibold shadow-md transition">
-            ABOUT US
-          </button>
+          </div>
         </div>
-      </div>
-    </div>
-  )
-}
+      </nav>
 
-export default AdminNavbar
+      {/* MODAL */}
+      {selectedNotification && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0b3d1e] border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg">
+
+            {/* Header */}
+            <div className="px-6 py-4 flex justify-between">
+              <h2 className="text-white">{selectedNotification.title}</h2>
+              <button onClick={() => setSelectedNotification(null)}>
+                <X />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 text-white">
+              <p>{selectedNotification.description}</p>
+
+              <div className="mt-4 flex gap-2">
+                {!selectedNotification.is_read && (
+                  <button
+                    onClick={() => markAsRead(selectedNotification.id)}
+                    className="bg-green-500 px-3 py-2 rounded"
+                  >
+                    Mark as Read
+                  </button>
+                )}
+
+                <button
+                  onClick={() => deleteNotification(selectedNotification.id)}
+                  className="bg-red-500 px-3 py-2 rounded"
+                >
+                  Delete
+                </button>
+              </div>
+            </div> 
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+export default AdminNavbar;

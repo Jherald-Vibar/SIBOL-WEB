@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import Echo from 'laravel-echo'
+import Pusher from 'pusher-js'
 import UserNavbar from './parts/UserNavbar'
 import axiosClient from './axios'
 import Leaf from '../assets/leaf.png'
@@ -8,6 +10,8 @@ import Leaf from '../assets/leaf.png'
 const CropCarePlant = () => {
   const { garden_id, crop_name } = useParams()
   const navigate = useNavigate()
+  const gardenEchoRef = useRef(null)
+
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState('')
   const [sensorData,   setSensorData]   = useState(null)
@@ -19,27 +23,108 @@ const CropCarePlant = () => {
   const [imageError,   setImageError]   = useState(false)
   const [isModalOpen,  setIsModalOpen]  = useState(false)
   const [modalImage,   setModalImage]   = useState(null)
+  const [wsConnected,  setWsConnected]  = useState(false)
+  const [lastUpdated,  setLastUpdated]  = useState(null)
 
-  useEffect(() => {
-    const fetchSensorData = async () => {
-      setLoading(true)
-      try {
-        const res = await axiosClient.get(`/getSensorDataCrop/${garden_id}/${crop_name}`)
-        if (res.data.success) {
-          setCropInfo(res.data.data.crop)
-          setCropProfile(res.data.data.crop_profile)
-          setSensorData(res.data.data.latest)
-          setAlerts(res.data.data.alerts || [])
-          setHistoryData(res.data.data.history || [])
-        }
-      } catch (err) {
-        setError(err.response?.data?.message || 'Failed to fetch sensor data!')
-      } finally { setLoading(false) }
+  // ── Initial fetch ─────────────────────────────────────────────────────────
+  const fetchSensorData = async () => {
+    setLoading(true)
+    try {
+      const res = await axiosClient.get(`/getSensorDataCrop/${garden_id}/${crop_name}`)
+      if (res.data.success) {
+        setCropInfo(res.data.data.crop)
+        setCropProfile(res.data.data.crop_profile)
+        setSensorData(res.data.data.latest)
+        setAlerts(res.data.data.alerts || [])
+        setHistoryData(res.data.data.history || [])
+        setLastUpdated(new Date())
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to fetch sensor data!')
+    } finally {
+      setLoading(false)
     }
-    if (garden_id && crop_name) {
-      fetchSensorData()
-      const id = setInterval(fetchSensorData, 10000)
-      return () => clearInterval(id)
+  }
+
+  // ── Connect / reconnect WebSocket ────────────────────────────────────────
+  const connectEcho = () => {
+    if (!garden_id || !crop_name) return
+
+    // Tear down any existing connection first
+    if (gardenEchoRef.current) {
+      gardenEchoRef.current.leaveChannel(`garden.${garden_id}`)
+      gardenEchoRef.current.disconnect()
+      gardenEchoRef.current = null
+    }
+
+    window.Pusher = Pusher
+
+    gardenEchoRef.current = new Echo({
+      broadcaster: 'reverb',
+      key: import.meta.env.VITE_REVERB_APP_KEY,
+      wsHost: import.meta.env.VITE_REVERB_HOST,
+      wsPort: import.meta.env.VITE_REVERB_PORT,
+      wssPort: import.meta.env.VITE_REVERB_PORT,
+      forceTLS: false,
+      enabledTransports: ['ws', 'wss'],
+    })
+
+    const channel = gardenEchoRef.current.channel(`garden.${garden_id}`)
+
+    channel
+      .listen('.sensor.updated', (e) => {
+        const d = e.sensor_data
+
+        setSensorData(prev => ({
+          ...prev,
+          soil_temperature:        d.soil_temperature,
+          air_temperature:         d.air_temperature,
+          air_humidity:            d.air_humidity,
+          soil_moisture:           d.soil_moisture,
+          ph:                      d.ph,
+          electrical_conductivity: d.electrical_conductivity,
+          nitrogen:                d.nitrogen,
+          phosphorus:              d.phosphorus,
+          potassium:               d.potassium,
+          created_at:              d.recorded_at,
+        }))
+
+        setHistoryData(prev => [{
+          soil_temperature: d.soil_temperature,
+          air_temperature:  d.air_temperature,
+          air_humidity:     d.air_humidity,
+          soil_moisture:    d.soil_moisture,
+          created_at:       d.recorded_at,
+        }, ...prev].slice(0, 50))
+
+        setLastUpdated(new Date())
+        setWsConnected(true)
+      })
+      .subscribed(() => {
+        setWsConnected(true)
+      })
+      .error(() => {
+        setWsConnected(false)
+      })
+  }
+
+  const handleReconnect = () => {
+    setWsConnected(false)
+    fetchSensorData()
+    connectEcho()
+  }
+
+  // ── WebSocket + initial fetch ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!garden_id || !crop_name) return
+
+    fetchSensorData()
+    connectEcho()
+
+    return () => {
+      gardenEchoRef.current?.leaveChannel(`garden.${garden_id}`)
+      gardenEchoRef.current?.disconnect()
+      gardenEchoRef.current = null
     }
   }, [garden_id, crop_name])
 
@@ -214,6 +299,16 @@ const CropCarePlant = () => {
     </div>
   )
 
+  // ── Loading ───────────────────────────────────────────────────────────────
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-screen bg-[#f7f4ee]">
+      <div className="text-center">
+        <div className="w-10 h-10 border-4 border-green-200 border-t-green-700 rounded-full animate-spin mx-auto mb-3" />
+        <p className="text-sm text-gray-400">Loading crop data…</p>
+      </div>
+    </div>
+  )
+
   if (error) return (
     <div className="flex items-center justify-center min-h-screen bg-[#f7f4ee]">
       <div className="text-center bg-white rounded-2xl shadow-lg p-8 max-w-sm">
@@ -235,16 +330,16 @@ const CropCarePlant = () => {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap');
         @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+        @keyframes pulse-dot { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
         .animate-fade-in { animation: fadeIn 0.2s ease-out; }
+        .animate-pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
       `}</style>
 
-      {/* Content */}
       <div className="px-5 md:px-9 py-7 pb-24 md:pb-10">
 
         {/* Page header */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-7">
           <div>
-            {/* Back button */}
             <button
               onClick={() => navigate(`/user/crop-care/${garden_id}`)}
               className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-green-950 transition-colors mb-2 group"
@@ -257,12 +352,35 @@ const CropCarePlant = () => {
             <h1 className="font-['Playfair_Display',serif] text-[clamp(26px,3.5vw,40px)] font-bold text-green-950 leading-tight">
               {crop_name || 'Crop Details'}
             </h1>
-            <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-400">
+            <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-400 items-center">
               <span>Garden {garden_id}</span>
-              {sensorData?.created_at && <><span>·</span><span>Updated {fmtDate(sensorData.created_at)}</span></>}
+
+              {/* WebSocket live indicator */}
+              <span className="flex items-center gap-1.5">
+                <span className={`inline-block w-1.5 h-1.5 rounded-full ${wsConnected ? 'bg-green-500 animate-pulse-dot' : 'bg-gray-300'}`} />
+                <span className={wsConnected ? 'text-green-600 font-medium' : 'text-gray-400'}>
+                  {wsConnected ? 'Live' : 'Not live'}
+                </span>
+                {!wsConnected && (
+                  <button
+                    onClick={handleReconnect}
+                    title="Reconnect"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 hover:bg-green-100 hover:text-green-700 text-gray-500 text-[11px] font-medium border border-gray-200 hover:border-green-300 transition-all duration-200"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                      <path d="M3 3v5h5"/>
+                    </svg>
+                    Reload
+                  </button>
+                )}
+              </span>
+
+              {lastUpdated && <><span>·</span><span>Updated {fmtDate(lastUpdated)}</span></>}
               {cropProfile && <><span>·</span><span className="text-green-600 font-semibold">✓ Profile Active</span></>}
             </div>
           </div>
+
           <button
             onClick={() => setIsIrrigating(v => !v)}
             className={`inline-flex items-center gap-2 px-6 py-3 rounded-full text-white text-sm font-medium transition-all duration-300 shrink-0 ${
@@ -334,7 +452,6 @@ const CropCarePlant = () => {
 
           {/* COL 2: Soil & Environment */}
           <div className="flex flex-col gap-4">
-            {/* Soil */}
             <div className="bg-white rounded-2xl p-5 border border-black/[0.05] flex-1">
               <h3 className="font-['Playfair_Display',serif] text-base font-bold text-green-950 mb-3.5 flex items-center gap-1.5">
                 🌱 Soil & Root
@@ -363,7 +480,6 @@ const CropCarePlant = () => {
               )}
             </div>
 
-            {/* Environment */}
             <div className="bg-white rounded-2xl p-5 border border-black/[0.05]">
               <h3 className="font-['Playfair_Display',serif] text-base font-bold text-green-950 mb-3.5 flex items-center gap-1.5">
                 🌤 Environment
@@ -382,7 +498,6 @@ const CropCarePlant = () => {
 
           {/* COL 3: Leaf + Alerts */}
           <div className="flex flex-col gap-4">
-            {/* Leaf */}
             <div className="bg-white rounded-2xl p-5 border border-black/[0.05]">
               <h3 className="font-['Playfair_Display',serif] text-base font-bold text-green-950 mb-3.5 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">🍃 Leaf Condition</span>
@@ -491,7 +606,7 @@ const CropCarePlant = () => {
               ) : <ChartEmpty />}
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Moisture Trend</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Moisture & Humidity Trend</p>
               {chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={chartData}>

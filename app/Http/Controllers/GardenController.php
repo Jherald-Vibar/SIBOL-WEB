@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\ActivityLogCreated;
 use App\Events\GardenUpdated;
 use App\Models\Crop;
 use App\Models\CropProfile;
@@ -14,41 +15,43 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Spatie\Activitylog\Models\Activity;
 
 class GardenController extends Controller
 {
     protected function getCloudinaryInstance()
-{
-    return new \Cloudinary\Cloudinary([
-        'cloud' => [
-            'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
-            'api_key'    => env('CLOUDINARY_API_KEY'),
-            'api_secret' => env('CLOUDINARY_API_SECRET'),
-        ],
-        'url' => [
-            'secure' => true,
-        ],
-        'http' => [
-            'verify'  => false,
-            'curl'    => [
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_SSL_VERIFYHOST => false,
+    {
+        return new \Cloudinary\Cloudinary([
+            'cloud' => [
+                'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
+                'api_key'    => env('CLOUDINARY_API_KEY'),
+                'api_secret' => env('CLOUDINARY_API_SECRET'),
             ],
-        ],
-    ]);
-}
+            'url' => [
+                'secure' => true,
+            ],
+            'http' => [
+                'verify' => false,
+                'curl'   => [
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_SSL_VERIFYHOST => false,
+                ],
+            ],
+        ]);
+    }
 
-    public function addGarden(Request $request) {
+    public function addGarden(Request $request)
+    {
         $user = $request->user();
         $validator = Validator::make($request->all(), [
             'garden_name' => 'required',
-            'location' => 'required',
+            'location'    => 'required',
         ]);
 
-        if($validator->fails()) {
+        if ($validator->fails()) {
             return response()->json([
                 'message' => $validator->errors(),
-                'status' => 'Failed',
+                'status'  => 'Failed',
             ], 422);
         }
 
@@ -56,41 +59,56 @@ class GardenController extends Controller
 
         try {
             $garden = Garden::create([
-                'user_id' => $user->id,
-                'name' => $validated['garden_name'],
+                'user_id'  => $user->id,
+                'name'     => $validated['garden_name'],
                 'location' => $validated['location'],
             ]);
+
+
+            activity('garden')
+                ->causedBy($user)
+                ->performedOn($garden)
+                ->withProperties([
+                    'garden_name' => $garden->name,
+                    'location'    => $garden->location,
+                    'ip'          => $request->ip(),
+                ])
+                ->log('User added a new garden');
+
+            $log = Activity::with('causer')->latest()->first();
+            event(new ActivityLogCreated($log));
 
             event(new GardenUpdated($user->id, 'created', $garden));
             $notificationService = new NotificationService();
             $notificationService->addGarden($garden, $user);
 
-
             return response()->json([
                 "message" => "Garden Successfully Created!",
-                "status" => "Success!",
-                "garden" => $garden,
+                "status"  => "Success!",
+                "garden"  => $garden,
             ], 201);
 
         } catch (\Exception $e) {
             return response()->json([
                 "message" => $e->getMessage(),
-                "status" => "Failed"
+                "status"  => "Failed"
             ], 500);
         }
     }
 
-    public function getLocation(Request $request) {
+    public function getLocation(Request $request)
+    {
         $user = $request->user();
 
         $locations = $user->gardens()->pluck('location');
 
         return response()->json([
-        'locations' => $locations
+            'locations' => $locations
         ], 200);
     }
 
-    public function getGardenData(Request $request) {
+    public function getGardenData(Request $request)
+    {
         $user = $request->user();
 
         $gardenData = $user->gardens()->get();
@@ -99,148 +117,166 @@ class GardenController extends Controller
     }
 
     public function addCrop(Request $request, $gardenId)
-{
-    $user = $request->user();
+    {
+        $user = $request->user();
 
-    $validator = Validator::make($request->all(), [
-        'name' => 'required|string|max:255',
-        'variety' => 'required|string|max:255',
-        'planted_date' => 'required|date',
-        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
-    ]);
+        $validator = Validator::make($request->all(), [
+            'name'         => 'required|string|max:255',
+            'variety'      => 'required|string|max:255',
+            'planted_date' => 'required|date',
+            'image'        => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+        ]);
 
-    if ($validator->fails()) {
-        return response()->json([
-            'message' => 'Validation failed',
-            'errors' => $validator->errors()
-        ], 422);
-    }
-
-    try {
-        $validated = $validator->validated();
-
-        $inputName = $validated["name"];
-        $baseName = preg_replace('/\s*\d+$/', '', $inputName);
-        $baseName = trim($baseName);
-
-        $existInCropProfile = CropProfile::all()->first(function($profile) use ($baseName) {
-            $profileBaseName = preg_replace('/\s*\d+$/', '', $profile->name);
-            $profileBaseName = trim($profileBaseName);
-            return $profileBaseName === $baseName;
-        });
-
-        if (!$existInCropProfile) {
+        if ($validator->fails()) {
             return response()->json([
-                "message" => "Can't add because it doesn't exist in Crop Profile",
+                'message' => 'Validation failed',
+                'errors'  => $validator->errors()
             ], 422);
         }
 
-        // Handle image upload
-        $imageUrl = null;
-        if ($request->hasFile('image')) {
-            try {
-                Log::info('Starting Cloudinary upload for addCrop');
+        try {
+            $validated = $validator->validated();
 
-                $uploadedFile = $request->file('image');
+            $inputName = $validated["name"];
+            $baseName  = preg_replace('/\s*\d+$/', '', $inputName);
+            $baseName  = trim($baseName);
 
-                if (!$uploadedFile->isValid()) {
-                    throw new \Exception('Uploaded file is not valid');
-                }
+            $existInCropProfile = CropProfile::all()->first(function ($profile) use ($baseName) {
+                $profileBaseName = preg_replace('/\s*\d+$/', '', $profile->name);
+                $profileBaseName = trim($profileBaseName);
+                return $profileBaseName === $baseName;
+            });
 
-                Log::info('File details', [
-                    'name' => $uploadedFile->getClientOriginalName(),
-                    'size' => $uploadedFile->getSize(),
-                    'mime' => $uploadedFile->getMimeType()
-                ]);
-
-                $cloudinary = $this->getCloudinaryInstance();
-
-                $result = $cloudinary->uploadApi()->upload(
-                    $uploadedFile->getRealPath(),
-                    [
-                        'folder' => 'crops_images',
-                        'public_id' => 'crop_' . time() . '_' . uniqid(),
-                    ]
-                );
-
-                $imageUrl = $result['secure_url'];
-
-                Log::info('Cloudinary upload successful', [
-                    'url' => $imageUrl,
-                    'public_id' => $result['public_id']
-                ]);
-
-            } catch (\Exception $e) {
-                Log::error('Cloudinary upload failed', [
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
-                ]);
-
+            if (!$existInCropProfile) {
                 return response()->json([
-                    'message' => 'Failed to upload image to Cloudinary',
-                    'error' => $e->getMessage()
-                ], 500);
+                    "message" => "Can't add because it doesn't exist in Crop Profile",
+                ], 422);
             }
+
+            // Handle image upload
+            $imageUrl = null;
+            if ($request->hasFile('image')) {
+                try {
+                    Log::info('Starting Cloudinary upload for addCrop');
+
+                    $uploadedFile = $request->file('image');
+
+                    if (!$uploadedFile->isValid()) {
+                        throw new \Exception('Uploaded file is not valid');
+                    }
+
+                    Log::info('File details', [
+                        'name' => $uploadedFile->getClientOriginalName(),
+                        'size' => $uploadedFile->getSize(),
+                        'mime' => $uploadedFile->getMimeType()
+                    ]);
+
+                    $cloudinary = $this->getCloudinaryInstance();
+
+                    $result = $cloudinary->uploadApi()->upload(
+                        $uploadedFile->getRealPath(),
+                        [
+                            'folder'    => 'crops_images',
+                            'public_id' => 'crop_' . time() . '_' . uniqid(),
+                        ]
+                    );
+
+                    $imageUrl = $result['secure_url'];
+
+                    Log::info('Cloudinary upload successful', [
+                        'url'       => $imageUrl,
+                        'public_id' => $result['public_id']
+                    ]);
+
+                } catch (\Exception $e) {
+                    Log::error('Cloudinary upload failed', [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
+
+                    return response()->json([
+                        'message' => 'Failed to upload image to Cloudinary',
+                        'error'   => $e->getMessage()
+                    ], 500);
+                }
+            }
+
+            // Create crop
+            $crop = Crop::create([
+                'user_id'         => $user->id,
+                'garden_id'       => $gardenId,
+                'crop_profile_id' => $existInCropProfile->id,
+                'name'            => $validated['name'],
+                'variety'         => $validated['variety'],
+                'image'           => $imageUrl,
+                'planted_at'      => $validated['planted_date']
+            ]);
+
+
+            activity('crop')
+                ->causedBy($user)
+                ->performedOn($crop)
+                ->withProperties([
+                    'crop_name'  => $crop->name,
+                    'variety'    => $crop->variety,
+                    'garden_id'  => $gardenId,
+                    'planted_at' => $crop->planted_at,
+                    'ip'         => $request->ip(),
+                ])
+                ->log('User added a crop to garden');
+
+            $log = Activity::with('causer')->latest()->first();
+            event(new ActivityLogCreated($log));
+
+            $garden = Garden::find($gardenId);
+
+            $notificationService = new \App\Services\NotificationService();
+            $notificationService->checkCrop($crop, $user, $garden);
+
+            Log::info('Crop created successfully', ['crop_id' => $crop->id]);
+
+            return response()->json([
+                'message' => 'Crop created successfully',
+                'data'    => $crop,
+            ], 201);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to create crop', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to create crop',
+                'error'   => $e->getMessage()
+            ], 500);
         }
-
-        // Create crop
-        $crop = Crop::create([
-            'user_id' => $user->id,
-            'garden_id' => $gardenId,
-            'crop_profile_id' => $existInCropProfile->id,
-            'name' => $validated['name'],
-            'variety' => $validated['variety'],
-            'image' => $imageUrl,
-            'planted_at' => $validated['planted_date']
-        ]);
-
-        $garden = Garden::find($gardenId);
-
-        $notificationService = new \App\Services\NotificationService();
-        $notificationService->checkCrop($crop, $user, $garden);
-
-        Log::info('Crop created successfully', ['crop_id' => $crop->id]);
-
-        return response()->json([
-            'message' => 'Crop created successfully',
-            'data' => $crop,
-        ], 201);
-
-    } catch (\Exception $e) {
-        Log::error('Failed to create crop', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-
-        return response()->json([
-            'message' => 'Failed to create crop',
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
 
-    public function getCropData(Request $request, $garden_id) {
+    public function getCropData(Request $request, $garden_id)
+    {
         $crops = Crop::where('garden_id', $garden_id)->get();
 
         return response()->json([
             'message' => 'Success',
-            'data' => $crops,
+            'data'    => $crops,
         ], 201);
     }
 
-    public function generateEsp(Request $request, $gardenId) {
-        $user = $request->user();
-        $random = rand(10000, 99999);
+    public function generateEsp(Request $request, $gardenId)
+    {
+        $user   = $request->user();
+        $random  = rand(10000, 99999);
         $espName = "ESP-" . $random . "-" . $user->name;
 
         $garden = Garden::where('id', $gardenId)
-        ->where('user_id', $user->id)
-        ->first();
+            ->where('user_id', $user->id)
+            ->first();
 
         if (!$garden) {
             return response()->json([
-                "success" => false,
-                "message" => "Garden not found or you don't have permission to access it"
+                "success"  => false,
+                "message"  => "Garden not found or you don't have permission to access it"
             ], 404);
         }
 
@@ -252,18 +288,19 @@ class GardenController extends Controller
                 "message" => "1 ESP per Garden! This garden already has a device."
             ], 400);
         }
+
         try {
             $esp = Esp::create([
-                "crop_id" => null,
-                "user_id" => $user->id,
-                "garden_id" => $garden->id,
+                "crop_id"       => null,
+                "user_id"       => $user->id,
+                "garden_id"     => $garden->id,
                 "serial_number" => $espName,
-                "status" => "inactive",
+                "status"        => "inactive",
             ]);
 
-            return response()->dljson([
+            return response()->json([
                 "status" => "Success",
-                "data" => $esp,
+                "data"   => $esp,
             ], 201);
 
         } catch (\Exception $e) {
@@ -273,448 +310,477 @@ class GardenController extends Controller
         }
     }
 
-    public function claimEspDevice(Request $request, $gardenId) {
-      $user = $request->user();
+    public function claimEspDevice(Request $request, $gardenId)
+    {
+        $user = $request->user();
 
-      $validator = Validator::make($request->all(), [
-        'esp-number' => 'required'
-      ]);
+        $validator = Validator::make($request->all(), [
+            'esp-number' => 'required'
+        ]);
 
-      $garden = Garden::where('id', $gardenId)
-        ->where('user_id', $user->id)
-        ->first();
+        $garden = Garden::where('id', $gardenId)
+            ->where('user_id', $user->id)
+            ->first();
 
-      if (!$garden) {
-          return response()->json([
-              "success" => false,
-              "message" => "Garden not found or you don't have permission to access it"
-          ], 404);
-      }
+        if (!$garden) {
+            return response()->json([
+                "success" => false,
+                "message" => "Garden not found or you don't have permission to access it"
+            ], 404);
+        }
 
-      $validated = $validator->validated();
+        $validated = $validator->validated();
 
-      $esp = Esp::create([
-        "user_id" => $user->id,
-        "garden_id" => $garden->id,
-        "serial_number" => $validated['esp-number'],
-        "status" => "inactive",
-      ]);
-
+        $esp = Esp::create([
+            "user_id"       => $user->id,
+            "garden_id"     => $garden->id,
+            "serial_number" => $validated['esp-number'],
+            "status"        => "inactive",
+        ]);
     }
 
-    public function deleteEsp(Request $request, $espId) {
-      $user = $request->user();
+    public function deleteEsp(Request $request, $espId)
+    {
+        $user = $request->user();
 
-      $esp = Esp::where("user_id", $user->id)->where("id", $espId)->first();
+        $esp = Esp::where("user_id", $user->id)->where("id", $espId)->first();
 
-      $esp->delete();
+        $esp->delete();
     }
 
-    public function getEsp(Request $request, $gardenId) {
+    public function getEsp(Request $request, $gardenId)
+    {
         $user = $request->user();
 
         $esp = Esp::where("garden_id", $gardenId)->where("user_id", $user->id)->first();
 
         return response()->json([
             "message" => "Success",
-            "data" => $esp,
+            "data"    => $esp,
         ]);
     }
 
-    public function getCrops(Request $request) {
+    public function getCrops(Request $request)
+    {
         $user = $request->user();
 
         $crops = Crop::with(['garden', 'latestDetectionResult'])->where('user_id', $user->id)->get();
 
         return response()->json([
             "message" => "Success!",
-            "data" => $crops,
+            "data"    => $crops,
         ], 200);
     }
 
     public function addAdminCrop(Request $request)
     {
-         $validated = $request->validate([
-        'name' => 'required|string',
-        'soil_temp_min' => 'nullable|numeric',
-        'soil_temp_max' => 'nullable|numeric',
-        'soil_moisture_min' => 'nullable|numeric',
-        'soil_moisture_max' => 'nullable|numeric',
-        'electrical_conductivity_min' => 'nullable|numeric',
-        'electrical_conductivity_max' => 'nullable|numeric',
-        'ph_min' => 'nullable|numeric',
-        'ph_max' => 'nullable|numeric',
-        'nitrogen_min' => 'nullable|numeric',
-        'nitrogen_max' => 'nullable|numeric',
-        'phosphorus_min' => 'nullable|numeric',
-        'phosphorus_max' => 'nullable|numeric',
-        'potassium_min' => 'nullable|numeric',
-        'potassium_max' => 'nullable|numeric',
-        'air_temperature_min' => 'nullable|numeric',
-        'air_temperature_max' => 'nullable|numeric',
-        'air_humidity_min' => 'nullable|numeric',
-        'air_humidity_max' => 'nullable|numeric',
-    ]);
+        $validated = $request->validate([
+            'name'                         => 'required|string',
+            'soil_temp_min'                => 'nullable|numeric',
+            'soil_temp_max'                => 'nullable|numeric',
+            'soil_moisture_min'            => 'nullable|numeric',
+            'soil_moisture_max'            => 'nullable|numeric',
+            'electrical_conductivity_min'  => 'nullable|numeric',
+            'electrical_conductivity_max'  => 'nullable|numeric',
+            'ph_min'                       => 'nullable|numeric',
+            'ph_max'                       => 'nullable|numeric',
+            'nitrogen_min'                 => 'nullable|numeric',
+            'nitrogen_max'                 => 'nullable|numeric',
+            'phosphorus_min'               => 'nullable|numeric',
+            'phosphorus_max'               => 'nullable|numeric',
+            'potassium_min'                => 'nullable|numeric',
+            'potassium_max'                => 'nullable|numeric',
+            'air_temperature_min'          => 'nullable|numeric',
+            'air_temperature_max'          => 'nullable|numeric',
+            'air_humidity_min'             => 'nullable|numeric',
+            'air_humidity_max'             => 'nullable|numeric',
+        ]);
 
-    $cropProfile = CropProfile::create($validated);
+        $cropProfile = CropProfile::create($validated);
 
-    return response()->json([
-        'message' => 'Crop Profile created successfully!',
-        'data' => $cropProfile
-    ], 201);
+        activity('crop_profile')
+            ->causedBy($request->user())
+            ->performedOn($cropProfile)
+            ->withProperties([
+                'crop_name' => $cropProfile->name,
+                'ip'        => $request->ip(),
+            ])
+            ->log('Admin added a new crop profile');
 
-    }
+        $log = Activity::with('causer')->latest()->first();
+        event(new ActivityLogCreated($log));
 
-    public function showCropsProfile() {
-  $crops = CropProfile::all();
-
-  return response()->json([
-    "message" => "Success!",  // Changed from "status"
-    "data" => $crops,
-   ], 200);  // Changed from 201 to 200 (GET requests typically return 200)
-  }
-    public function getUserCropProfile(Request $request) {
-      $user = $request->user();
-
-      $crops = Crop::with('cropProfile')->where('user_id', $user->id)->get();
-
-      $cropProfiles = $crops->map(function($crop) {
-          if (!$crop->cropProfile) {
-              return null;
-          }
-
-          $profile = $crop->cropProfile;
-
-          return [
-
-              'name' => $profile->name ?? $crop->name ?? 'Unknown',
-              'temperature' => $profile->air_temperature_min && $profile->air_temperature_max
-                  ? "{$profile->air_temperature_min}-{$profile->air_temperature_max}°C"
-                  : 'N/A',
-              'humidity' => $profile->air_humidity_min && $profile->air_humidity_max
-                  ? "{$profile->air_humidity_min}-{$profile->air_humidity_max}%"
-                  : 'N/A',
-              'soilPH' => $profile->ph_min && $profile->ph_max
-                  ? "{$profile->ph_min}-{$profile->ph_max}"
-                  : 'N/A',
-              'ec' => $profile->electrical_conductivity_min && $profile->electrical_conductivity_max
-                  ? "{$profile->electrical_conductivity_min}-{$profile->electrical_conductivity_max}"
-                  : 'N/A',
-              'npk' => $profile->nitrogen_min && $profile->phosphorus_min && $profile->potassium_min
-                  ? "{$profile->nitrogen_min}-{$profile->phosphorus_min}-{$profile->potassium_min}"
-                  : 'N/A',
-          ];
-      })->filter()->values();
-
-      return response()->json($cropProfiles, 200);
-  }
-
-  public function getSensorDataCrop(Request $request, $garden_id, $crop) {
-    $user = $request->user();
-
-    // Get crop with profile and ALL detection results (not just latest)
-    $cropSensor = Crop::with([
-        'cropProfile',
-        'detectionResults' => function($query) {
-            $query->orderBy('created_at', 'desc')->limit(10); // Get last 10 detections
-        }
-    ])
-        ->where('user_id', $user->id)
-        ->where('garden_id', $garden_id)
-        ->where('name', $crop)
-        ->first();
-
-    if (!$cropSensor) {
         return response()->json([
-            'success' => false,
-            'message' => 'Crop not found'
-        ], 404);
+            'message' => 'Crop Profile created successfully!',
+            'data'    => $cropProfile
+        ], 201);
     }
 
-    // Now check for ESP device
-    $esp = Esp::where('garden_id', $garden_id)
-        ->where('user_id', $user->id)
-        ->first();
+    public function showCropsProfile()
+    {
+        $crops = CropProfile::all();
 
-    if (!$esp) {
         return response()->json([
-            'success' => false,
-            'message' => 'ESP device not found for this garden'
-        ], 404);
+            "message" => "Success!",
+            "data"    => $crops,
+        ], 200);
     }
 
+    public function getUserCropProfile(Request $request)
+    {
+        $user = $request->user();
 
-    $latestData = SensorData::with('crop')
-      ->where('esp_id', $esp->id)
-      ->where('crop_id', $cropSensor->id)
-      ->orderBy('created_at', 'desc')
-      ->first();
+        $crops = Crop::with('cropProfile')->where('user_id', $user->id)->get();
 
-
-    $allData = SensorData::where('esp_id', $esp->id)
-        ->where('crop_id', $cropSensor->id)
-        ->orderBy('created_at', 'desc')
-        ->limit(50)
-        ->get();
-
-    $alerts = [];
-    $profile = $cropSensor->cropProfile;
-
-    // Generate alerts only if we have both data and profile
-    if ($latestData && $profile) {
-        // Soil Moisture Alert
-        if ($latestData->soil_moisture < $profile->soil_moisture_min) {
-            $alerts[] = [
-                'type' => 'soil_moisture',
-                'message' => "Low soil moisture detected ({$latestData->soil_moisture}%). Optimal range: {$profile->soil_moisture_min}-{$profile->soil_moisture_max}%. Consider watering.",
-                'severity' => 'high',
-                'current_value' => $latestData->soil_moisture,
-                'expected_range' => "{$profile->soil_moisture_min}-{$profile->soil_moisture_max}",
-                'timestamp' => $latestData->created_at
-            ];
-        } elseif ($latestData->soil_moisture > $profile->soil_moisture_max) {
-            $alerts[] = [
-                'type' => 'soil_moisture',
-                'message' => "High soil moisture detected ({$latestData->soil_moisture}%). Optimal range: {$profile->soil_moisture_min}-{$profile->soil_moisture_max}%. Check for overwatering.",
-                'severity' => 'medium',
-                'current_value' => $latestData->soil_moisture,
-                'expected_range' => "{$profile->soil_moisture_min}-{$profile->soil_moisture_max}",
-                'timestamp' => $latestData->created_at
-            ];
-        }
-
-        // pH Alert
-        if ($latestData->ph < $profile->ph_min || $latestData->ph > $profile->ph_max) {
-            $severity = ($latestData->ph < $profile->ph_min - 0.5 || $latestData->ph > $profile->ph_max + 0.5) ? 'high' : 'medium';
-            $alerts[] = [
-                'type' => 'ph',
-                'message' => "Soil pH ({$latestData->ph}) is outside optimal range ({$profile->ph_min}-{$profile->ph_max}).",
-                'severity' => $severity,
-                'current_value' => $latestData->ph,
-                'expected_range' => "{$profile->ph_min}-{$profile->ph_max}",
-                'timestamp' => $latestData->created_at
-            ];
-        }
-
-        // Soil Temperature Alert
-        if ($latestData->soil_temperature < $profile->soil_temp_min) {
-            $alerts[] = [
-                'type' => 'soil_temperature',
-                'message' => "Low soil temperature detected ({$latestData->soil_temperature}°C). Optimal range: {$profile->soil_temp_min}-{$profile->soil_temp_max}°C.",
-                'severity' => 'medium',
-                'current_value' => $latestData->soil_temperature,
-                'expected_range' => "{$profile->soil_temp_min}-{$profile->soil_temp_max}",
-                'timestamp' => $latestData->created_at
-            ];
-        } elseif ($latestData->soil_temperature > $profile->soil_temp_max) {
-            $alerts[] = [
-                'type' => 'soil_temperature',
-                'message' => "High soil temperature detected ({$latestData->soil_temperature}°C). Optimal range: {$profile->soil_temp_min}-{$profile->soil_temp_max}°C.",
-                'severity' => 'high',
-                'current_value' => $latestData->soil_temperature,
-                'expected_range' => "{$profile->soil_temp_min}-{$profile->soil_temp_max}",
-                'timestamp' => $latestData->created_at
-            ];
-        }
-
-        // Nitrogen Alert
-        if ($latestData->nitrogen < $profile->nitrogen_min) {
-            $alerts[] = [
-                'type' => 'nitrogen',
-                'message' => "Low nitrogen levels ({$latestData->nitrogen}). Optimal range: {$profile->nitrogen_min}-{$profile->nitrogen_max}. Nitrogen fertilizer recommended.",
-                'severity' => 'high',
-                'current_value' => $latestData->nitrogen,
-                'expected_range' => "{$profile->nitrogen_min}-{$profile->nitrogen_max}",
-                'timestamp' => $latestData->created_at
-            ];
-        } elseif ($latestData->nitrogen > $profile->nitrogen_max) {
-            $alerts[] = [
-                'type' => 'nitrogen',
-                'message' => "High nitrogen levels ({$latestData->nitrogen}). Optimal range: {$profile->nitrogen_min}-{$profile->nitrogen_max}.",
-                'severity' => 'medium',
-                'current_value' => $latestData->nitrogen,
-                'expected_range' => "{$profile->nitrogen_min}-{$profile->nitrogen_max}",
-                'timestamp' => $latestData->created_at
-            ];
-        }
-
-        // Phosphorus Alert
-        if ($latestData->phosphorus < $profile->phosphorus_min) {
-            $alerts[] = [
-                'type' => 'phosphorus',
-                'message' => "Low phosphorus levels ({$latestData->phosphorus}). Optimal range: {$profile->phosphorus_min}-{$profile->phosphorus_max}. Phosphorus fertilizer recommended.",
-                'severity' => 'high',
-                'current_value' => $latestData->phosphorus,
-                'expected_range' => "{$profile->phosphorus_min}-{$profile->phosphorus_max}",
-                'timestamp' => $latestData->created_at
-            ];
-        } elseif ($latestData->phosphorus > $profile->phosphorus_max) {
-            $alerts[] = [
-                'type' => 'phosphorus',
-                'message' => "High phosphorus levels ({$latestData->phosphorus}). Optimal range: {$profile->phosphorus_min}-{$profile->phosphorus_max}.",
-                'severity' => 'medium',
-                'current_value' => $latestData->phosphorus,
-                'expected_range' => "{$profile->phosphorus_min}-{$profile->phosphorus_max}",
-                'timestamp' => $latestData->created_at
-            ];
-        }
-
-        // Potassium Alert
-        if ($latestData->potassium < $profile->potassium_min) {
-            $alerts[] = [
-                'type' => 'potassium',
-                'message' => "Low potassium levels ({$latestData->potassium}). Optimal range: {$profile->potassium_min}-{$profile->potassium_max}. Potassium fertilizer recommended.",
-                'severity' => 'high',
-                'current_value' => $latestData->potassium,
-                'expected_range' => "{$profile->potassium_min}-{$profile->potassium_max}",
-                'timestamp' => $latestData->created_at
-            ];
-        } elseif ($latestData->potassium > $profile->potassium_max) {
-            $alerts[] = [
-                'type' => 'potassium',
-                'message' => "High potassium levels ({$latestData->potassium}). Optimal range: {$profile->potassium_min}-{$profile->potassium_max}.",
-                'severity' => 'medium',
-                'current_value' => $latestData->potassium,
-                'expected_range' => "{$profile->potassium_min}-{$profile->potassium_max}",
-                'timestamp' => $latestData->created_at
-            ];
-        }
-
-        // Electrical Conductivity Alert
-        if (isset($latestData->electrical_conductivity) &&
-            isset($profile->electrical_conductivity_min) &&
-            isset($profile->electrical_conductivity_max)) {
-            if ($latestData->electrical_conductivity < $profile->electrical_conductivity_min) {
-                $alerts[] = [
-                    'type' => 'electrical_conductivity',
-                    'message' => "Low electrical conductivity ({$latestData->electrical_conductivity}). Optimal range: {$profile->electrical_conductivity_min}-{$profile->electrical_conductivity_max}.",
-                    'severity' => 'medium',
-                    'current_value' => $latestData->electrical_conductivity,
-                    'expected_range' => "{$profile->electrical_conductivity_min}-{$profile->electrical_conductivity_max}",
-                    'timestamp' => $latestData->created_at
-                ];
-            } elseif ($latestData->electrical_conductivity > $profile->electrical_conductivity_max) {
-                $alerts[] = [
-                    'type' => 'electrical_conductivity',
-                    'message' => "High electrical conductivity ({$latestData->electrical_conductivity}). Optimal range: {$profile->electrical_conductivity_min}-{$profile->electrical_conductivity_max}.",
-                    'severity' => 'medium',
-                    'current_value' => $latestData->electrical_conductivity,
-                    'expected_range' => "{$profile->electrical_conductivity_min}-{$profile->electrical_conductivity_max}",
-                    'timestamp' => $latestData->created_at
-                ];
+        $cropProfiles = $crops->map(function ($crop) {
+            if (!$crop->cropProfile) {
+                return null;
             }
-        }
 
-        // Air Temperature Alert
-        if (isset($latestData->air_temperature) &&
-            isset($profile->air_temperature_min) &&
-            isset($profile->air_temperature_max)) {
-            if ($latestData->air_temperature < $profile->air_temperature_min) {
-                $alerts[] = [
-                    'type' => 'air_temperature',
-                    'message' => "Low air temperature ({$latestData->air_temperature}°C). Optimal range: {$profile->air_temperature_min}-{$profile->air_temperature_max}°C.",
-                    'severity' => 'medium',
-                    'current_value' => $latestData->air_temperature,
-                    'expected_range' => "{$profile->air_temperature_min}-{$profile->air_temperature_max}",
-                    'timestamp' => $latestData->created_at
-                ];
-            } elseif ($latestData->air_temperature > $profile->air_temperature_max) {
-                $alerts[] = [
-                    'type' => 'air_temperature',
-                    'message' => "High air temperature ({$latestData->air_temperature}°C). Optimal range: {$profile->air_temperature_min}-{$profile->air_temperature_max}°C.",
-                    'severity' => 'high',
-                    'current_value' => $latestData->air_temperature,
-                    'expected_range' => "{$profile->air_temperature_min}-{$profile->air_temperature_max}",
-                    'timestamp' => $latestData->created_at
-                ];
-            }
-        }
+            $profile = $crop->cropProfile;
 
-        // Air Humidity Alert
-        if (isset($latestData->air_humidity) &&
-            isset($profile->air_humidity_min) &&
-            isset($profile->air_humidity_max)) {
-            if ($latestData->air_humidity < $profile->air_humidity_min) {
-                $alerts[] = [
-                    'type' => 'air_humidity',
-                    'message' => "Low air humidity ({$latestData->air_humidity}%). Optimal range: {$profile->air_humidity_min}-{$profile->air_humidity_max}%.",
-                    'severity' => 'medium',
-                    'current_value' => $latestData->air_humidity,
-                    'expected_range' => "{$profile->air_humidity_min}-{$profile->air_humidity_max}",
-                    'timestamp' => $latestData->created_at
-                ];
-            } elseif ($latestData->air_humidity > $profile->air_humidity_max) {
-                $alerts[] = [
-                    'type' => 'air_humidity',
-                    'message' => "High air humidity ({$latestData->air_humidity}%). Optimal range: {$profile->air_humidity_min}-{$profile->air_humidity_max}%.",
-                    'severity' => 'medium',
-                    'current_value' => $latestData->air_humidity,
-                    'expected_range' => "{$profile->air_humidity_min}-{$profile->air_humidity_max}",
-                    'timestamp' => $latestData->created_at
-                ];
-            }
-        }
+            return [
+                'name'        => $profile->name ?? $crop->name ?? 'Unknown',
+                'temperature' => $profile->air_temperature_min && $profile->air_temperature_max
+                    ? "{$profile->air_temperature_min}-{$profile->air_temperature_max}°C"
+                    : 'N/A',
+                'humidity'    => $profile->air_humidity_min && $profile->air_humidity_max
+                    ? "{$profile->air_humidity_min}-{$profile->air_humidity_max}%"
+                    : 'N/A',
+                'soilPH'      => $profile->ph_min && $profile->ph_max
+                    ? "{$profile->ph_min}-{$profile->ph_max}"
+                    : 'N/A',
+                'ec'          => $profile->electrical_conductivity_min && $profile->electrical_conductivity_max
+                    ? "{$profile->electrical_conductivity_min}-{$profile->electrical_conductivity_max}"
+                    : 'N/A',
+                'npk'         => $profile->nitrogen_min && $profile->phosphorus_min && $profile->potassium_min
+                    ? "{$profile->nitrogen_min}-{$profile->phosphorus_min}-{$profile->potassium_min}"
+                    : 'N/A',
+            ];
+        })->filter()->values();
+
+        return response()->json($cropProfiles, 200);
     }
 
-    // IMPORTANT: Add detection_results to the crop object
-    // This makes it accessible as cropInfo.detection_results in React
-    $cropData = $cropSensor->toArray();
-    $cropData['detection_results'] = $cropSensor->detectionResults; // Add the relationship
+    public function getSensorDataCrop(Request $request, $garden_id, $crop)
+    {
+        $user = $request->user();
 
-    return response()->json([
-        'success' => true,
-        'data' => [
-            'crop' => $cropData,
-            'crop_profile' => $profile,
-            'latest' => $latestData,
-            'history' => $allData,
-            'alerts' => $alerts
-        ]
-    ], 200);
-}
+        $cropSensor = Crop::with([
+            'cropProfile',
+            'detectionResults' => function ($query) {
+                $query->orderBy('created_at', 'desc')->limit(10);
+            }
+        ])
+            ->where('user_id', $user->id)
+            ->where('garden_id', $garden_id)
+            ->where('name', $crop)
+            ->first();
 
-    public function userGardenDelete(Request $request, $garden_id) {
-      $user = $request->user();
+        if (!$cropSensor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Crop not found'
+            ], 404);
+        }
 
-      $garden = Garden::where('user_id', $user->id)->find($garden_id);
+        $esp = Esp::where('garden_id', $garden_id)
+            ->where('user_id', $user->id)
+            ->first();
 
-      if (!$garden) {
-          return response()->json([
-              'message' => 'Garden not found or you do not have permission to delete it'
-          ], 404);
-      }
+        if (!$esp) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ESP device not found for this garden'
+            ], 404);
+        }
 
-      $garden->delete();
+        $latestData = SensorData::with('crop')
+            ->where('esp_id', $esp->id)
+            ->where('crop_id', $cropSensor->id)
+            ->orderBy('created_at', 'desc')
+            ->first();
 
-      $notificationService = new NotificationService();
-      $notificationService->deleteGarden($garden, $user);
+        $allData = SensorData::where('esp_id', $esp->id)
+            ->where('crop_id', $cropSensor->id)
+            ->orderBy('created_at', 'desc')
+            ->limit(50)
+            ->get();
 
-      return response()->json([
-          'message' => 'Garden deleted successfully'
-      ], 200);
+        $alerts  = [];
+        $profile = $cropSensor->cropProfile;
 
+        if ($latestData && $profile) {
+            // Soil Moisture Alert
+            if ($latestData->soil_moisture < $profile->soil_moisture_min) {
+                $alerts[] = [
+                    'type'           => 'soil_moisture',
+                    'message'        => "Low soil moisture detected ({$latestData->soil_moisture}%). Optimal range: {$profile->soil_moisture_min}-{$profile->soil_moisture_max}%. Consider watering.",
+                    'severity'       => 'high',
+                    'current_value'  => $latestData->soil_moisture,
+                    'expected_range' => "{$profile->soil_moisture_min}-{$profile->soil_moisture_max}",
+                    'timestamp'      => $latestData->created_at
+                ];
+            } elseif ($latestData->soil_moisture > $profile->soil_moisture_max) {
+                $alerts[] = [
+                    'type'           => 'soil_moisture',
+                    'message'        => "High soil moisture detected ({$latestData->soil_moisture}%). Optimal range: {$profile->soil_moisture_min}-{$profile->soil_moisture_max}%. Check for overwatering.",
+                    'severity'       => 'medium',
+                    'current_value'  => $latestData->soil_moisture,
+                    'expected_range' => "{$profile->soil_moisture_min}-{$profile->soil_moisture_max}",
+                    'timestamp'      => $latestData->created_at
+                ];
+            }
+
+            // pH Alert
+            if ($latestData->ph < $profile->ph_min || $latestData->ph > $profile->ph_max) {
+                $severity = ($latestData->ph < $profile->ph_min - 0.5 || $latestData->ph > $profile->ph_max + 0.5) ? 'high' : 'medium';
+                $alerts[] = [
+                    'type'           => 'ph',
+                    'message'        => "Soil pH ({$latestData->ph}) is outside optimal range ({$profile->ph_min}-{$profile->ph_max}).",
+                    'severity'       => $severity,
+                    'current_value'  => $latestData->ph,
+                    'expected_range' => "{$profile->ph_min}-{$profile->ph_max}",
+                    'timestamp'      => $latestData->created_at
+                ];
+            }
+
+            // Soil Temperature Alert
+            if ($latestData->soil_temperature < $profile->soil_temp_min) {
+                $alerts[] = [
+                    'type'           => 'soil_temperature',
+                    'message'        => "Low soil temperature detected ({$latestData->soil_temperature}°C). Optimal range: {$profile->soil_temp_min}-{$profile->soil_temp_max}°C.",
+                    'severity'       => 'medium',
+                    'current_value'  => $latestData->soil_temperature,
+                    'expected_range' => "{$profile->soil_temp_min}-{$profile->soil_temp_max}",
+                    'timestamp'      => $latestData->created_at
+                ];
+            } elseif ($latestData->soil_temperature > $profile->soil_temp_max) {
+                $alerts[] = [
+                    'type'           => 'soil_temperature',
+                    'message'        => "High soil temperature detected ({$latestData->soil_temperature}°C). Optimal range: {$profile->soil_temp_min}-{$profile->soil_temp_max}°C.",
+                    'severity'       => 'high',
+                    'current_value'  => $latestData->soil_temperature,
+                    'expected_range' => "{$profile->soil_temp_min}-{$profile->soil_temp_max}",
+                    'timestamp'      => $latestData->created_at
+                ];
+            }
+
+            // Nitrogen Alert
+            if ($latestData->nitrogen < $profile->nitrogen_min) {
+                $alerts[] = [
+                    'type'           => 'nitrogen',
+                    'message'        => "Low nitrogen levels ({$latestData->nitrogen}). Optimal range: {$profile->nitrogen_min}-{$profile->nitrogen_max}. Nitrogen fertilizer recommended.",
+                    'severity'       => 'high',
+                    'current_value'  => $latestData->nitrogen,
+                    'expected_range' => "{$profile->nitrogen_min}-{$profile->nitrogen_max}",
+                    'timestamp'      => $latestData->created_at
+                ];
+            } elseif ($latestData->nitrogen > $profile->nitrogen_max) {
+                $alerts[] = [
+                    'type'           => 'nitrogen',
+                    'message'        => "High nitrogen levels ({$latestData->nitrogen}). Optimal range: {$profile->nitrogen_min}-{$profile->nitrogen_max}.",
+                    'severity'       => 'medium',
+                    'current_value'  => $latestData->nitrogen,
+                    'expected_range' => "{$profile->nitrogen_min}-{$profile->nitrogen_max}",
+                    'timestamp'      => $latestData->created_at
+                ];
+            }
+
+            // Phosphorus Alert
+            if ($latestData->phosphorus < $profile->phosphorus_min) {
+                $alerts[] = [
+                    'type'           => 'phosphorus',
+                    'message'        => "Low phosphorus levels ({$latestData->phosphorus}). Optimal range: {$profile->phosphorus_min}-{$profile->phosphorus_max}. Phosphorus fertilizer recommended.",
+                    'severity'       => 'high',
+                    'current_value'  => $latestData->phosphorus,
+                    'expected_range' => "{$profile->phosphorus_min}-{$profile->phosphorus_max}",
+                    'timestamp'      => $latestData->created_at
+                ];
+            } elseif ($latestData->phosphorus > $profile->phosphorus_max) {
+                $alerts[] = [
+                    'type'           => 'phosphorus',
+                    'message'        => "High phosphorus levels ({$latestData->phosphorus}). Optimal range: {$profile->phosphorus_min}-{$profile->phosphorus_max}.",
+                    'severity'       => 'medium',
+                    'current_value'  => $latestData->phosphorus,
+                    'expected_range' => "{$profile->phosphorus_min}-{$profile->phosphorus_max}",
+                    'timestamp'      => $latestData->created_at
+                ];
+            }
+
+            // Potassium Alert
+            if ($latestData->potassium < $profile->potassium_min) {
+                $alerts[] = [
+                    'type'           => 'potassium',
+                    'message'        => "Low potassium levels ({$latestData->potassium}). Optimal range: {$profile->potassium_min}-{$profile->potassium_max}. Potassium fertilizer recommended.",
+                    'severity'       => 'high',
+                    'current_value'  => $latestData->potassium,
+                    'expected_range' => "{$profile->potassium_min}-{$profile->potassium_max}",
+                    'timestamp'      => $latestData->created_at
+                ];
+            } elseif ($latestData->potassium > $profile->potassium_max) {
+                $alerts[] = [
+                    'type'           => 'potassium',
+                    'message'        => "High potassium levels ({$latestData->potassium}). Optimal range: {$profile->potassium_min}-{$profile->potassium_max}.",
+                    'severity'       => 'medium',
+                    'current_value'  => $latestData->potassium,
+                    'expected_range' => "{$profile->potassium_min}-{$profile->potassium_max}",
+                    'timestamp'      => $latestData->created_at
+                ];
+            }
+
+            // Electrical Conductivity Alert
+            if (
+                isset($latestData->electrical_conductivity) &&
+                isset($profile->electrical_conductivity_min) &&
+                isset($profile->electrical_conductivity_max)
+            ) {
+                if ($latestData->electrical_conductivity < $profile->electrical_conductivity_min) {
+                    $alerts[] = [
+                        'type'           => 'electrical_conductivity',
+                        'message'        => "Low electrical conductivity ({$latestData->electrical_conductivity}). Optimal range: {$profile->electrical_conductivity_min}-{$profile->electrical_conductivity_max}.",
+                        'severity'       => 'medium',
+                        'current_value'  => $latestData->electrical_conductivity,
+                        'expected_range' => "{$profile->electrical_conductivity_min}-{$profile->electrical_conductivity_max}",
+                        'timestamp'      => $latestData->created_at
+                    ];
+                } elseif ($latestData->electrical_conductivity > $profile->electrical_conductivity_max) {
+                    $alerts[] = [
+                        'type'           => 'electrical_conductivity',
+                        'message'        => "High electrical conductivity ({$latestData->electrical_conductivity}). Optimal range: {$profile->electrical_conductivity_min}-{$profile->electrical_conductivity_max}.",
+                        'severity'       => 'medium',
+                        'current_value'  => $latestData->electrical_conductivity,
+                        'expected_range' => "{$profile->electrical_conductivity_min}-{$profile->electrical_conductivity_max}",
+                        'timestamp'      => $latestData->created_at
+                    ];
+                }
+            }
+
+            // Air Temperature Alert
+            if (
+                isset($latestData->air_temperature) &&
+                isset($profile->air_temperature_min) &&
+                isset($profile->air_temperature_max)
+            ) {
+                if ($latestData->air_temperature < $profile->air_temperature_min) {
+                    $alerts[] = [
+                        'type'           => 'air_temperature',
+                        'message'        => "Low air temperature ({$latestData->air_temperature}°C). Optimal range: {$profile->air_temperature_min}-{$profile->air_temperature_max}°C.",
+                        'severity'       => 'medium',
+                        'current_value'  => $latestData->air_temperature,
+                        'expected_range' => "{$profile->air_temperature_min}-{$profile->air_temperature_max}",
+                        'timestamp'      => $latestData->created_at
+                    ];
+                } elseif ($latestData->air_temperature > $profile->air_temperature_max) {
+                    $alerts[] = [
+                        'type'           => 'air_temperature',
+                        'message'        => "High air temperature ({$latestData->air_temperature}°C). Optimal range: {$profile->air_temperature_min}-{$profile->air_temperature_max}°C.",
+                        'severity'       => 'high',
+                        'current_value'  => $latestData->air_temperature,
+                        'expected_range' => "{$profile->air_temperature_min}-{$profile->air_temperature_max}",
+                        'timestamp'      => $latestData->created_at
+                    ];
+                }
+            }
+
+            // Air Humidity Alert
+            if (
+                isset($latestData->air_humidity) &&
+                isset($profile->air_humidity_min) &&
+                isset($profile->air_humidity_max)
+            ) {
+                if ($latestData->air_humidity < $profile->air_humidity_min) {
+                    $alerts[] = [
+                        'type'           => 'air_humidity',
+                        'message'        => "Low air humidity ({$latestData->air_humidity}%). Optimal range: {$profile->air_humidity_min}-{$profile->air_humidity_max}%.",
+                        'severity'       => 'medium',
+                        'current_value'  => $latestData->air_humidity,
+                        'expected_range' => "{$profile->air_humidity_min}-{$profile->air_humidity_max}",
+                        'timestamp'      => $latestData->created_at
+                    ];
+                } elseif ($latestData->air_humidity > $profile->air_humidity_max) {
+                    $alerts[] = [
+                        'type'           => 'air_humidity',
+                        'message'        => "High air humidity ({$latestData->air_humidity}%). Optimal range: {$profile->air_humidity_min}-{$profile->air_humidity_max}%.",
+                        'severity'       => 'medium',
+                        'current_value'  => $latestData->air_humidity,
+                        'expected_range' => "{$profile->air_humidity_min}-{$profile->air_humidity_max}",
+                        'timestamp'      => $latestData->created_at
+                    ];
+                }
+            }
+        }
+
+        $cropData                     = $cropSensor->toArray();
+        $cropData['detection_results'] = $cropSensor->detectionResults;
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'crop'         => $cropData,
+                'crop_profile' => $profile,
+                'latest'       => $latestData,
+                'history'      => $allData,
+                'alerts'       => $alerts
+            ]
+        ], 200);
+    }
+
+    public function userGardenDelete(Request $request, $garden_id)
+    {
+        $user = $request->user();
+
+        $garden = Garden::where('user_id', $user->id)->find($garden_id);
+
+        if (!$garden) {
+            return response()->json([
+                'message' => 'Garden not found or you do not have permission to delete it'
+            ], 404);
+        }
+
+        // ✅ Activity Log: Garden Deleted
+        activity('garden')
+            ->causedBy($user)
+            ->performedOn($garden)
+            ->withProperties([
+                'garden_name' => $garden->name,
+                'location'    => $garden->location,
+                'ip'          => $request->ip(),
+            ])
+            ->log('User deleted a garden');
+          $log = Activity::with('causer')->latest()->first();
+          event(new ActivityLogCreated($log));
+
+        $garden->delete();
+
+        $notificationService = new NotificationService();
+        $notificationService->deleteGarden($garden, $user);
+
+        return response()->json([
+            'message' => 'Garden deleted successfully'
+        ], 200);
     }
 
     public function updateCrop(Request $request, $crop_id)
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'variety' => 'required|string|max:255',
+            'name'         => 'required|string|max:255',
+            'variety'      => 'required|string|max:255',
             'planted_date' => 'required|date',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120'
+            'image'        => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120'
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors()
             ], 422);
         }
 
         try {
             $user = $request->user();
 
-            $crop = Crop::whereHas('garden', function($query) use ($user) {
+            $crop = Crop::whereHas('garden', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             })->find($crop_id);
 
@@ -735,14 +801,12 @@ class GardenController extends Controller
                         throw new \Exception('Uploaded file is not valid');
                     }
 
-                    // Get Cloudinary instance
                     $cloudinary = $this->getCloudinaryInstance();
 
-                    // Upload to Cloudinary
                     $result = $cloudinary->uploadApi()->upload(
                         $uploadedFile->getRealPath(),
                         [
-                            'folder' => 'crops_images',
+                            'folder'    => 'crops_images',
                             'public_id' => 'crop_' . time() . '_' . uniqid(),
                         ]
                     );
@@ -761,21 +825,36 @@ class GardenController extends Controller
 
                     return response()->json([
                         'message' => 'Failed to upload image',
-                        'error' => $e->getMessage()
+                        'error'   => $e->getMessage()
                     ], 500);
                 }
             }
 
-            $crop->name = $request->name;
-            $crop->variety = $request->variety;
+            $crop->name       = $request->name;
+            $crop->variety    = $request->variety;
             $crop->planted_at = $request->planted_date;
             $crop->save();
+
+            // ✅ Activity Log: Crop Updated
+            activity('crop')
+                ->causedBy($user)
+                ->performedOn($crop)
+                ->withProperties([
+                    'crop_name'  => $crop->name,
+                    'variety'    => $crop->variety,
+                    'planted_at' => $crop->planted_at,
+                    'ip'         => $request->ip(),
+                ])
+                ->log('User updated a crop');
+
+            $log = Activity::with('causer')->latest()->first();
+            event(new ActivityLogCreated($log));
 
             Log::info('Crop updated successfully', ['crop_id' => $crop_id]);
 
             return response()->json([
                 'message' => 'Crop updated successfully',
-                'data' => $crop
+                'data'    => $crop
             ], 200);
 
         } catch (\Exception $e) {
@@ -786,7 +865,7 @@ class GardenController extends Controller
 
             return response()->json([
                 'message' => 'Failed to update crop',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage()
             ], 500);
         }
     }
@@ -796,7 +875,7 @@ class GardenController extends Controller
         try {
             $user = $request->user();
 
-            $crop = Crop::whereHas('garden', function($query) use ($user) {
+            $crop = Crop::whereHas('garden', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             })->find($crop_id);
 
@@ -806,8 +885,21 @@ class GardenController extends Controller
                 ], 404);
             }
 
-            $cropName = $crop->name;
             $garden = $crop->garden;
+
+            // ✅ Activity Log: Crop Deleted (log BEFORE delete so model still exists)
+            activity('crop')
+                ->causedBy($user)
+                ->performedOn($crop)
+                ->withProperties([
+                    'crop_name' => $crop->name,
+                    'variety'   => $crop->variety,
+                    'garden_id' => $crop->garden_id,
+                    'ip'        => $request->ip(),
+                ])
+                ->log('User deleted a crop');
+            $log = Activity::with('causer')->latest()->first();
+            event(new ActivityLogCreated($log));
 
             $crop->delete();
 
@@ -825,7 +917,7 @@ class GardenController extends Controller
 
             return response()->json([
                 'message' => 'Failed to delete crop',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage()
             ], 500);
         }
     }
@@ -842,71 +934,85 @@ class GardenController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255|unique:crops,name,' . $id,
-            'soil_temp_min' => 'required|numeric',
-            'soil_temp_max' => 'required|numeric|gte:soil_temp_min',
-            'soil_moisture_min' => 'required|numeric|min:0|max:100',
-            'soil_moisture_max' => 'required|numeric|gte:soil_moisture_min|max:100',
-            'ph_min' => 'required|numeric|min:0|max:14',
-            'ph_max' => 'required|numeric|gte:ph_min|max:14',
-            'electrical_conductivity_min' => 'required|numeric|min:0',
-            'electrical_conductivity_max' => 'required|numeric|gte:electrical_conductivity_min',
-            'nitrogen_min' => 'required|numeric|min:0',
-            'nitrogen_max' => 'required|numeric|gte:nitrogen_min',
-            'phosphorus_min' => 'required|numeric|min:0',
-            'phosphorus_max' => 'required|numeric|gte:phosphorus_min',
-            'potassium_min' => 'required|numeric|min:0',
-            'potassium_max' => 'required|numeric|gte:potassium_min',
-            'air_temperature_min' => 'required|numeric',
-            'air_temperature_max' => 'required|numeric|gte:air_temperature_min',
-            'air_humidity_min' => 'required|numeric|min:0|max:100',
-            'air_humidity_max' => 'required|numeric|gte:air_humidity_min|max:100',
+            'name'                         => 'required|string|max:255|unique:crops,name,' . $id,
+            'soil_temp_min'                => 'required|numeric',
+            'soil_temp_max'                => 'required|numeric|gte:soil_temp_min',
+            'soil_moisture_min'            => 'required|numeric|min:0|max:100',
+            'soil_moisture_max'            => 'required|numeric|gte:soil_moisture_min|max:100',
+            'ph_min'                       => 'required|numeric|min:0|max:14',
+            'ph_max'                       => 'required|numeric|gte:ph_min|max:14',
+            'electrical_conductivity_min'  => 'required|numeric|min:0',
+            'electrical_conductivity_max'  => 'required|numeric|gte:electrical_conductivity_min',
+            'nitrogen_min'                 => 'required|numeric|min:0',
+            'nitrogen_max'                 => 'required|numeric|gte:nitrogen_min',
+            'phosphorus_min'               => 'required|numeric|min:0',
+            'phosphorus_max'               => 'required|numeric|gte:phosphorus_min',
+            'potassium_min'                => 'required|numeric|min:0',
+            'potassium_max'                => 'required|numeric|gte:potassium_min',
+            'air_temperature_min'          => 'required|numeric',
+            'air_temperature_max'          => 'required|numeric|gte:air_temperature_min',
+            'air_humidity_min'             => 'required|numeric|min:0|max:100',
+            'air_humidity_max'             => 'required|numeric|gte:air_humidity_min|max:100',
         ], [
             'name.unique' => 'This crop name is already taken',
-            '*.gte' => 'Maximum value must be greater than or equal to minimum value',
+            '*.gte'       => 'Maximum value must be greater than or equal to minimum value',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors()
             ], 422);
         }
 
         try {
             $crop->update([
-                'name' => $request->name,
-                'soil_temp_min' => $request->soil_temp_min,
-                'soil_temp_max' => $request->soil_temp_max,
-                'soil_moisture_min' => $request->soil_moisture_min,
-                'soil_moisture_max' => $request->soil_moisture_max,
-                'ph_min' => $request->ph_min,
-                'ph_max' => $request->ph_max,
+                'name'                        => $request->name,
+                'soil_temp_min'               => $request->soil_temp_min,
+                'soil_temp_max'               => $request->soil_temp_max,
+                'soil_moisture_min'           => $request->soil_moisture_min,
+                'soil_moisture_max'           => $request->soil_moisture_max,
+                'ph_min'                      => $request->ph_min,
+                'ph_max'                      => $request->ph_max,
                 'electrical_conductivity_min' => $request->electrical_conductivity_min,
                 'electrical_conductivity_max' => $request->electrical_conductivity_max,
-                'nitrogen_min' => $request->nitrogen_min,
-                'nitrogen_max' => $request->nitrogen_max,
-                'phosphorus_min' => $request->phosphorus_min,
-                'phosphorus_max' => $request->phosphorus_max,
-                'potassium_min' => $request->potassium_min,
-                'potassium_max' => $request->potassium_max,
-                'air_temperature_min' => $request->air_temperature_min,
-                'air_temperature_max' => $request->air_temperature_max,
-                'air_humidity_min' => $request->air_humidity_min,
-                'air_humidity_max' => $request->air_humidity_max,
+                'nitrogen_min'                => $request->nitrogen_min,
+                'nitrogen_max'                => $request->nitrogen_max,
+                'phosphorus_min'              => $request->phosphorus_min,
+                'phosphorus_max'              => $request->phosphorus_max,
+                'potassium_min'               => $request->potassium_min,
+                'potassium_max'               => $request->potassium_max,
+                'air_temperature_min'         => $request->air_temperature_min,
+                'air_temperature_max'         => $request->air_temperature_max,
+                'air_humidity_min'            => $request->air_humidity_min,
+                'air_humidity_max'            => $request->air_humidity_max,
             ]);
+
+            // ✅ Activity Log: Admin updated a crop profile
+            activity('crop_profile')
+                ->causedBy($request->user())
+                ->performedOn($crop)
+                ->withProperties([
+                    'crop_name' => $crop->name,
+                    'ip'        => $request->ip(),
+                ])
+                ->log('Admin updated a crop profile');
+
+            $log = Activity::with('causer')->latest()->first();
+            event(new ActivityLogCreated($log));
 
             return response()->json([
                 'success' => true,
                 'message' => 'Crop updated successfully',
-                'data' => $crop
+                'data'    => $crop
             ], 200);
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update crop',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage()
             ], 500);
         }
     }
@@ -923,18 +1029,43 @@ class GardenController extends Controller
                 ], 404);
             }
 
+
+            activity('crop_profile')
+                ->performedOn($crop)
+                ->withProperties([
+                    'crop_name' => $crop->name,
+                ])
+                ->log('Admin deleted a crop profile');
+
+
+            $log = Activity::with('causer')->latest()->first();
+            event(new ActivityLogCreated($log));
             $crop->delete();
 
             return response()->json([
                 'success' => true,
                 'message' => "Crop '{$crop->name}' deleted successfully"
             ], 200);
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete crop',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function activityLogs(Request $request) {
+      $query = Activity::with('causer')
+            ->latest();
+
+        if ($request->filled('log_name')) {
+            $query->where('log_name', $request->log_name);
+        }
+
+        $logs = $query->paginate(20);
+
+        return response()->json($logs);
     }
 }

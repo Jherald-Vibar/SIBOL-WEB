@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import AdminSidebar from './parts/AdminSidebar';
-import AdminNavbar from './parts/AdminNavbar';
 import axiosClient from './axios';
 
 const AdminCropProfile = () => {
@@ -28,46 +26,29 @@ const AdminCropProfile = () => {
   const [formData, setFormData] = useState(initialFormData);
 
   const parameters = [
-    { key: 'soilTemp', label: 'Soil Temperature' },
-    { key: 'soilMoisture', label: 'Soil Moisture' },
-    { key: 'phLevel', label: 'pH Level' },
-    { key: 'electricalConductivity', label: 'Electrical Conductivity' },
-    { key: 'nitrogen', label: 'Nitrogen' },
-    { key: 'phosphorus', label: 'Phosphorus' },
-    { key: 'potassium', label: 'Potassium' },
-    { key: 'temperature', label: 'Air Temperature' },
-    { key: 'humidity', label: 'Air Humidity' }
+    { key: 'soilTemp',               label: 'Soil Temperature',       unit: '°C',   icon: '🌡' },
+    { key: 'soilMoisture',           label: 'Soil Moisture',           unit: '%',    icon: '💧' },
+    { key: 'phLevel',                label: 'pH Level',                unit: 'pH',   icon: '⚗' },
+    { key: 'electricalConductivity', label: 'Electrical Conductivity', unit: 'dS/m', icon: '⚡' },
+    { key: 'nitrogen',               label: 'Nitrogen (N)',            unit: 'mg/L', icon: '🟢' },
+    { key: 'phosphorus',             label: 'Phosphorus (P)',          unit: 'mg/L', icon: '🟡' },
+    { key: 'potassium',              label: 'Potassium (K)',           unit: 'mg/L', icon: '🟠' },
+    { key: 'temperature',            label: 'Air Temperature',         unit: '°C',   icon: '🌤' },
+    { key: 'humidity',               label: 'Air Humidity',            unit: '%',    icon: '🌫' },
   ];
 
-  // Form handlers
   const handleInputChange = (field, type, value) => {
     if (field === 'name') {
       setFormData(prev => ({ ...prev, name: value }));
     } else {
-      setFormData(prev => ({
-        ...prev,
-        [field]: { ...prev[field], [type]: value }
-      }));
+      setFormData(prev => ({ ...prev, [field]: { ...prev[field], [type]: value } }));
     }
   };
 
-  const resetForm = () => {
-    setFormData(initialFormData);
-    setEditingCrop(null);
-    setError("");
-  };
+  const resetForm = () => { setFormData(initialFormData); setEditingCrop(null); setError(""); };
+  const closeModal = () => { setModalOpen(false); resetForm(); };
+  const toggleCrop = (id) => setExpandedCrop(prev => prev === id ? null : id);
 
-  const closeModal = () => {
-    setModalOpen(false);
-    resetForm();
-  };
-
-  // Crop handlers
-  const toggleCrop = (cropId) => {
-    setExpandedCrop(prev => prev === cropId ? null : cropId);
-  };
-
-  // Data transformation
   const transformCropData = (crop) => ({
     id: crop.id,
     name: crop.name,
@@ -101,334 +82,296 @@ const AdminCropProfile = () => {
     air_temperature_min: parseFloat(data.temperature.min) || 0,
     air_temperature_max: parseFloat(data.temperature.max) || 0,
     air_humidity_min: parseFloat(data.humidity.min) || 0,
-    air_humidity_max: parseFloat(data.humidity.max) || 0
+    air_humidity_max: parseFloat(data.humidity.max) || 0,
   });
 
-  // API calls
   const addCrop = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError("");
-
+    e.preventDefault(); setIsLoading(true); setError("");
     try {
-      const cropData = transformToApiFormat(formData);
-      const response = await axiosClient.post("/addAdminCrop", cropData);
-      const newCrop = transformCropData(response.data.data);
-
-      setCrops(prev => [...prev, newCrop]);
+      const res = await axiosClient.post("/addAdminCrop", transformToApiFormat(formData));
+      setCrops(prev => [...prev, transformCropData(res.data.data)]);
       closeModal();
-    } catch (error) {
-      setError(error.response?.data?.message || "Something Went Wrong!");
-      console.error("Error adding crop:", error);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (err) { setError(err.response?.data?.message || "Something Went Wrong!"); }
+    finally { setIsLoading(false); }
   };
 
   const editCrop = (crop) => {
     setEditingCrop(crop.id);
-    setFormData({
-      name: crop.name,
-      soilTemp: crop.soilTemp,
-      soilMoisture: crop.soilMoisture,
-      phLevel: crop.phLevel,
-      electricalConductivity: crop.electricalConductivity,
-      nitrogen: crop.nitrogen,
-      phosphorus: crop.phosphorus,
-      potassium: crop.potassium,
-      temperature: crop.temperature,
-      humidity: crop.humidity
-    });
+    setFormData({ name: crop.name, soilTemp: crop.soilTemp, soilMoisture: crop.soilMoisture, phLevel: crop.phLevel, electricalConductivity: crop.electricalConductivity, nitrogen: crop.nitrogen, phosphorus: crop.phosphorus, potassium: crop.potassium, temperature: crop.temperature, humidity: crop.humidity });
     setModalOpen(true);
   };
 
   const updateCrop = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError("");
-
+    e.preventDefault(); setIsLoading(true); setError("");
     try {
-      const cropData = transformToApiFormat(formData);
-      const response = await axiosClient.put(`/updateAdminCrop/${editingCrop}`, cropData);
-      const updatedCrop = transformCropData(response.data.data);
-
-      setCrops(prev => prev.map(crop =>
-        crop.id === editingCrop ? updatedCrop : crop
-      ));
+      const res = await axiosClient.put(`/updateAdminCrop/${editingCrop}`, transformToApiFormat(formData));
+      setCrops(prev => prev.map(c => c.id === editingCrop ? transformCropData(res.data.data) : c));
       closeModal();
-    } catch (error) {
-      setError(error.response?.data?.message || "Something Went Wrong!");
-      console.error("Error updating crop:", error);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (err) { setError(err.response?.data?.message || "Something Went Wrong!"); }
+    finally { setIsLoading(false); }
   };
 
   const deleteCrop = async (cropId) => {
     setIsLoading(true);
     try {
       await axiosClient.delete(`/deleteAdminCrop/${cropId}`);
-      setCrops(prev => prev.filter(crop => crop.id !== cropId));
+      setCrops(prev => prev.filter(c => c.id !== cropId));
       setDeleteConfirm(null);
-    } catch (error) {
-      setError(error.response?.data?.message || "Something Went Wrong!");
-      console.error("Error deleting crop:", error);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (err) { setError(err.response?.data?.message || "Something Went Wrong!"); }
+    finally { setIsLoading(false); }
   };
 
   const fetchCrops = async () => {
     setIsLoading(true);
     try {
-      const response = await axiosClient.get("/getCropProfile");
-      const transformedCrops = response.data.data.map(transformCropData);
-      setCrops(transformedCrops);
-    } catch (error) {
-      setError(error.response?.data?.message || "Something Went Wrong!");
-      console.error("Error fetching crops:", error);
-    } finally {
-      setIsLoading(false);
-    }
+      const res = await axiosClient.get("/getCropProfile");
+      setCrops(res.data.data.map(transformCropData));
+    } catch (err) { setError(err.response?.data?.message || "Something Went Wrong!"); }
+    finally { setIsLoading(false); }
   };
 
-  useEffect(() => {
-    fetchCrops();
-  }, []);
+  useEffect(() => { fetchCrops(); }, []);
+
+  const SpinIcon = () => (
+    <svg style={{ animation: 'spin 0.8s linear infinite' }} xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+      <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+    </svg>
+  );
 
   return (
-    <div className='bg-[#F4F0E5] flex min-h-screen'>
-      {/* Desktop Sidebar */}
-      <div className='hidden md:block w-64 bg-white fixed top-0 left-0 h-screen shadow-md z-40'>
-        <AdminSidebar/>
-      </div>
+    // ── No sidebar/navbar here — AdminLayout provides them ──
+    <div style={{ background: '#f7f4ee', minHeight: '100%', fontFamily: "'DM Sans', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes modalIn { from { opacity:0; transform:scale(0.9) translateY(16px); } to { opacity:1; transform:scale(1) translateY(0); } }
+        @keyframes slideDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
 
-      {/* Main Content */}
-      <div className='flex-1 flex flex-col md:ml-64'>
-        {/* Navbar */}
-        <div className="shadow-md bg-white sticky top-0 z-30">
-          <AdminNavbar/>
+        .crop-row:hover { background: #f0fdf4 !important; }
+        .btn-edit:hover { background: #1a6636 !important; transform: translateY(-1px); }
+        .btn-del:hover { background: #b91c1c !important; transform: translateY(-1px); }
+        .form-input:focus { border-color: #2e8b57 !important; box-shadow: 0 0 0 3px rgba(46,139,87,0.1) !important; background: #fff !important; }
+        .card-hover:hover { box-shadow: 0 16px 40px rgba(11,61,30,0.1) !important; transform: translateY(-2px); }
+        .accordion-header:hover { background: rgba(11,61,30,0.04) !important; }
+
+        @media (max-width: 768px) {
+          .acp-content { padding: 16px !important; }
+          .param-grid { grid-template-columns: 1fr !important; }
+          .param-row { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+        }
+      `}</style>
+
+      <div className="acp-content" style={{ padding: '32px 40px' }}>
+
+        {/* Page Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 28, paddingBottom: 24, borderBottom: '1px solid rgba(11,61,30,0.1)', flexWrap: 'wrap', gap: 16 }}>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: 2, textTransform: 'uppercase', color: '#2e8b57', marginBottom: 6 }}>Admin Panel</p>
+            <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 'clamp(24px,3vw,36px)', fontWeight: 700, color: '#0b3d1e', lineHeight: 1.1 }}>
+              Crop <em style={{ fontStyle: 'italic', color: '#2e8b57' }}>Profiles</em>
+            </h1>
+            <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>Define optimal growing conditions for each crop type.</p>
+          </div>
+          <button
+            onClick={() => setModalOpen(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#0b3d1e', color: '#fff', border: 'none', borderRadius: 100, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'all 0.25s', whiteSpace: 'nowrap' }}
+            className="btn-edit"
+          >
+            <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#d4840a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, lineHeight: 1, fontWeight: 300 }}>+</span>
+            New Profile
+          </button>
         </div>
 
-        {/* Content */}
-        <div className='flex-1 px-4 sm:px-6 lg:px-8 py-4 md:py-6'>
-          {/* Header */}
-          <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6'>
-            <h1 className='text-2xl sm:text-3xl font-bold text-gray-900'>Crop Profile</h1>
-            <button
-              onClick={() => setModalOpen(true)}
-              className='bg-[#114320] text-white px-6 py-3 rounded-lg hover:bg-[#0f3a1d] transition w-full sm:w-auto font-medium shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
-            >
-              ADD CROP
-            </button>
+        {/* Loading */}
+        {loading && crops.length === 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
+            <svg style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }} xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#2e8b57" strokeWidth="2" strokeLinecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            <p style={{ fontSize: 14, color: '#9ca3af' }}>Loading profiles…</p>
           </div>
+        )}
 
-          {/* Status Messages */}
-          {loading && crops.length === 0 && (
-            <div className="text-center py-8">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-[#114320] border-t-transparent"></div>
-              <p className="text-gray-600 mt-4">Loading crops...</p>
-            </div>
-          )}
+        {/* Error */}
+        {error && !loading && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 12, fontSize: 13, color: '#be123c', marginBottom: 20 }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            {error}
+          </div>
+        )}
 
-          {error && !loading && (
-            <div className="bg-red-100 text-red-700 px-4 py-3 rounded-lg mb-4 border border-red-200">
-              ⚠️ {error}
-            </div>
-          )}
+        {/* Empty */}
+        {!loading && crops.length === 0 && !error && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0', textAlign: 'center' }}>
+            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(11,61,30,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, marginBottom: 16 }}>🌾</div>
+            <p style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: '#0b3d1e', marginBottom: 6 }}>No profiles yet</p>
+            <p style={{ fontSize: 13, color: '#9ca3af' }}>Create your first crop profile to start monitoring.</p>
+          </div>
+        )}
 
-          {!loading && crops.length === 0 && !error && (
-            <div className="text-center py-12 bg-white rounded-lg shadow">
-              <p className="text-gray-600 text-lg">No crop profiles found</p>
-            </div>
-          )}
+        {/* Crop Cards */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {crops.map((crop) => {
+            const isOpen = expandedCrop === crop.id;
+            return (
+              <div key={crop.id} className="card-hover" style={{ background: '#fff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.05)', overflow: 'hidden', transition: 'all 0.3s' }}>
 
-          {/* Crops List */}
-          <div className="space-y-4">
-            {crops.map((crop) => (
-              <div key={crop.id} className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-200">
-                {/* Crop Header */}
-                <div className="bg-gradient-to-r from-[#E8DCC4] to-[#d4c9ad]">
-                  <div
-                    onClick={() => toggleCrop(crop.id)}
-                    className="px-6 py-4 cursor-pointer hover:from-[#ddd4bd] hover:to-[#cac0a4] transition-all flex justify-between items-center"
-                  >
-                    <h2 className="text-xl font-bold text-gray-800">{crop.name}</h2>
-                    <span className="text-gray-700 font-bold text-2xl transform transition-transform duration-200" style={{ transform: expandedCrop === crop.id ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-                      ▼
-                    </span>
+                {/* Accordion Header */}
+                <div
+                  className="accordion-header"
+                  onClick={() => toggleCrop(crop.id)}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', cursor: 'pointer', transition: 'background 0.2s', userSelect: 'none' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(11,61,30,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🌿</div>
+                    <div>
+                      <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, fontWeight: 700, color: '#0b3d1e' }}>{crop.name}</h2>
+                      <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{parameters.length} parameters configured</p>
+                    </div>
                   </div>
-
-                  {/* Mobile Action Buttons - Always Visible */}
-                  <div className="md:hidden px-6 pb-4 flex gap-3">
-                    <button
-                      onClick={() => editCrop(crop)}
-                      className="flex-1 bg-[#114320] text-white px-4 py-2.5 rounded-lg hover:bg-[#1a5c2e] transition-all transform hover:-translate-y-0.5 hover:shadow-lg text-sm font-semibold"
-                    >
-                      EDIT
-                    </button>
-                    <button
-                      onClick={() => setDeleteConfirm(crop.id)}
-                      className="flex-1 bg-red-600 text-white px-4 py-2.5 rounded-lg hover:bg-red-700 transition-all transform hover:-translate-y-0.5 hover:shadow-lg text-sm font-semibold"
-                    >
-                      DELETE
-                    </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(11,61,30,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.3s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', color: '#0b3d1e', fontSize: 11 }}>▼</div>
                   </div>
                 </div>
 
-                {/* Crop Details */}
-                {expandedCrop === crop.id && (
-                  <div className="overflow-hidden">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-b-2 border-gray-300">
-                            Parameter
-                          </th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-b-2 border-l-2 border-gray-300">
-                            Min
-                          </th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-b-2 border-l-2 border-gray-300">
-                            Max
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {parameters.map((param, index) => (
-                          <tr key={param.key} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                            <td className="px-4 py-3 text-sm text-gray-700 border-b border-gray-200">
-                              {param.label}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-center text-gray-800 border-b border-l-2 border-gray-200 font-medium">
-                              {crop[param.key]?.min ?? 0}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-center text-gray-800 border-b border-l-2 border-gray-200 font-medium">
-                              {crop[param.key]?.max ?? 0}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                {/* Expanded Content */}
+                {isOpen && (
+                  <div style={{ animation: 'slideDown 0.25s ease-out', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
 
-                    {/* Action Buttons - Desktop Only */}
-                    <div className="hidden md:flex bg-gray-50 px-6 py-4 gap-3 justify-end border-t-2 border-gray-300">
-                      <button
-                        onClick={() => editCrop(crop)}
-                        className="bg-[#114320] text-white px-6 py-2.5 rounded-lg hover:bg-[#1a5c2e] transition-all transform hover:-translate-y-0.5 hover:shadow-lg text-sm font-semibold"
-                      >
-                        EDIT
+                    {/* Parameters Grid */}
+                    <div style={{ padding: '20px 24px' }}>
+                      <p style={{ fontSize: 10, fontWeight: 500, letterSpacing: 2, textTransform: 'uppercase', color: '#9ca3af', marginBottom: 14 }}>Optimal Ranges</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+                        {parameters.map((param) => (
+                          <div key={param.key} style={{ background: '#f7f4ee', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 16 }}>{param.icon}</span>
+                              <div>
+                                <p style={{ fontSize: 11, color: '#9ca3af', marginBottom: 1 }}>{param.label}</p>
+                                <p style={{ fontSize: 13, fontWeight: 600, color: '#0b3d1e' }}>
+                                  {crop[param.key]?.min ?? 0} – {crop[param.key]?.max ?? 0}
+                                  <span style={{ fontSize: 10, fontWeight: 400, color: '#9ca3af', marginLeft: 3 }}>{param.unit}</span>
+                                </p>
+                              </div>
+                            </div>
+                            {/* Range bar */}
+                            <div style={{ width: 48, height: 4, background: '#e5e7eb', borderRadius: 100, overflow: 'hidden', flexShrink: 0 }}>
+                              <div style={{ height: '100%', background: '#2e8b57', borderRadius: 100, width: `${Math.min(((crop[param.key]?.max ?? 0) / 100) * 100, 100)}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Action Footer */}
+                    <div style={{ padding: '14px 24px', background: 'rgba(11,61,30,0.02)', borderTop: '1px solid rgba(0,0,0,0.04)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                      <button className="btn-edit" onClick={() => editCrop(crop)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 20px', background: '#0b3d1e', color: '#fff', border: 'none', borderRadius: 100, fontSize: 12, fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Edit Profile
                       </button>
-                      <button
-                        onClick={() => setDeleteConfirm(crop.id)}
-                        className="bg-red-600 text-white px-6 py-2.5 rounded-lg hover:bg-red-700 transition-all transform hover:-translate-y-0.5 hover:shadow-lg text-sm font-semibold"
-                      >
-                        DELETE
+                      <button className="btn-del" onClick={() => setDeleteConfirm(crop.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 20px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 100, fontSize: 12, fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                        Delete
                       </button>
                     </div>
                   </div>
                 )}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white shadow-lg z-50 border-t border-gray-200">
-        <AdminSidebar />
-      </div>
-
-      {/* Add/Edit Crop Modal */}
+      {/* ── ADD / EDIT MODAL ── */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={e => e.target === e.currentTarget && closeModal()}>
+          <div style={{ background: '#fff', borderRadius: 22, width: '100%', maxWidth: 680, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.25)', animation: 'modalIn 0.3s cubic-bezier(0.34,1.56,0.64,1)' }}>
+
             {/* Modal Header */}
-            <div className="bg-[#114320] px-6 py-4 flex justify-between items-center sticky top-0">
-              <h2 className="text-xl font-bold text-white">
-                {editingCrop ? 'Edit Crop' : 'Add New Crop'}
-              </h2>
-              <button
-                onClick={closeModal}
-                className="text-white hover:text-gray-200 text-2xl"
-              >
-                ×
+            <div style={{ background: '#0b3d1e', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 1, borderRadius: '22px 22px 0 0' }}>
+              <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, fontWeight: 700, color: '#fff' }}>
+                {editingCrop ? 'Edit Profile' : 'New Crop Profile'}
+              </span>
+              <button onClick={closeModal} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
 
-            {/* Modal Form */}
-            <div className="p-6">
+            <div style={{ padding: 24 }}>
               {error && (
-                <div className="bg-red-100 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-200">
-                  ⚠️ {error}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 12, fontSize: 13, color: '#be123c', marginBottom: 20 }}>
+                  <span>{error}</span>
                 </div>
               )}
 
               {/* Crop Name */}
-              <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Crop Name *
-                </label>
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.5px', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 6, display: 'block' }}>Crop Name</label>
                 <input
+                  className="form-input"
                   type="text"
                   value={formData.name}
-                  onChange={(e) => handleInputChange('name', null, e.target.value)}
-                  className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-[#114320]"
-                  placeholder="Enter crop name"
+                  onChange={e => handleInputChange('name', null, e.target.value)}
+                  placeholder="e.g. Tomato, Pechay, Kamote…"
+                  style={{ width: '100%', padding: '11px 14px', border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: '#0b3d1e', background: '#f7f4ee', outline: 'none', boxSizing: 'border-box' }}
                   required
                 />
               </div>
 
-              <h3 className="text-lg font-bold text-gray-800 mb-4 border-b-2 border-gray-300 pb-2">
-                Optimal Conditions
-              </h3>
+              {/* Section Label */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: 2, textTransform: 'uppercase', color: '#9ca3af', whiteSpace: 'nowrap' }}>Optimal Conditions</p>
+                <div style={{ flex: 1, height: 1, background: 'rgba(0,0,0,0.07)' }} />
+              </div>
 
-              {/* Parameters Grid */}
-              <div className="space-y-4">
+              {/* Parameters */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }} className="param-grid">
                 {parameters.map((param) => (
-                  <div key={param.key} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center bg-gray-50 p-4 rounded-lg">
-                    <label className="text-sm font-semibold text-gray-700">
-                      {param.label}
-                    </label>
+                  <div key={param.key} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px', gap: 12, alignItems: 'center', background: '#f7f4ee', borderRadius: 12, padding: '12px 16px' }} className="param-row">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 16 }}>{param.icon}</span>
+                      <div>
+                        <p style={{ fontSize: 13, fontWeight: 500, color: '#0b3d1e' }}>{param.label}</p>
+                        <p style={{ fontSize: 10, color: '#9ca3af' }}>{param.unit}</p>
+                      </div>
+                    </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Minimum</label>
+                      <label style={{ fontSize: 10, color: '#9ca3af', marginBottom: 4, display: 'block', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Min</label>
                       <input
+                        className="form-input"
                         type="number"
                         step="0.01"
                         value={formData[param.key].min}
-                        onChange={(e) => handleInputChange(param.key, 'min', e.target.value)}
-                        className="w-full border-2 border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-[#114320] text-sm"
-                        placeholder="Min"
+                        onChange={e => handleInputChange(param.key, 'min', e.target.value)}
+                        placeholder="0"
+                        style={{ width: '100%', padding: '8px 10px', border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: '#0b3d1e', background: '#fff', outline: 'none', boxSizing: 'border-box' }}
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Maximum</label>
+                      <label style={{ fontSize: 10, color: '#9ca3af', marginBottom: 4, display: 'block', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Max</label>
                       <input
+                        className="form-input"
                         type="number"
                         step="0.01"
                         value={formData[param.key].max}
-                        onChange={(e) => handleInputChange(param.key, 'max', e.target.value)}
-                        className="w-full border-2 border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-[#114320] text-sm"
-                        placeholder="Max"
+                        onChange={e => handleInputChange(param.key, 'max', e.target.value)}
+                        placeholder="0"
+                        style={{ width: '100%', padding: '8px 10px', border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: '#0b3d1e', background: '#fff', outline: 'none', boxSizing: 'border-box' }}
                       />
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Modal Actions */}
-              <div className="flex flex-col sm:flex-row gap-3 mt-8 pt-6 border-t-2 border-gray-300">
-                <button
-                  onClick={closeModal}
-                  className="flex-1 bg-gray-300 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-400 transition font-semibold"
-                >
-                  CANCEL
+              {/* Modal Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 20, marginTop: 20, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                <button onClick={closeModal} style={{ padding: '10px 20px', borderRadius: 100, border: '1.5px solid rgba(0,0,0,0.1)', background: 'transparent', color: '#9ca3af', fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+                  Cancel
                 </button>
                 <button
                   onClick={editingCrop ? updateCrop : addCrop}
                   disabled={loading}
-                  className="flex-1 bg-[#114320] text-white px-6 py-3 rounded-lg hover:bg-[#1a5c2e] transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ padding: '10px 24px', borderRadius: 100, background: '#0b3d1e', border: 'none', color: '#fff', fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 7, opacity: loading ? 0.6 : 1 }}
                 >
-                  {loading ? "SAVING..." : editingCrop ? "UPDATE CROP" : "SAVE CROP"}
+                  {loading ? <><SpinIcon /> Saving…</> : editingCrop ? 'Update Profile' : 'Save Profile'}
                 </button>
               </div>
             </div>
@@ -436,89 +379,31 @@ const AdminCropProfile = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* ── DELETE MODAL ── */}
       {deleteConfirm && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-red-200 bg-red-50">
-              <h2 className="text-xl font-bold text-red-700">Delete Crop Profile</h2>
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="hover:bg-red-100 p-2 rounded-full transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32">
-                  <path fill="#dc2626" d="M16 2C8.2 2 2 8.2 2 16s6.2 14 14 14s14-6.2 14-14S23.8 2 16 2m0 26C9.4 28 4 22.6 4 16S9.4 4 16 4s12 5.4 12 12s-5.4 12-12 12" />
-                  <path fill="#dc2626" d="M21.4 23L16 17.6L10.6 23L9 21.4l5.4-5.4L9 10.6L10.6 9l5.4 5.4L21.4 9l1.6 1.6l-5.4 5.4l5.4 5.4z" />
-                </svg>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={e => e.target === e.currentTarget && setDeleteConfirm(null)}>
+          <div style={{ background: '#fff', borderRadius: 22, width: '100%', maxWidth: 420, boxShadow: '0 32px 80px rgba(0,0,0,0.25)', animation: 'modalIn 0.3s cubic-bezier(0.34,1.56,0.64,1)', overflow: 'hidden' }}>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+              <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, fontWeight: 700, color: '#dc2626' }}>Delete Profile</span>
+              <button onClick={() => setDeleteConfirm(null)} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
 
-            {error && (
-              <div className="flex items-center p-4 mx-6 mt-4 text-sm text-red-800 rounded-lg bg-red-50 border border-red-200">
-                <div><span className="font-medium">Error!</span> {error}</div>
-              </div>
-            )}
-
-            <div className="px-6 py-6">
-              <div className="flex items-center justify-center mb-4">
-                <div className="bg-red-100 rounded-full p-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24">
-                    <path fill="#dc2626" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2m0 11c-.55 0-1-.45-1-1V8c0-.55.45-1 1-1s1 .45 1 1v4c0 .55-.45 1-1 1m1 4h-2v-2h2z" />
-                  </svg>
-                </div>
-              </div>
-
-              <p className="text-center text-gray-700 mb-2">Are you sure you want to delete</p>
-              <p className="text-center font-bold text-lg text-gray-900 mb-4">
-                "{crops.find(c => c.id === deleteConfirm)?.name}"?
-              </p>
-              <p className="text-center text-sm text-gray-600">
-                This action cannot be undone. All data associated with this crop profile will be permanently deleted.
-              </p>
+            <div style={{ padding: '28px 24px 8px', textAlign: 'center' }}>
+              <div style={{ width: 68, height: 68, borderRadius: '50%', background: '#fff1f2', border: '2px solid #fecdd3', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 28 }}>🗑️</div>
+              <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.6 }}>You're about to permanently delete</p>
+              <p style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: '#0b3d1e', fontWeight: 700, margin: '8px 0' }}>"{crops.find(c => c.id === deleteConfirm)?.name}"</p>
+              <p style={{ fontSize: 12, color: '#9ca3af', maxWidth: 300, margin: '0 auto 8px' }}>All data associated with this crop profile will be permanently deleted. This cannot be undone.</p>
             </div>
 
-            <div className="flex justify-end gap-3 px-6 py-4 border-t">
-              <button
-                type="button"
-                onClick={() => setDeleteConfirm(null)}
-                disabled={loading}
-                className="px-4 py-2 border-2 border-gray-300 rounded-md font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 24px', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+              <button onClick={() => setDeleteConfirm(null)} disabled={loading} style={{ padding: '10px 20px', borderRadius: 100, border: '1.5px solid rgba(0,0,0,0.1)', background: 'transparent', color: '#9ca3af', fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: loading ? 0.5 : 1 }}>
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={() => deleteCrop(deleteConfirm)}
-                disabled={loading}
-                className="bg-red-600 hover:bg-red-700 transition-colors px-6 py-2 rounded-md font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <svg
-                      className="animate-spin h-5 w-5 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                      />
-                    </svg>
-                    Deleting...
-                  </>
-                ) : (
-                  "Delete Crop"
-                )}
+              <button onClick={() => deleteCrop(deleteConfirm)} disabled={loading} style={{ padding: '10px 24px', borderRadius: 100, background: '#dc2626', border: 'none', color: '#fff', fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 7, opacity: loading ? 0.6 : 1 }} className="btn-del">
+                {loading ? <><SpinIcon /> Deleting…</> : 'Yes, delete'}
               </button>
             </div>
           </div>

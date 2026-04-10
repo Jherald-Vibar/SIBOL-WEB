@@ -1,7 +1,5 @@
 import React, { useState } from 'react'
 import axiosClient from './axios';
-import AdminSidebar from './parts/AdminSidebar';
-import AdminNavbar from './parts/AdminNavbar';
 
 const AdminAccountSettings = () => {
     const [error, setError] = useState("");
@@ -14,195 +12,199 @@ const AdminAccountSettings = () => {
     });
 
     const handleChange = (e) => {
-        setForm({
-            ...form,
-            [e.target.name]: e.target.value
-        });
-        setError("");
-        setSuccess("");
-    }
+        setForm({ ...form, [e.target.name]: e.target.value });
+        setError(""); setSuccess("");
+    };
 
     const passwordsMatch = form.new_password === form.confirm_password || form.confirm_password === "";
 
-    const handleChangePass = async(e) => {
+    const handleChangePass = async (e) => {
         e.preventDefault();
+        setError(""); setSuccess("");
 
-        setError("");
-        setSuccess("");
-
-        if(!form.current_password || !form.new_password || !form.confirm_password) {
-            setError("All fields are required!");
-            return;
+        if (!form.current_password || !form.new_password || !form.confirm_password) {
+            setError("All fields are required!"); return;
         }
-
-        if(form.new_password !== form.confirm_password) {
-            setError("New passwords do not match!");
-            return;
+        if (form.new_password !== form.confirm_password) {
+            setError("New passwords do not match!"); return;
         }
-
-        if(form.new_password.length < 8) {
-            setError("New password must be at least 8 characters!");
-            return;
+        if (form.new_password.length < 8) {
+            setError("New password must be at least 8 characters!"); return;
         }
 
         setIsLoading(true);
-
         try {
-            const response = await axiosClient.put("/changePassword", form);
+            await axiosClient.put("/changePassword", form);
             setSuccess("Password changed successfully!");
-            setForm({
-                current_password: "",
-                new_password: "",
-                confirm_password: "",
-            });
+            setForm({ current_password: "", new_password: "", confirm_password: "" });
         } catch (error) {
             setError(error.response?.data?.message || "Failed to change password!");
         } finally {
             setIsLoading(false);
         }
-    }
+    };
+
+    const SpinIcon = () => (
+        <svg style={{ animation: 'spin 0.8s linear infinite' }} xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+        </svg>
+    );
+
+    const inputStyle = (isError = false) => ({
+        width: "100%",
+        padding: "10px 14px",
+        border: `1.5px solid ${isError ? "#fca5a5" : "rgba(0,0,0,0.1)"}`,
+        borderRadius: 12,
+        fontFamily: "'DM Sans', sans-serif",
+        fontSize: 14,
+        color: "#0b3d1e",
+        background: isError ? "#fff1f2" : "#f7f4ee",
+        outline: "none",
+        boxSizing: "border-box",
+        transition: "border-color 0.2s",
+    });
 
     return (
-        <div className='bg-[#F4F0E5] min-h-screen'>
-            {/* Desktop Sidebar */}
-            <div className='hidden md:block w-64 bg-white fixed top-0 left-0 h-screen shadow-md z-40'>
-                <AdminSidebar/>
-            </div>
+        <div style={{ background: "#f0ece0", minHeight: "100%", fontFamily: "'DM Sans', sans-serif", padding: 24 }}>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+                @keyframes spin { to { transform: rotate(360deg); } }
+                .pass-input:focus { border-color: #2e8b57 !important; box-shadow: 0 0 0 3px rgba(46,139,87,0.1) !important; background: #fff !important; }
+                .save-btn:hover { background: #1a6636 !important; transform: translateY(-1px); }
+                .forgot-btn:hover { color: #0b3d1e !important; text-decoration: underline; }
+            `}</style>
 
-            {/* Mobile Bottom Navigation */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white shadow-lg z-50 border-t border-gray-200">
-                <AdminSidebar />
-            </div>
-
-            <div className='flex flex-col md:ml-64'>
-                {/* Navbar */}
-                <div className="shadow-md bg-white sticky top-0 z-30">
-                    <AdminNavbar/>
+            {/* Header */}
+            <div style={{ background: "#f7f4ee", borderRadius: 14, padding: "18px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
+                <div>
+                    <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: 2, textTransform: "uppercase", color: "#2e8b57", margin: "0 0 6px" }}>Admin Panel</p>
+                    <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 700, color: "#0b3d1e" }}>
+                        Account <em style={{ fontStyle: "italic", color: "#d4840a" }}>Settings</em>
+                    </div>
+                    <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>Manage your account credentials and security.</p>
                 </div>
+            </div>
 
-                {/* Main Content - Added bottom padding for mobile */}
-                <div className='flex-1 px-4 sm:px-6 lg:px-8 py-4 md:py-6 pb-20 md:pb-6'> {/* Added pb-20 for mobile */}
-                    {/* Header */}
-                    <div className='mb-6'>
-                        <h1 className='text-2xl sm:text-3xl font-bold text-gray-900'>Account Settings</h1>
+            {/* Card */}
+            <div style={{ display: "flex", justifyContent: "center" }}>
+                <div style={{ width: "100%", maxWidth: 560, background: "#fff", borderRadius: 18, border: "1px solid rgba(0,0,0,0.05)", overflow: "hidden" }}>
+
+                    {/* Card Header */}
+                    <div style={{ background: "#0b3d1e", padding: "13px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: 2, textTransform: "uppercase", color: "rgba(255,255,255,0.75)" }}>Change Password</span>
+                        <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        </div>
                     </div>
 
-                    {/* Change Password Card */}
-                    <div className='flex justify-center'>
-                        <div className='w-full max-w-2xl bg-white rounded-lg shadow-md overflow-hidden'>
-                            {/* Card Header */}
-                            <div className='px-4 sm:px-6 py-4 border-b border-gray-200'>
-                                <h2 className='text-lg font-semibold text-gray-800'>Change Password</h2>
+                    <div style={{ padding: 24 }}>
+
+                        {/* Error */}
+                        {error && (
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 12, fontSize: 13, color: "#be123c", marginBottom: 20 }}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                {error}
                             </div>
+                        )}
 
-                            {/* Alerts */}
-                            <div className='px-4 sm:px-6'>
-                                {error && (
-                                    <div className="mt-4 flex items-center p-4 text-sm text-red-800 rounded-lg bg-red-50" role="alert">
-                                        <svg className="flex-shrink-0 inline w-4 h-4 me-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z"/>
-                                        </svg>
-                                        <span className="sr-only">Error</span>
-                                        <div>
-                                            <span className="font-medium">Error!</span> {error}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {success && (
-                                    <div className="mt-4 flex items-center p-4 text-sm text-green-800 rounded-lg bg-green-50" role="alert">
-                                        <svg className="flex-shrink-0 inline w-4 h-4 me-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 8.207-4 4a1 1 0 0 1-1.414 0l-2-2a1 1 0 0 1 1.414-1.414L9 10.586l3.293-3.293a1 1 0 0 1 1.414 1.414Z"/>
-                                        </svg>
-                                        <span className="sr-only">Success</span>
-                                        <div>
-                                            <span className="font-medium">Success!</span> {success}
-                                        </div>
-                                    </div>
-                                )}
+                        {/* Success */}
+                        {success && (
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, fontSize: 13, color: "#166534", marginBottom: 20 }}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 1 }}><polyline points="20 6 9 17 4 12"/></svg>
+                                {success}
                             </div>
+                        )}
 
-                            {/* Form */}
-                            <form onSubmit={handleChangePass} className='p-4 sm:p-6 space-y-4'>
+                        {/* Divider label */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+                            <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: 2, textTransform: "uppercase", color: "#9ca3af", whiteSpace: "nowrap" }}>Credentials</p>
+                            <div style={{ flex: 1, height: 1, background: "rgba(0,0,0,0.07)" }} />
+                        </div>
+
+                        <form onSubmit={handleChangePass}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
                                 {/* Current Password */}
-                                <div className='space-y-2'>
-                                    <label className='text-sm font-medium text-gray-700'>Current Password</label>
-                                    <div className='bg-gray-50 rounded-lg border border-gray-200 focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-colors'>
-                                        <input
-                                            type="password"
-                                            value={form.current_password}
-                                            onChange={handleChange}
-                                            name="current_password"
-                                            placeholder='Enter current password'
-                                            className='w-full px-4 py-3 bg-transparent outline-none text-gray-700 placeholder-gray-500'
-                                            required
-                                        />
-                                    </div>
+                                <div>
+                                    <label style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.5px", textTransform: "uppercase", color: "#9ca3af", marginBottom: 6, display: "block" }}>
+                                        Current Password
+                                    </label>
+                                    <input
+                                        className="pass-input"
+                                        type="password"
+                                        name="current_password"
+                                        value={form.current_password}
+                                        onChange={handleChange}
+                                        placeholder="Enter current password"
+                                        style={inputStyle()}
+                                        required
+                                    />
                                 </div>
 
                                 {/* New Password */}
-                                <div className='space-y-2'>
-                                    <label className='text-sm font-medium text-gray-700'>New Password</label>
-                                    <div className='bg-gray-50 rounded-lg border border-gray-200 focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-colors'>
-                                        <input
-                                            type="password"
-                                            value={form.new_password}
-                                            onChange={handleChange}
-                                            name="new_password"
-                                            placeholder='Enter new password'
-                                            className='w-full px-4 py-3 bg-transparent outline-none text-gray-700 placeholder-gray-500'
-                                            required
-                                        />
-                                    </div>
+                                <div>
+                                    <label style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.5px", textTransform: "uppercase", color: "#9ca3af", marginBottom: 6, display: "block" }}>
+                                        New Password
+                                    </label>
+                                    <input
+                                        className="pass-input"
+                                        type="password"
+                                        name="new_password"
+                                        value={form.new_password}
+                                        onChange={handleChange}
+                                        placeholder="Enter new password"
+                                        style={inputStyle()}
+                                        required
+                                    />
                                 </div>
 
                                 {/* Confirm Password */}
-                                <div className='space-y-2'>
-                                    <label className='text-sm font-medium text-gray-700'>Confirm New Password</label>
-                                    <div className={`bg-gray-50 rounded-lg border transition-colors ${
-                                        !passwordsMatch && form.confirm_password
-                                            ? 'border-red-500 ring-1 ring-red-500'
-                                            : 'border-gray-200 focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500'
-                                    }`}>
-                                        <input
-                                            type="password"
-                                            value={form.confirm_password}
-                                            onChange={handleChange}
-                                            name="confirm_password"
-                                            placeholder='Re-enter new password'
-                                            className='w-full px-4 py-3 bg-transparent outline-none text-gray-700 placeholder-gray-500'
-                                            required
-                                        />
-                                    </div>
+                                <div>
+                                    <label style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.5px", textTransform: "uppercase", color: "#9ca3af", marginBottom: 6, display: "block" }}>
+                                        Confirm New Password
+                                    </label>
+                                    <input
+                                        className="pass-input"
+                                        type="password"
+                                        name="confirm_password"
+                                        value={form.confirm_password}
+                                        onChange={handleChange}
+                                        placeholder="Re-enter new password"
+                                        style={inputStyle(!passwordsMatch && form.confirm_password)}
+                                        required
+                                    />
                                     {!passwordsMatch && form.confirm_password && (
-                                        <p className='text-red-500 text-xs'>Passwords do not match</p>
+                                        <p style={{ fontSize: 12, color: "#be123c", marginTop: 5 }}>Passwords do not match</p>
                                     )}
                                 </div>
 
-                                {/* Form Actions */}
-                                <div className='flex flex-col sm:flex-row justify-between items-center gap-4 pt-4'>
-                                    <button
-                                        type="button"
-                                        className='text-green-700 hover:text-green-800 hover:underline text-sm font-medium transition-colors w-full sm:w-auto text-center py-2'
-                                    >
-                                        Forgot your password?
-                                    </button>
+                            </div>
 
-                                    <button
-                                        type='submit'
-                                        disabled={loading}
-                                        className='bg-green-900 hover:bg-green-800 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-lg px-8 py-3 text-white font-semibold transition-colors w-full sm:w-auto text-center'
-                                    >
-                                        {loading ? "Saving..." : "Save Changes"}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                            {/* Footer */}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 24, marginTop: 24, borderTop: "1px solid rgba(0,0,0,0.06)", flexWrap: "wrap", gap: 12 }}>
+                                <button
+                                    type="button"
+                                    className="forgot-btn"
+                                    style={{ background: "none", border: "none", fontSize: 13, color: "#2e8b57", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 500, padding: 0, transition: "all 0.2s" }}
+                                >
+                                    Forgot your password?
+                                </button>
+
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="save-btn"
+                                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 24px", background: loading ? "#9ca3af" : "#0b3d1e", color: "#fff", border: "none", borderRadius: 100, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500, cursor: loading ? "not-allowed" : "pointer", transition: "all 0.25s", opacity: loading ? 0.7 : 1 }}
+                                >
+                                    {loading ? <><SpinIcon /> Saving…</> : "Save Changes"}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
-    )
-}
+    );
+};
 
-export default AdminAccountSettings
+export default AdminAccountSettings;

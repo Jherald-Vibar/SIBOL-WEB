@@ -96,6 +96,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/getCropProfile', [GardenController::class, "showCropsProfile"]);
     Route::put('/updateAdminCrop/{id}', [GardenController::class, 'updateAdminCrop']);
     Route::delete('/deleteAdminCrop/{id}', [GardenController::class, 'deleteAdminCrop']);
+    Route::get('/admin/activity-logs', [GardenController::class, 'activityLogs']);
 
 
 
