@@ -59,14 +59,20 @@ const CropCarePlant = () => {
 
     window.Pusher = Pusher
 
-    gardenEchoRef.current = new Echo({
-      broadcaster: 'reverb',
-      key: import.meta.env.VITE_REVERB_APP_KEY,
-      wsHost: import.meta.env.VITE_REVERB_HOST,
-      wsPort: import.meta.env.VITE_REVERB_PORT,
-      wssPort: import.meta.env.VITE_REVERB_PORT,
-      forceTLS: false,
-      enabledTransports: ['ws', 'wss'],
+        gardenEchoRef.current = new Echo({
+        broadcaster: 'pusher',
+        key: '329d2861d0c6f9e42c30',
+        cluster: 'ap1',
+        forceTLS: true,
+        authEndpoint: 'https://sibol-web.onrender.com/api/broadcasting/auth',
+        auth: {
+            headers: {
+                get Authorization() {
+                    return `Bearer ${localStorage.getItem('authToken')}`;
+                },
+                Accept: 'application/json',
+            },
+        },
     })
 
     const channel = gardenEchoRef.current.channel(`garden.${garden_id}`)
