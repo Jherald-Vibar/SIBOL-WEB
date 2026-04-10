@@ -48,8 +48,7 @@ const Login = () => {
   };
 
   const handleGoogleSignIn = () => {
-    const backendUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-    window.location.href = `${backendUrl}/api/auth/google`;
+    window.location.href = "https://sibol-web.onrender.com/api/auth/google"; // ✅ use backend URL
   };
 
   useEffect(() => {
