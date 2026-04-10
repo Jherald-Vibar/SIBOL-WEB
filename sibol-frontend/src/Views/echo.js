@@ -8,7 +8,7 @@ const echo = new Echo({
   key: '329d2861d0c6f9e42c30',
   cluster: 'ap1',
   forceTLS: true,
-  authEndpoint: 'https://sibol-web.onrender.com/api/broadcasting/auth',
+  authEndpoint: 'https://sibol-web.onrender.com/broadcasting/auth',
   auth: {
     headers: {
       get Authorization() {
