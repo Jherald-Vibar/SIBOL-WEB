@@ -33,8 +33,39 @@ Route::get('/test-notification', function () {
 });
 
 Route::post('/broadcasting/auth', function (Request $request) {
-    return Broadcast::auth($request);
+    $user = $request->user();
+
+    if (!$user) {
+        return response()->json(['error' => 'Unauthenticated'], 401);
+    }
+
+    $channelName = $request->input('channel_name');
+    $socketId = $request->input('socket_id');
+
+    try {
+        $pusher = new \Pusher\Pusher(
+            env('PUSHER_APP_KEY'),
+            env('PUSHER_APP_SECRET'),
+            env('PUSHER_APP_ID'),
+            ['cluster' => env('PUSHER_APP_CLUSTER'), 'useTLS' => true]
+        );
+
+        $auth = $pusher->authorizeChannel($channelName, $socketId);
+        return response($auth, 200)->header('Content-Type', 'application/json');
+
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
 })->middleware('auth:sanctum');
+
+Route::post('/broadcasting/auth-debug', function (Request $request) {
+    return response()->json([
+        'user' => $request->user(),
+        'has_token' => !empty($request->header('Authorization')),
+        'channel' => $request->input('channel_name'),
+    ]);
+})->middleware('auth:sanctum');
+
 
 Route::post('/broadcasting/auth-test', function(Request $request) {
     return response()->json([
