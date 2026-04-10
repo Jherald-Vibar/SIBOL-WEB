@@ -38,6 +38,32 @@ export function useSensorData(gardenId) {
         };
     }, [gardenId]);
 
+    useEffect(() => {
+    if (!gardenId) {
+        console.log('❌ gardenId is null, not subscribing');
+        return;
+    }
+
+    console.log('✅ Subscribing to garden:', gardenId);
+
+    const channel = echo.channel(`garden.${gardenId}`);
+
+    channel
+        .subscribed(() => {
+            console.log('✅ Successfully subscribed to garden channel');
+            setIsConnected(true);
+        })
+        .listen('.sensor.updated', (event) => {
+            console.log('🌱 SENSOR DATA RECEIVED:', event);
+            // ... rest of your code
+        });
+
+    return () => {
+        echo.leaveChannel(`garden.${gardenId}`);
+        setIsConnected(false);
+    };
+}, [gardenId]);
+
     // Added setAirHumidityHistory to the return object
     return { sensorData, airHumidityHistory, setAirHumidityHistory, isConnected };
 }
