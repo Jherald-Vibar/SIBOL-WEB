@@ -32,7 +32,14 @@ Route::get('/test-notification', function () {
     return response()->json(['message' => 'Notification sent!', 'user_id' => $user->id]);
 });
 
-Broadcast::routes(['middleware' => ['auth:sanctum']]);
+Broadcast::routes(['middleware' => ['auth:sanctum'], 'prefix' => 'api']);
+
+Route::post('/broadcasting/auth-test', function(Request $request) {
+    return response()->json([
+        'user' => $request->user(),
+        'token' => $request->header('Authorization'),
+    ]);
+})->middleware('auth:sanctum');
 
 // In routes/api.php or routes/web.php
 Route::get('/test-cloudinary-direct', function () {
