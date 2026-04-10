@@ -32,7 +32,9 @@ Route::get('/test-notification', function () {
     return response()->json(['message' => 'Notification sent!', 'user_id' => $user->id]);
 });
 
-Broadcast::routes(['middleware' => ['auth:sanctum'], 'prefix' => 'api']);
+Route::post('/broadcasting/auth', function (Request $request) {
+    return Broadcast::auth($request);
+})->middleware('auth:sanctum');
 
 Route::post('/broadcasting/auth-test', function(Request $request) {
     return response()->json([
