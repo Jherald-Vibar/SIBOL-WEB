@@ -5,10 +5,10 @@ window.Pusher = Pusher;
 
 const echo = new Echo({
   broadcaster: 'pusher',
-  key: '329d2861d0c6f9e42c30', // hardcoded temporarily
-  cluster: 'ap1',              // hardcoded temporarily
+  key: import.meta.env.VITE_PUSHER_APP_KEY,
+  cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER,
   forceTLS: true,
-  authEndpoint: 'https://sibol-web.onrender.com/api/broadcasting/auth',
+  authEndpoint: `${import.meta.env.VITE_API_URL}/api/broadcasting/auth`,
   auth: {
     headers: {
       get Authorization() {
