@@ -10,6 +10,7 @@ return [
         'login',
         'logout',
         'broadcasting/auth',
+        'api/broadcasting/auth',
     ],
 
     'allowed_methods' => ['*'],
