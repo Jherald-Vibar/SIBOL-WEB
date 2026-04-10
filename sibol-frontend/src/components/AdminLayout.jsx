@@ -1,15 +1,20 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
-import Logo from '../assets/logo-left.png'; // Adjust path to your logo
+import Logo from '../assets/logo-left.png';
+import AdminSidebar from '../Views/parts/AdminSidebar';
+import AdminNavbar from '../Views/parts/AdminNavbar';
 
 const AdminLayout = () => {
   const [allowed, setAllowed] = useState(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
 
   useEffect(() => {
     const role = localStorage.getItem("role");
     setAllowed(role === "admin");
   }, []);
 
+  // ── Loading screen ──
   if (allowed === null) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-green-50 via-white to-amber-50">
@@ -46,42 +51,62 @@ const AdminLayout = () => {
         `}</style>
 
         <div className="flex flex-col items-center justify-center gap-6 p-8">
-          {/* Logo Container */}
           <div className="relative">
-            <div className="absolute inset-0 rounded-full border-4 border-green-200 spinner-ring" style={{ width: '180px', height: '180px' }}></div>
-            <div className="absolute inset-0 bg-green-500/20 blur-3xl rounded-full"></div>
-            <div className="relative bg-white rounded-full p-6 animate-pulse-glow" style={{ width: '180px', height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="absolute inset-0 rounded-full border-4 border-green-200 spinner-ring"
+              style={{ width: '180px', height: '180px' }} />
+            <div className="absolute inset-0 bg-green-500/20 blur-3xl rounded-full" />
+            <div className="relative bg-white rounded-full p-6 animate-pulse-glow"
+              style={{ width: '180px', height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <img src={Logo} alt="SIBOL Logo" className="w-28 h-28 object-contain animate-float" />
             </div>
           </div>
-
-          {/* Loading Text */}
           <div className="text-center">
             <h2 className="text-2xl md:text-3xl font-serif font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-900 via-green-600 to-green-900 mb-2">
               Loading
             </h2>
             <p className="text-sm text-green-700 font-medium">Verifying admin access...</p>
           </div>
-
-          {/* Progress Bar */}
           <div className="w-64 md:w-80 bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
-            <div className="shimmer-effect h-full rounded-full progress-bar"></div>
+            <div className="shimmer-effect h-full rounded-full progress-bar" />
           </div>
-
-          {/* Loading Dots */}
           <div className="flex gap-2">
-            <div className="w-3 h-3 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-            <div className="w-3 h-3 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-            <div className="w-3 h-3 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+            <div className="w-3 h-3 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+            <div className="w-3 h-3 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+            <div className="w-3 h-3 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
           </div>
         </div>
       </div>
     );
   }
 
+  // ── Auth failed ──
   if (!allowed) return <Navigate to="/guest/login" replace />;
 
-  return <Outlet/>;
+  // ── Authenticated layout with persistent sidebar ──
+  return (
+    <div className="flex flex-col md:flex-row min-h-screen">
+      {/* Sidebar lives HERE — never remounts on navigation */}
+      <AdminSidebar
+        collapsed={collapsed}
+        onToggleCollapse={() => setCollapsed(c => !c)}
+        showLogout={showLogout}
+        onLogoutOpen={() => setShowLogout(true)}
+        onLogoutClose={() => setShowLogout(false)}
+      />
+
+      <div className="flex-1 flex flex-col min-h-screen">
+        {/* Navbar once, here */}
+        <div className="bg-white shadow-sm sticky top-0 z-30">
+          <AdminNavbar />
+        </div>
+
+        {/* Page content — remove navbar from all individual pages */}
+        <main className="flex-1 flex flex-col overflow-auto pb-16 md:pb-0">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
 };
 
-export default AdminLayout
+export default AdminLayout;

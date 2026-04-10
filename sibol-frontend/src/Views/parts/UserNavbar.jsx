@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Bell, X, Check, Info, AlertCircle, Droplet, CheckCircle } from 'lucide-react'
+import { Bell, X, Check, Info, AlertCircle, Droplet, CheckCircle, RotateCcw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Logo from '../../assets/logo-left.png'
 import axiosClient from '../axios'
@@ -11,7 +11,9 @@ const UserNavbar = () => {
   const [notifications, setNotifications] = useState([]);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [wsConnected, setWsConnected] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const notificationRef = useRef(null);
+  const channelRef = useRef(null);
 
   // ── Helper: prepend new notification without duplicates ──
   const addNotification = (notif) => {
@@ -30,22 +32,58 @@ const UserNavbar = () => {
     }
   };
 
-  // ── Initial fetch on mount ──
-  // useEffect(() => {
-  //   fetchNotifications();
-  //   // Fallback polling every 30s (WS handles real-time, polling is a safety net)
-  //   const interval = setInterval(fetchNotifications, 30000);
-  //   return () => clearInterval(interval);
-  // }, []);
+  // ── Subscribe to Echo channel ──
+  const subscribeToChannel = (userId) => {
+    const channelName = `notifications.${userId}`;
 
+    // Leave existing channel if any
+    if (channelRef.current) {
+      echo.leave(channelName);
+      channelRef.current = null;
+    }
+
+    const channel = echo.private(channelName);
+    channelRef.current = channel;
+
+    channel
+      .listen('.notification.created', (data) => {
+        const notif = data.notification;
+        if (notif) addNotification(notif);
+      })
+      .subscribed(() => {
+        setWsConnected(true);
+        setIsReconnecting(false);
+        console.log(`[Echo] Subscribed to private channel: ${channelName}`);
+      })
+      .error((error) => {
+        setWsConnected(false);
+        setIsReconnecting(false);
+        console.error('[Echo] Channel subscription error:', error);
+      });
+
+    return channelName;
+  };
+
+  // ── Reconnect handler ──
+  const handleReconnect = async () => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+
+    setIsReconnecting(true);
+    setWsConnected(false);
+
+    // Re-fetch data too
+    await fetchNotifications();
+    subscribeToChannel(userId);
+  };
+
+  // ── Initial fetch on mount ──
   useEffect(() => {
     fetchNotifications();
   }, []);
 
   // ── WebSocket subscription via Laravel Echo ──
   useEffect(() => {
-    // userId must be stored in localStorage at login time:
-    // localStorage.setItem('userId', response.data.user.id)
     const userId = localStorage.getItem('userId');
 
     if (!userId) {
@@ -53,33 +91,15 @@ const UserNavbar = () => {
       return;
     }
 
-    const channelName = `notifications.${userId}`;
-
-    const channel = echo.private(channelName);
-
-    channel
-      .listen('.notification.created', (data) => {
-        // broadcastWith() returns { notification: { ...fields } }
-        const notif = data.notification;
-        if (notif) {
-          addNotification(notif);
-        }
-      })
-      .subscribed(() => {
-        setWsConnected(true);
-        console.log(`[Echo] Subscribed to private channel: ${channelName}`);
-      })
-      .error((error) => {
-        setWsConnected(false);
-        console.error('[Echo] Channel subscription error:', error);
-      });
+    const channelName = subscribeToChannel(userId);
 
     return () => {
       echo.leave(channelName);
+      channelRef.current = null;
       setWsConnected(false);
       console.log(`[Echo] Left channel: ${channelName}`);
     };
-  }, []); // runs once on mount
+  }, []);
 
   // ── Close panel on outside click ──
   useEffect(() => {
@@ -242,11 +262,29 @@ const UserNavbar = () => {
                               {unreadCount} new
                             </span>
                           )}
-                          {/* Live indicator pill */}
+                          {/* Live indicator pill — shown when connected */}
                           {wsConnected && (
                             <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
                               <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
                               <span className="text-[9px] text-emerald-400 font-medium">Live</span>
+                            </span>
+                          )}
+                          {/* Disconnected + reload button — shown when not connected */}
+                          {!wsConnected && (
+                            <span className="flex items-center gap-1.5">
+                              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-white/6 border border-white/10">
+                                <span className="w-1 h-1 rounded-full bg-white/25" />
+                                <span className="text-[9px] text-white/30 font-medium">Not live</span>
+                              </span>
+                              <button
+                                onClick={handleReconnect}
+                                disabled={isReconnecting}
+                                title="Reconnect"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/6 hover:bg-emerald-500/15 border border-white/10 hover:border-emerald-500/30 text-white/35 hover:text-emerald-400 text-[9px] font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                <RotateCcw className={`w-2.5 h-2.5 ${isReconnecting ? 'animate-spin' : ''}`} />
+                                {isReconnecting ? 'Connecting…' : 'Reload'}
+                              </button>
                             </span>
                           )}
                         </div>
