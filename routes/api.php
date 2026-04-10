@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Broadcast;
 
 // routes/api.php
 Route::get('/test-notification', function () {
-    $userId = auth()->id() ?? 3; // use logged-in user if available
+    $userId = auth()->id() ?? 1; // use logged-in user if available
     $user = \App\Models\User::find($userId);
 
     $notification = Notification::create([
