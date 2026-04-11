@@ -328,7 +328,7 @@ const App = () => {
             <a href="/guest/login" className="px-8 py-2.5 rounded-full bg-[#144528] hover:bg-[#0b3d1e] text-white text-[13px] font-bold transition-colors shadow-lg">
               LOGIN
             </a>
-            <a href="/guest/register" className="px-8 py-2.5 rounded-full bg-[#20693a] hover:bg-[#2d8f52] text-white text-[13px] font-bold transition-colors shadow-lg">
+            <a href="/guest/sign_up" className="px-8 py-2.5 rounded-full bg-[#20693a] hover:bg-[#2d8f52] text-white text-[13px] font-bold transition-colors shadow-lg">
               SIGN UP
             </a>
           </div>
