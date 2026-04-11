@@ -40,33 +40,24 @@ const UserDashboard = () => {
 
   const navigate = useNavigate();
 
-  // Custom hook for live websocket data
-  // Ensure your useSensorData hook returns { ..., airHumidityHistory, setAirHumidityHistory, isConnected }
   const { airHumidityHistory, isConnected, setAirHumidityHistory } = useSensorData(gardenId);
 
-  // 1. Fetch historical data on mount and seed the hook's state
   useEffect(() => {
     const fetchHistory = async () => {
       try {
         const res = await axiosClient.get('/getAirHumidity');
         const formattedData = Array.isArray(res.data) ? res.data : (res.data.data || []);
-
-        // Push database history into the hook so live data appends to it
         if (typeof setAirHumidityHistory === 'function') {
           setAirHumidityHistory(formattedData);
         }
       } catch (err) {
-        console.error("Fetch history error:", err);
+        console.error('Fetch history error:', err);
         setError('Database connection error.');
       }
     };
-
-    if (gardenId) {
-        fetchHistory();
-    }
+    if (gardenId) fetchHistory();
   }, [gardenId, setAirHumidityHistory]);
 
-  // Use the history from the hook directly as the chart data
   const chartData = airHumidityHistory;
 
   useEffect(() => {
@@ -87,13 +78,11 @@ const UserDashboard = () => {
   useEffect(() => {
     if (!location) return;
     axios.get('https://api.weatherapi.com/v1/forecast.json', {
-      params: { key: apikey, q: location, days: 3 }
-    })
-      .then(res => {
-        setWeather(res.data);
-        setForecastData(res.data.forecast.forecastday);
-      })
-      .catch(console.error);
+      params: { key: apikey, q: location, days: 3 },
+    }).then(res => {
+      setWeather(res.data);
+      setForecastData(res.data.forecast.forecastday);
+    }).catch(console.error);
   }, [location, apikey]);
 
   useEffect(() => {
@@ -106,9 +95,7 @@ const UserDashboard = () => {
       .then(res => {
         const cropList = res.data.data;
         setCrops(cropList);
-        if (cropList?.length > 0) {
-          setGardenId(cropList[0].garden?.id);
-        }
+        if (cropList?.length > 0) setGardenId(cropList[0].garden?.id);
       })
       .catch(err => setError(err.response?.data?.message || 'Something Went Wrong!'));
   }, []);
@@ -144,7 +131,7 @@ const UserDashboard = () => {
   const getTemp = (c, f) => unit === 'C' ? Math.round(c) : Math.round(f);
 
   return (
-    <div className="min-h-screen bg-[#f7f4ee] font-['DM_Sans',sans-serif] overflow-x-hidden">
+    <div className="min-h-screen w-full max-w-full bg-[#f7f4ee] font-['DM_Sans',sans-serif]">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap');
         .playfair { font-family: 'Playfair Display', serif; }
@@ -154,23 +141,32 @@ const UserDashboard = () => {
         .thin-scroll::-webkit-scrollbar-track { background: transparent; }
         .thin-scroll::-webkit-scrollbar-thumb { background: rgba(46,139,87,0.3); border-radius: 10px; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        * { box-sizing: border-box; }
       `}</style>
 
-      <div className="px-6 md:px-10 py-9 pb-20 md:pb-14">
+      {/* ── Page header — matches CropProfile ── */}
+      <div className="w-full px-6 md:px-10 pt-9">
         <p className="text-[11px] font-medium tracking-[2px] uppercase text-[#2e8b57] mb-1.5">
           Good to see you
         </p>
         <h1 className="playfair text-[clamp(28px,3.5vw,44px)] font-bold leading-tight text-[#0b3d1e] mb-4">
-          Welcome back, <em className="not-italic text-[#2e8b57]">{name}</em>
+          Welcome back, <em className="text-[#f0a830]">{name}</em>
         </h1>
         <div className="w-10 h-0.5 bg-[#d4840a] mb-8" />
+      </div>
 
-        <div className="flex flex-wrap gap-5 mb-6">
-          {/* Weather card */}
-          <div className="relative w-[280px] shrink-0 rounded-[20px] overflow-hidden border border-white/14 bg-gradient-to-br from-[rgba(26,102,54,0.82)] via-[rgba(11,61,30,0.88)] to-[rgba(11,61,30,0.92)] p-6">
+      {/* ── Content ── */}
+      <div className="w-full px-6 md:px-10 pb-28 md:pb-14 flex flex-col gap-6">
+
+        {/* ── Row 1: Weather + Forecast + Advisory — stack on mobile, row on desktop ── */}
+        <div className="flex flex-col md:flex-row gap-5">
+
+          {/* Weather card — full width on mobile */}
+          <div className="relative w-full md:w-[280px] md:shrink-0 rounded-[20px] overflow-hidden border border-white/14 bg-gradient-to-br from-[rgba(26,102,54,0.82)] via-[rgba(11,61,30,0.88)] to-[rgba(11,61,30,0.92)] p-6">
             <Orb className="w-[200px] h-[200px] -top-[60px] -right-[60px] bg-[radial-gradient(circle,rgba(46,139,87,0.18)_0%,transparent_70%)]" />
             <Orb className="w-[120px] h-[120px] -bottom-5 -left-5 bg-[radial-gradient(circle,rgba(212,132,10,0.12)_0%,transparent_70%)]" />
-            <div className="relative z-10 flex items-center justify-between mb-5">
+
+            <div className="relative z-10 flex items-center justify-between gap-2 flex-wrap mb-5">
               <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-[12px] font-medium text-white/90">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 48 48">
                   <path fill="none" stroke="rgba(255,255,255,0.8)" strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M24 44s14-10.435 14-24A14 14 0 1 0 10 20c0 13.565 14 24 14 24z" />
@@ -192,10 +188,12 @@ const UserDashboard = () => {
                 </div>
               </button>
             </div>
+
             <div className="relative z-10 text-center mb-4">
               <div className="playfair text-[13px] text-white/60 tracking-wider">{weekday}</div>
               <div className="text-[11px] text-white/40 mt-0.5">{formattedDate}</div>
             </div>
+
             {weather ? (
               <div className="relative z-10 flex items-center justify-between">
                 <div>
@@ -216,8 +214,8 @@ const UserDashboard = () => {
             )}
           </div>
 
-          {/* Forecast card */}
-          <div className="relative flex-1 min-w-[300px] rounded-[20px] overflow-hidden bg-gradient-to-br from-[rgba(26,102,54,0.82)] via-[rgba(11,61,30,0.88)] to-[rgba(11,61,30,0.92)] border border-white/14 p-6">
+          {/* Forecast card — full width on mobile, flex-1 on desktop */}
+          <div className="relative w-full md:flex-1 rounded-[20px] overflow-hidden bg-gradient-to-br from-[rgba(26,102,54,0.82)] via-[rgba(11,61,30,0.88)] to-[rgba(11,61,30,0.92)] border border-white/14 p-6">
             <Orb className="w-[300px] h-[300px] -top-[100px] -right-[80px] bg-[radial-gradient(circle,rgba(46,139,87,0.13)_0%,transparent_70%)]" />
             <div className="relative z-10 mb-5">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[rgba(168,197,160,0.2)] bg-[rgba(46,139,87,0.15)] text-[10px] font-semibold tracking-[1.5px] uppercase text-[rgba(168,197,160,0.9)] mb-3">
@@ -233,22 +231,22 @@ const UserDashboard = () => {
                 {forecastData.map((day, i) => (
                   <div
                     key={i}
-                    className="forecast-card rounded-2xl p-5 text-center cursor-pointer border border-white/16 transition-all duration-300"
+                    className="forecast-card rounded-2xl p-3 sm:p-5 text-center cursor-pointer border border-white/16 transition-all duration-300"
                     style={{ background: 'rgba(255,255,255,0.10)' }}
                   >
-                    <div className="text-[11px] font-semibold text-white/70 tracking-wide mb-3">
+                    <div className="text-[11px] font-semibold text-white/70 tracking-wide mb-2 sm:mb-3">
                       {i === 0 ? 'Today' : getShortDay(day.date)}
                     </div>
-                    <div className="flex justify-center mb-3">
+                    <div className="flex justify-center mb-2 sm:mb-3">
                       {getWeatherIcon(day.day.condition.text)}
                     </div>
-                    <div className="playfair text-[28px] font-bold text-white">
+                    <div className="playfair text-[22px] sm:text-[28px] font-bold text-white">
                       {getTemp(day.day.maxtemp_c, day.day.maxtemp_f)}°
                     </div>
-                    <div className="text-[14px] text-white/50 my-0.5">
+                    <div className="text-[13px] text-white/50 my-0.5">
                       {getTemp(day.day.mintemp_c, day.day.mintemp_f)}°
                     </div>
-                    <div className="text-[10px] text-white/55 font-medium">{day.day.condition.text}</div>
+                    <div className="text-[10px] text-white/55 font-medium leading-tight">{day.day.condition.text}</div>
                   </div>
                 ))}
               </div>
@@ -257,14 +255,14 @@ const UserDashboard = () => {
             )}
           </div>
 
-          {/* Crop advisory */}
-          <div className="relative w-[240px] shrink-0 rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-6">
+          {/* Advisory card — full width on mobile */}
+          <div className="relative w-full md:w-[240px] md:shrink-0 rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-6">
             <Orb className="w-[150px] h-[150px] -top-10 -right-10 bg-[radial-gradient(circle,rgba(46,139,87,0.13)_0%,transparent_70%)]" />
             <div className="relative z-10">
               <SectionPill label="Advisory" />
               <div className="flex items-center justify-between mb-3.5">
                 <div className="playfair text-[18px] font-bold text-[#0b3d1e]">
-                  Crop <em>Alerts</em>
+                  Crop <em className="text-[#f0a830]">Alerts</em>
                 </div>
                 {cropAdvisory?.length > 0 && (
                   <span className="bg-[#d4840a] text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
@@ -297,8 +295,8 @@ const UserDashboard = () => {
           </div>
         </div>
 
-        {/* Chart Section */}
-        <div className="relative rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-7 mb-6">
+        {/* ── Chart Section ── */}
+        <div className="relative w-full rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-7">
           <Orb className="w-[250px] h-[250px] -top-[80px] -right-[60px] bg-[radial-gradient(circle,rgba(212,132,10,0.12)_0%,transparent_70%)]" />
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-1">
@@ -309,7 +307,7 @@ const UserDashboard = () => {
             </div>
             <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
               <div className="playfair text-[22px] font-bold text-[#0b3d1e]">
-                Environmental <em className="text-[#2e8b57]">Conditions</em>
+                Environmental <em className="text-[#f0a830]">Conditions</em>
               </div>
               <div className="flex gap-4">
                 <div className="flex items-center gap-1.5 text-[12px] font-medium text-gray-500">
@@ -348,14 +346,16 @@ const UserDashboard = () => {
           </div>
         </div>
 
-        {/* Crops Section */}
-        <div className="flex flex-wrap gap-5">
-          <div className="relative flex-1 min-w-[300px] rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-7">
+        {/* ── Crops Section — stack on mobile, row on desktop ── */}
+        <div className="flex flex-col md:flex-row gap-5">
+
+          {/* Available crops table */}
+          <div className="relative w-full md:flex-1 rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-7">
             <Orb className="w-40 h-40 -top-10 -left-10 bg-[radial-gradient(circle,rgba(46,139,87,0.13)_0%,transparent_70%)]" />
             <div className="relative z-10">
               <SectionPill label="Garden" />
               <div className="playfair text-[22px] font-bold text-[#0b3d1e] mb-5">
-                Available <em className="text-[#2e8b57]">Crops</em>
+                Available <em className="text-[#f0a830]">Crops</em>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
@@ -404,7 +404,8 @@ const UserDashboard = () => {
             </div>
           </div>
 
-          <div className="relative flex-1 min-w-[300px] rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07]">
+          {/* Crop detail card */}
+          <div className="relative w-full md:flex-1 rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07]">
             <Orb className="w-40 h-40 -bottom-10 -right-10 bg-[radial-gradient(circle,rgba(212,132,10,0.12)_0%,transparent_70%)]" />
             <div className="relative h-[220px] overflow-hidden">
               <img
@@ -477,6 +478,7 @@ const UserDashboard = () => {
             </div>
           </div>
         </div>
+
       </div>
     </div>
   );
