@@ -352,7 +352,7 @@ const Login = () => {
 
           {/* Mobile brand */}
           <div className="auth-brand-mobile">
-            <div className="auth-brand-chip"><img src={Logo} alt="" /></div>
+            <button onClick={() => navigate('/')} className="auth-brand-chip"><img src={Logo} alt="" /></button>
             <span className="auth-brand-name">SIBOL</span>
           </div>
 
