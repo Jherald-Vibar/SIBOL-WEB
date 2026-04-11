@@ -11,6 +11,7 @@ import Logo5 from './assets/logo5.png'
 import Image1 from './assets/first_image.png'
 import Image2 from './assets/second_image.png'
 import Image3 from './assets/third_image.png'
+import Video from './assets/video/vid.mp4'
 import "mapbox-gl/dist/mapbox-gl.css"
 import mapboxgl from "mapbox-gl"
 import Footer from './Views/parts/Footer'
@@ -112,7 +113,7 @@ const LiveSensorCard = () => {
         </span>
       </div>
 
-      {/* Metrics row (Now includes pH) */}
+      {/* Metrics row */}
       <div className="grid grid-cols-2 gap-2 px-5 pb-4">
         {[
           { label: 'Moisture', val: `${moisture.toFixed(1)}%` },
@@ -209,6 +210,103 @@ const LiveSensorCard = () => {
   )
 }
 
+// ─── Floating Navbar ───────────────────────────────────────────────────────────
+const FloatingNav = () => {
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 80)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  if (scrolled) {
+    return (
+      // Stretches edge-to-edge with only 20px left/right margin
+      <div
+        className="fixed z-50"
+        style={{
+          top: '16px',
+          left: '20px',
+          right: '20px',
+          animation: 'navFloat 0.35s cubic-bezier(0.34,1.56,0.64,1) both',
+        }}
+      >
+        <div
+          className="w-full flex items-center justify-between px-6 py-3 rounded-full shadow-2xl"
+          style={{
+            background: 'rgba(11, 61, 30, 0.90)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.15)',
+          }}
+        >
+          {/* Left — logo + brand */}
+          <div className="flex items-center gap-3">
+            <img src={LOGO} alt="Sibol" className="w-7 h-7 object-contain" />
+            <span className="text-[12px] font-bold text-white tracking-widest uppercase">
+              SIBOL
+            </span>
+            <span className="hidden sm:block text-white/30 text-[11px] font-medium">
+              — IOT Crop Monitoring
+            </span>
+          </div>
+
+          {/* Right — nav links + auth buttons */}
+          <div className="flex items-center gap-2">
+            <a
+              href="#know-us"
+              className="hidden md:block px-4 py-1.5 text-white/70 text-[11px] font-medium hover:text-white transition-colors"
+            >
+              About
+            </a>
+            <a
+              href="#video-section"
+              className="hidden md:block px-4 py-1.5 text-white/70 text-[11px] font-medium hover:text-white transition-colors"
+            >
+              Demo
+            </a>
+            <div className="w-px h-4 bg-white/20 mx-1" />
+            <a
+              href="/guest/login"
+              className="px-4 py-1.5 rounded-full text-white text-[11px] font-bold transition-colors hover:bg-white/20"
+              style={{ background: 'rgba(255,255,255,0.1)' }}
+            >
+              Login
+            </a>
+            <a
+              href="/guest/sign_up"
+              className="px-4 py-1.5 rounded-full text-[11px] font-bold transition-colors hover:opacity-90"
+              style={{ background: '#f0a830', color: '#0b3d1e' }}
+            >
+              Sign Up
+            </a>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Default hero navbar
+  return (
+    <nav className="relative z-10 flex items-center justify-between px-8 lg:px-16 py-6">
+      <div className="border border-green-500/50 rounded-full px-5 py-2 backdrop-blur-sm bg-white/5">
+        <span className="text-[13px] font-bold text-white tracking-widest uppercase">
+          IOT Crop Monitoring
+        </span>
+      </div>
+      <div className="flex items-center gap-4">
+        <a href="/guest/login" className="px-8 py-2.5 rounded-full bg-[#144528] hover:bg-[#0b3d1e] text-white text-[13px] font-bold transition-colors shadow-lg">
+          LOGIN
+        </a>
+        <a href="/guest/sign_up" className="px-8 py-2.5 rounded-full bg-[#20693a] hover:bg-[#2d8f52] text-white text-[13px] font-bold transition-colors shadow-lg">
+          SIGN UP
+        </a>
+      </div>
+    </nav>
+  )
+}
+
 // ─── Main App ──────────────────────────────────────────────────────────────────
 const App = () => {
   const MapToken = import.meta.env.VITE_MAPS_APIKEY
@@ -245,13 +343,13 @@ const App = () => {
     return () => observer.disconnect()
   }, [])
 
-  // Restored Mapbox Logic
+  // Mapbox
   useEffect(() => {
     if (!mapContainer.current || !MapToken) return
     const map = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
-      center: [120.9822, 14.6507], // Adjusted roughly to Caloocan bounds based on your profile
+      center: [120.9822, 14.6507],
       zoom: 15,
       pitch: 45,
       bearing: -17.6,
@@ -282,19 +380,21 @@ const App = () => {
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=DM+Sans:wght@400;500;700&display=swap');
         .font-playfair { font-family: 'Playfair Display', serif; }
 
-        /* Animations */
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeUp      { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes marqueeAnim { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        @keyframes navFloat    {
+          from { opacity: 0; transform: translateY(-14px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0)     scale(1);    }
+        }
 
-        .reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s ease-out; }
+        .reveal        { opacity: 0; transform: translateY(30px); transition: all 0.8s ease-out; }
         .reveal.visible { opacity: 1; transform: translateY(0); }
-        .anim-fadeUp { animation: fadeUp 1s ease-out both; }
+        .anim-fadeUp   { animation: fadeUp 1s ease-out both; }
         .anim-fadeUp-d { animation: fadeUp 1s 0.3s ease-out both; }
 
-        .marquee-run { animation: marqueeAnim 30s linear infinite; display: inline-block; white-space: nowrap; }
+        .marquee-run       { animation: marqueeAnim 30s linear infinite; display: inline-block; white-space: nowrap; }
         .marquee-run:hover { animation-play-state: paused; }
 
-        /* Glass Card */
         .glass-panel {
           background: rgba(18, 51, 30, 0.65);
           backdrop-filter: blur(16px);
@@ -303,40 +403,16 @@ const App = () => {
       `}</style>
 
       {/* ─── HERO SECTION ─── */}
-     <section
+      <section
         className="min-h-screen relative flex flex-col bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${BG})` }}
       >
-        {/* 1. Your new bg-hue.png filter layer */}
-        <div
-          className="absolute inset-0 z-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${BGHue})` }}
-        ></div>
+        <div className="absolute inset-0 z-0 bg-cover bg-center" style={{ backgroundImage: `url(${BGHue})` }} />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent z-0" />
 
-        {/* 2. The existing gradient (keeps the white text easy to read) */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent z-0"></div>
+        <FloatingNav />
 
-        {/* Navbar */}
-        <nav className="relative z-10 flex items-center justify-between px-8 lg:px-16 py-6">
-          <div className="border border-green-500/50 rounded-full px-5 py-2 backdrop-blur-sm bg-white/5">
-            <span className="text-[13px] font-bold text-white tracking-widest uppercase">
-              IOT Crop Monitoring
-            </span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <a href="/guest/login" className="px-8 py-2.5 rounded-full bg-[#144528] hover:bg-[#0b3d1e] text-white text-[13px] font-bold transition-colors shadow-lg">
-              LOGIN
-            </a>
-            <a href="/guest/sign_up" className="px-8 py-2.5 rounded-full bg-[#20693a] hover:bg-[#2d8f52] text-white text-[13px] font-bold transition-colors shadow-lg">
-              SIGN UP
-            </a>
-          </div>
-        </nav>
-
-        {/* Hero Content */}
         <div className="relative z-10 flex-1 flex flex-col lg:flex-row items-center justify-between px-8 lg:px-16 pb-12 pt-12 gap-12">
-          {/* Left Text */}
           <div className="flex-1 max-w-[500px] anim-fadeUp">
             <img src={LOGO} alt="Sibol Logo" className="w-28 mb-8 drop-shadow-2xl" />
             <h1 className="font-playfair text-[clamp(48px,5vw,64px)] font-bold leading-[1.1] text-white mb-6">
@@ -349,12 +425,11 @@ const App = () => {
             </p>
           </div>
 
-          {/* Right Live Sensor Card */}
           <LiveSensorCard />
         </div>
       </section>
 
-      {/* ─── RESTORED MARQUEE ─── */}
+      {/* ─── MARQUEE ─── */}
       <div className="bg-[#f0a830] py-4 overflow-hidden border-b border-[#d4840a]">
         {marqueeReady && (
           <div className="marquee-run">
@@ -394,7 +469,51 @@ const App = () => {
         </div>
       </section>
 
-      {/* ─── THE FULL PICTURE (Mapbox Restoration) ─── */}
+      {/* ─── VIDEO SECTION ─── */}
+      <section className="py-24 px-8 lg:px-16 bg-[#f4f2eb]">
+        <div
+          id="video-section"
+          data-animate
+          className={`reveal text-center ${isVisible['video-section'] ? 'visible' : ''}`}
+        >
+          <p className="text-[11px] font-bold tracking-[3px] uppercase text-[#0b3d1e]/60 mb-4">
+            See it in action
+          </p>
+          <h2 className="font-playfair text-[clamp(36px,4vw,48px)] font-bold text-[#0b3d1e] mb-4">
+            Watch SIBOL <br />
+            <em className="italic text-[#2d8f52]">come to life.</em>
+          </h2>
+          <div className="w-12 h-[3px] bg-[#f0a830] mx-auto mt-4 mb-12" />
+
+          {/* Video container */}
+          <div
+            className="relative max-w-4xl mx-auto rounded-3xl overflow-hidden shadow-2xl"
+            style={{ background: '#0b3d1e' }}
+          >
+            {/* 16:9 aspect ratio wrapper */}
+            <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
+              <video
+                className="absolute inset-0 w-full h-full object-cover"
+                src={Video}
+                controls
+                playsInline
+              />
+            </div>
+
+            {/* Subtle inner vignette — pointer-events:none so it doesn't block video controls */}
+            <div
+              className="absolute inset-0 pointer-events-none rounded-3xl"
+              style={{ boxShadow: 'inset 0 0 60px rgba(11,61,30,0.4)' }}
+            />
+          </div>
+
+          <p className="mt-8 text-[14px] text-[#0b3d1e]/60 max-w-md mx-auto leading-relaxed">
+            See how SIBOL monitors soil moisture, temperature, and crop health — all in real time, straight from the field.
+          </p>
+        </div>
+      </section>
+
+      {/* ─── THE FULL PICTURE (Mapbox) ─── */}
       <section className="bg-[#0b3d1e] pt-24 pb-0 relative text-center rounded-t-[40px] overflow-hidden shadow-[0_-20px_50px_rgba(0,0,0,0.15)]">
         <div className="px-8 lg:px-16 relative z-10">
           <p className="text-[11px] font-bold tracking-[3px] uppercase text-green-400 mb-4">The full picture</p>
@@ -406,19 +525,19 @@ const App = () => {
             See your fields the way they've never been seen before — live, connected, and beautifully clear.
           </p>
 
-          {/* Replaced 'INSERT VIDEO' with the Mapbox Map */}
           <div className="w-full max-w-5xl mx-auto h-[400px] md:h-[600px] bg-[#1a2e20] rounded-t-3xl overflow-hidden shadow-2xl relative border-t border-l border-r border-white/10">
             {import.meta.env.VITE_MAPS_APIKEY ? (
               <div ref={mapContainer} className="w-full h-full" />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-white/50">
-                <svg className="w-12 h-12 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+                <svg className="w-12 h-12 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
                 <p className="font-playfair text-2xl">Mapbox Token Required</p>
                 <p className="text-sm mt-2">Add VITE_MAPS_APIKEY to your .env file</p>
               </div>
             )}
-            {/* Inner shadow overlay to blend map into the section */}
-            <div className="absolute inset-0 pointer-events-none shadow-[inset_0_20px_40px_rgba(11,61,30,0.5)]"></div>
+            <div className="absolute inset-0 pointer-events-none shadow-[inset_0_20px_40px_rgba(11,61,30,0.5)]" />
           </div>
         </div>
       </section>
