@@ -55,7 +55,6 @@ export function useSensorData(gardenId) {
         })
         .listen('.sensor.updated', (event) => {
             console.log('🌱 SENSOR DATA RECEIVED:', event);
-            // ... rest of your code
         });
 
     return () => {

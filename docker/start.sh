@@ -1,6 +1,4 @@
 #!/bin/sh
-
-# Test DB connection
 echo "Testing DB connection..."
 
 php artisan storage:link
