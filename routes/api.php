@@ -165,6 +165,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/updateCrop/{crop_id}', [GardenController::class, 'updateCrop']);
     Route::delete('/deleteCrop/{crop_id}', [GardenController::class, 'deleteCrop']);
     Route::delete('/deleteEsp/{espId}',[GardenController::class, 'deleteEsp']);
+    Route::post('/claimDevice/{gardenId}', [GardenController::class, 'claimEspDevice']);
 
 
     //Admin Routes
