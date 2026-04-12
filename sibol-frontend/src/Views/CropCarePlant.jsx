@@ -356,7 +356,7 @@ const CropCarePlant = () => {
               Back to Crops
             </button>
             <h1 className="font-['Playfair_Display',serif] text-[clamp(26px,3.5vw,40px)] font-bold text-green-950 leading-tight">
-              {crop_name || 'Crop Details'}
+              {cropInfo.name || 'Crop Details'}
             </h1>
             <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-400 items-center">
               <span>Garden {garden_id}</span>

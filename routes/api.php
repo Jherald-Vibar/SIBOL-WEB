@@ -160,7 +160,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get("/getCrops", [GardenController::class, 'getCrops']);
     Route::get('/monthly-report/{year}/{month}', [IotController::class, 'downloadMonthlyReport']);
     Route::get('/user/crop-profile', [GardenController::class, 'getUserCropProfile']);
-    Route::get('/getSensorDataCrop/{garden_id}/{crop}', [GardenController::class, 'getSensorDataCrop']);
+    Route::get('/getSensorDataCrop/{garden_id}/{crop_id}', [GardenController::class, 'getSensorDataCrop']);
     Route::delete("/deleteGarden/{garden_id}", [GardenController::class, 'userGardenDelete']);
     Route::put('/updateCrop/{crop_id}', [GardenController::class, 'updateCrop']);
     Route::delete('/deleteCrop/{crop_id}', [GardenController::class, 'deleteCrop']);

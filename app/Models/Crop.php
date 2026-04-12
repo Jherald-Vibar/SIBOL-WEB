@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Termwind\Components\Dd;
 
 class Crop extends Model
 {
@@ -44,5 +45,9 @@ class Crop extends Model
     public function detectionResults()
     {
         return $this->hasMany(DetectionResults::class, 'crop_id');
+    }
+
+    public function esp() {
+        return $this->hasOne(Esp::class);
     }
 }
