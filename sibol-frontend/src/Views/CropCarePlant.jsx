@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import Echo from 'laravel-echo'
@@ -7,10 +7,47 @@ import UserNavbar from './parts/UserNavbar'
 import axiosClient from './axios'
 import Leaf from '../assets/leaf.png'
 
+// ── Client-side alert evaluator (mirrors backend logic) ───────────────────
+const evaluateAlerts = (data, profile) => {
+  if (!data || !profile) return []
+  const alerts = []
+
+  const check = (value, min, max, type, unit = '', sevLow = 'high', sevHigh = 'medium') => {
+    if (value == null || min == null || max == null) return
+    const v = parseFloat(value), mn = parseFloat(min), mx = parseFloat(max)
+    if (isNaN(v) || isNaN(mn) || isNaN(mx)) return
+    if (v < mn) alerts.push({
+      type,
+      severity: sevLow,
+      message: `Low ${type.replace(/_/g, ' ')} (${v}${unit}). Optimal: ${mn}–${mx}${unit}.`,
+      timestamp: new Date().toISOString(),
+    })
+    else if (v > mx) alerts.push({
+      type,
+      severity: sevHigh,
+      message: `High ${type.replace(/_/g, ' ')} (${v}${unit}). Optimal: ${mn}–${mx}${unit}.`,
+      timestamp: new Date().toISOString(),
+    })
+  }
+
+  check(data.soil_moisture,           profile.soil_moisture_min,           profile.soil_moisture_max,           'soil_moisture',           '%',  'high',   'medium')
+  check(data.ph,                      profile.ph_min,                      profile.ph_max,                      'ph',                      '',   'medium', 'medium')
+  check(data.soil_temperature,        profile.soil_temp_min,               profile.soil_temp_max,               'soil_temperature',        '°C', 'medium', 'high')
+  check(data.nitrogen,                profile.nitrogen_min,                profile.nitrogen_max,                'nitrogen',                '',   'high',   'medium')
+  check(data.phosphorus,              profile.phosphorus_min,              profile.phosphorus_max,              'phosphorus',              '',   'high',   'medium')
+  check(data.potassium,               profile.potassium_min,              profile.potassium_max,               'potassium',               '',   'high',   'medium')
+  check(data.electrical_conductivity, profile.electrical_conductivity_min, profile.electrical_conductivity_max, 'electrical_conductivity', '',   'medium', 'medium')
+  check(data.air_temperature,         profile.air_temperature_min,         profile.air_temperature_max,         'air_temperature',         '°C', 'medium', 'high')
+  check(data.air_humidity,            profile.air_humidity_min,            profile.air_humidity_max,            'air_humidity',            '%',  'medium', 'medium')
+
+  return alerts
+}
+
 const CropCarePlant = () => {
   const { garden_id, crop_name } = useParams()
   const navigate = useNavigate()
-  const gardenEchoRef = useRef(null)
+  const gardenEchoRef  = useRef(null)
+  const cropProfileRef = useRef(null) // stable ref so WS closure always reads latest profile
 
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState('')
@@ -26,17 +63,21 @@ const CropCarePlant = () => {
   const [wsConnected,  setWsConnected]  = useState(false)
   const [lastUpdated,  setLastUpdated]  = useState(null)
 
+  // Keep ref in sync with state so the WebSocket closure always has latest profile
+  useEffect(() => { cropProfileRef.current = cropProfile }, [cropProfile])
+
   // ── Initial fetch ─────────────────────────────────────────────────────────
   const fetchSensorData = async () => {
     setLoading(true)
     try {
       const res = await axiosClient.get(`/getSensorDataCrop/${garden_id}/${crop_name}`)
       if (res.data.success) {
-        setCropInfo(res.data.data.crop)
-        setCropProfile(res.data.data.crop_profile)
-        setSensorData(res.data.data.latest)
-        setAlerts(res.data.data.alerts || [])
-        setHistoryData(res.data.data.history || [])
+        const { crop, crop_profile, latest, history, alerts: serverAlerts } = res.data.data
+        setCropInfo(crop)
+        setCropProfile(crop_profile)
+        setSensorData(latest)
+        setAlerts(serverAlerts || [])
+        setHistoryData(history || [])
         setLastUpdated(new Date())
       }
     } catch (err) {
@@ -50,7 +91,6 @@ const CropCarePlant = () => {
   const connectEcho = () => {
     if (!garden_id || !crop_name) return
 
-    // Tear down any existing connection first
     if (gardenEchoRef.current) {
       gardenEchoRef.current.leaveChannel(`garden.${garden_id}`)
       gardenEchoRef.current.disconnect()
@@ -59,41 +99,45 @@ const CropCarePlant = () => {
 
     window.Pusher = Pusher
 
-        gardenEchoRef.current = new Echo({
-        broadcaster: 'pusher',
-        key: '329d2861d0c6f9e42c30',
-        cluster: 'ap1',
-        forceTLS: true,
-        authEndpoint: 'https://sibol-web.onrender.com/api/broadcasting/auth',
-        auth: {
-            headers: {
-                get Authorization() {
-                    return `Bearer ${localStorage.getItem('authToken')}`;
-                },
-                Accept: 'application/json',
-            },
+    gardenEchoRef.current = new Echo({
+      broadcaster: 'pusher',
+      key: '329d2861d0c6f9e42c30',
+      cluster: 'ap1',
+      forceTLS: true,
+      authEndpoint: 'https://sibol-web.onrender.com/api/broadcasting/auth',
+      auth: {
+        headers: {
+          get Authorization() { return `Bearer ${localStorage.getItem('authToken')}` },
+          Accept: 'application/json',
         },
+      },
     })
 
-    const channel = gardenEchoRef.current.channel(`garden.${garden_id}`)
-
-    channel
+    gardenEchoRef.current
+      .channel(`garden.${garden_id}`)
       .listen('.sensor.updated', (e) => {
         const d = e.sensor_data
 
-        setSensorData(prev => ({
-          ...prev,
-          soil_temperature:        d.soil_temperature,
-          air_temperature:         d.air_temperature,
-          air_humidity:            d.air_humidity,
-          soil_moisture:           d.soil_moisture,
-          ph:                      d.ph,
-          electrical_conductivity: d.electrical_conductivity,
-          nitrogen:                d.nitrogen,
-          phosphorus:              d.phosphorus,
-          potassium:               d.potassium,
-          created_at:              d.recorded_at,
-        }))
+        setSensorData(prev => {
+          const updated = {
+            ...prev,
+            soil_temperature:        d.soil_temperature,
+            air_temperature:         d.air_temperature,
+            air_humidity:            d.air_humidity,
+            soil_moisture:           d.soil_moisture,
+            ph:                      d.ph,
+            electrical_conductivity: d.electrical_conductivity,
+            nitrogen:                d.nitrogen,
+            phosphorus:              d.phosphorus,
+            potassium:               d.potassium,
+            created_at:              d.recorded_at,
+          }
+
+          // ✅ Re-evaluate alerts every WebSocket push using latest profile ref
+          setAlerts(evaluateAlerts(updated, cropProfileRef.current))
+
+          return updated
+        })
 
         setHistoryData(prev => [{
           soil_temperature: d.soil_temperature,
@@ -106,12 +150,8 @@ const CropCarePlant = () => {
         setLastUpdated(new Date())
         setWsConnected(true)
       })
-      .subscribed(() => {
-        setWsConnected(true)
-      })
-      .error(() => {
-        setWsConnected(false)
-      })
+      .subscribed(() => setWsConnected(true))
+      .error(()    => setWsConnected(false))
   }
 
   const handleReconnect = () => {
@@ -123,10 +163,8 @@ const CropCarePlant = () => {
   // ── WebSocket + initial fetch ─────────────────────────────────────────────
   useEffect(() => {
     if (!garden_id || !crop_name) return
-
     fetchSensorData()
     connectEcho()
-
     return () => {
       gardenEchoRef.current?.leaveChannel(`garden.${garden_id}`)
       gardenEchoRef.current?.disconnect()
@@ -140,8 +178,8 @@ const CropCarePlant = () => {
     return () => window.removeEventListener('keydown', onKey)
   }, [isModalOpen])
 
-  const openImageModal  = (url) => { setModalImage(url); setIsModalOpen(true); document.body.style.overflow = 'hidden' }
-  const closeImageModal = ()    => { setIsModalOpen(false); setModalImage(null); document.body.style.overflow = 'unset' }
+  const openImageModal  = (url) => { setModalImage(url); setIsModalOpen(true);  document.body.style.overflow = 'hidden' }
+  const closeImageModal = ()    => { setIsModalOpen(false); setModalImage(null); document.body.style.overflow = 'unset'  }
 
   // ── Status helpers ────────────────────────────────────────────────────────
   const rangeStatus = (value, min, max, lowLabel = 'Low', highLabel = 'High') => {
@@ -228,15 +266,15 @@ const CropCarePlant = () => {
         getIndividualNutrientStatus(k, cropProfile.potassium_min,  cropProfile.potassium_max),
       ]
       const good = stats.filter(s => s === 'good').length
-      if (good === 3) return { label: 'Optimal', tier: 'good' }
-      if (good >= 2)  return { label: 'Good', tier: 'good' }
-      if (good === 1) return { label: 'Needs Attention', tier: 'warn' }
-      return { label: 'Critical', tier: 'critical' }
+      if (good === 3) return { label: 'Optimal',          tier: 'good'     }
+      if (good >= 2)  return { label: 'Good',             tier: 'good'     }
+      if (good === 1) return { label: 'Needs Attention',  tier: 'warn'     }
+      return              { label: 'Critical',           tier: 'critical' }
     }
     const avg = (parseFloat(n) + parseFloat(p) + parseFloat(k)) / 3
-    if (avg > 70) return { label: 'High', tier: 'good' }
-    if (avg > 40) return { label: 'Medium', tier: 'warn' }
-    return { label: 'Low', tier: 'critical' }
+    if (avg > 70) return { label: 'High',   tier: 'good'     }
+    if (avg > 40) return { label: 'Medium', tier: 'warn'     }
+    return              { label: 'Low',    tier: 'critical' }
   }
 
   const getSimpleStatus = (value, min, max) => {
@@ -565,8 +603,13 @@ const CropCarePlant = () => {
 
             {/* Alerts */}
             <div className="bg-white rounded-2xl p-5 border border-black/[0.05] flex-1 flex flex-col">
-              <h3 className="font-['Playfair_Display',serif] text-base font-bold text-green-950 mb-3.5 flex items-center gap-1.5">
-                ⚠️ Alerts
+              <h3 className="font-['Playfair_Display',serif] text-base font-bold text-green-950 mb-3.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">⚠️ Alerts</span>
+                {alerts?.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-[11px] font-bold border border-red-200">
+                    {alerts.length}
+                  </span>
+                )}
               </h3>
               <div className="overflow-y-auto flex-1 max-h-[200px] flex flex-col gap-2">
                 {alerts?.length > 0 ? alerts.map((alert, i) => {

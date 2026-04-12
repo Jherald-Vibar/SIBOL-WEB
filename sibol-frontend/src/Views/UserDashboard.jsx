@@ -112,7 +112,7 @@ const UserDashboard = () => {
     .replace(/\//g, ' / ');
 
   const handleMoreDetails = (crop) =>
-    navigate(`/user/crop-care/${crop.garden?.id}/${crop.name}`);
+    navigate(`/user/crop-care/${crop.garden?.id}/${crop.id}`);
 
   const formatPlantedDate = (d) =>
     d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
