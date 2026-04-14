@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import Echo from 'laravel-echo'
@@ -35,7 +35,7 @@ const evaluateAlerts = (data, profile) => {
   check(data.soil_temperature,        profile.soil_temp_min,               profile.soil_temp_max,               'soil_temperature',        '°C', 'medium', 'high')
   check(data.nitrogen,                profile.nitrogen_min,                profile.nitrogen_max,                'nitrogen',                '',   'high',   'medium')
   check(data.phosphorus,              profile.phosphorus_min,              profile.phosphorus_max,              'phosphorus',              '',   'high',   'medium')
-  check(data.potassium,               profile.potassium_min,              profile.potassium_max,               'potassium',               '',   'high',   'medium')
+  check(data.potassium,               profile.potassium_min,               profile.potassium_max,               'potassium',               '',   'high',   'medium')
   check(data.electrical_conductivity, profile.electrical_conductivity_min, profile.electrical_conductivity_max, 'electrical_conductivity', '',   'medium', 'medium')
   check(data.air_temperature,         profile.air_temperature_min,         profile.air_temperature_max,         'air_temperature',         '°C', 'medium', 'high')
   check(data.air_humidity,            profile.air_humidity_min,            profile.air_humidity_max,            'air_humidity',            '%',  'medium', 'medium')
@@ -47,21 +47,25 @@ const CropCarePlant = () => {
   const { garden_id, crop_name } = useParams()
   const navigate = useNavigate()
   const gardenEchoRef  = useRef(null)
-  const cropProfileRef = useRef(null) // stable ref so WS closure always reads latest profile
+  const cropProfileRef = useRef(null)
 
-  const [loading,      setLoading]      = useState(true)
-  const [error,        setError]        = useState('')
-  const [sensorData,   setSensorData]   = useState(null)
-  const [cropInfo,     setCropInfo]     = useState(null)
-  const [cropProfile,  setCropProfile]  = useState(null)
-  const [alerts,       setAlerts]       = useState([])
-  const [historyData,  setHistoryData]  = useState([])
-  const [isIrrigating, setIsIrrigating] = useState(false)
-  const [imageError,   setImageError]   = useState(false)
-  const [isModalOpen,  setIsModalOpen]  = useState(false)
-  const [modalImage,   setModalImage]   = useState(null)
-  const [wsConnected,  setWsConnected]  = useState(false)
-  const [lastUpdated,  setLastUpdated]  = useState(null)
+  const [loading,              setLoading]              = useState(true)
+  const [error,                setError]                = useState('')
+  const [sensorData,           setSensorData]           = useState(null)
+  const [cropInfo,             setCropInfo]             = useState(null)
+  const [cropProfile,          setCropProfile]          = useState(null)
+  const [alerts,               setAlerts]               = useState([])
+  const [historyData,          setHistoryData]          = useState([])
+  const [imageError,           setImageError]           = useState(false)
+  const [isModalOpen,          setIsModalOpen]          = useState(false)
+  const [modalImage,           setModalImage]           = useState(null)
+  const [wsConnected,          setWsConnected]          = useState(false)
+  const [lastUpdated,          setLastUpdated]          = useState(null)
+
+  // ── Irrigation state ──────────────────────────────────────────────────────
+  const [isIrrigating,         setIsIrrigating]         = useState(false)
+  const [irrigationLoading,    setIrrigationLoading]    = useState(false)
+  const [showIrrigationModal,  setShowIrrigationModal]  = useState(false)
 
   // Keep ref in sync with state so the WebSocket closure always has latest profile
   useEffect(() => { cropProfileRef.current = cropProfile }, [cropProfile])
@@ -87,7 +91,7 @@ const CropCarePlant = () => {
     }
   }
 
-  // ── Connect / reconnect WebSocket ────────────────────────────────────────
+  // ── Connect / reconnect WebSocket ─────────────────────────────────────────
   const connectEcho = () => {
     if (!garden_id || !crop_name) return
 
@@ -133,9 +137,7 @@ const CropCarePlant = () => {
             created_at:              d.recorded_at,
           }
 
-          // ✅ Re-evaluate alerts every WebSocket push using latest profile ref
           setAlerts(evaluateAlerts(updated, cropProfileRef.current))
-
           return updated
         })
 
@@ -160,7 +162,6 @@ const CropCarePlant = () => {
     connectEcho()
   }
 
-  // ── WebSocket + initial fetch ─────────────────────────────────────────────
   useEffect(() => {
     if (!garden_id || !crop_name) return
     fetchSensorData()
@@ -178,6 +179,32 @@ const CropCarePlant = () => {
     return () => window.removeEventListener('keydown', onKey)
   }, [isModalOpen])
 
+  // ── Irrigation handlers ───────────────────────────────────────────────────
+  const handleIrrigationClick = () => {
+    if (!isIrrigating) {
+      setShowIrrigationModal(true) // show warning before starting
+    } else {
+      triggerIrrigation('off')     // stop directly, no warning needed
+    }
+  }
+
+  const triggerIrrigation = async (state) => {
+    setShowIrrigationModal(false)
+    setIrrigationLoading(true)
+    try {
+      await axiosClient.post('/irrigation/toggle', {
+        garden_id,
+        state,
+      })
+      setIsIrrigating(state === 'on')
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to toggle irrigation. Please try again.')
+    } finally {
+      setIrrigationLoading(false)
+    }
+  }
+
+  // ── Image modal ───────────────────────────────────────────────────────────
   const openImageModal  = (url) => { setModalImage(url); setIsModalOpen(true);  document.body.style.overflow = 'hidden' }
   const closeImageModal = ()    => { setIsModalOpen(false); setModalImage(null); document.body.style.overflow = 'unset'  }
 
@@ -266,10 +293,10 @@ const CropCarePlant = () => {
         getIndividualNutrientStatus(k, cropProfile.potassium_min,  cropProfile.potassium_max),
       ]
       const good = stats.filter(s => s === 'good').length
-      if (good === 3) return { label: 'Optimal',          tier: 'good'     }
-      if (good >= 2)  return { label: 'Good',             tier: 'good'     }
-      if (good === 1) return { label: 'Needs Attention',  tier: 'warn'     }
-      return              { label: 'Critical',           tier: 'critical' }
+      if (good === 3) return { label: 'Optimal',         tier: 'good'     }
+      if (good >= 2)  return { label: 'Good',            tier: 'good'     }
+      if (good === 1) return { label: 'Needs Attention', tier: 'warn'     }
+      return              { label: 'Critical',          tier: 'critical' }
     }
     const avg = (parseFloat(n) + parseFloat(p) + parseFloat(k)) / 3
     if (avg > 70) return { label: 'High',   tier: 'good'     }
@@ -373,15 +400,19 @@ const CropCarePlant = () => {
     <div className="bg-[#f7f4ee] min-h-screen font-['DM_Sans',sans-serif]">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap');
-        @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
-        @keyframes pulse-dot { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
-        .animate-fade-in { animation: fadeIn 0.2s ease-out; }
-        .animate-pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+        @keyframes fadeIn      { from { opacity:0; transform:scale(0.97) } to { opacity:1; transform:scale(1) } }
+        @keyframes slideUp     { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:translateY(0) } }
+        @keyframes pulse-dot   { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
+        @keyframes drip        { 0%,100% { transform:translateY(0) scaleY(1); opacity:1 } 60% { transform:translateY(6px) scaleY(1.3); opacity:0.7 } }
+        .animate-fade-in       { animation: fadeIn  0.25s ease-out; }
+        .animate-slide-up      { animation: slideUp 0.3s ease-out; }
+        .animate-pulse-dot     { animation: pulse-dot 1.5s ease-in-out infinite; }
+        .animate-drip          { animation: drip 1.2s ease-in-out infinite; }
       `}</style>
 
       <div className="px-5 md:px-9 py-7 pb-24 md:pb-10">
 
-        {/* Page header */}
+        {/* ── Page header ── */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-7">
           <div>
             <button
@@ -421,24 +452,46 @@ const CropCarePlant = () => {
               </span>
 
               {lastUpdated && <><span>·</span><span>Updated {fmtDate(lastUpdated)}</span></>}
-              {cropProfile && <><span>·</span><span className="text-green-600 font-semibold">✓ Profile Active</span></>}
+              {cropProfile  && <><span>·</span><span className="text-green-600 font-semibold">✓ Profile Active</span></>}
+
+              {/* Manual mode badge — shown when irrigating */}
+              {isIrrigating && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 text-[11px] font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse-dot inline-block" />
+                  Manual Mode
+                </span>
+              )}
             </div>
           </div>
 
+          {/* ── Irrigation button ── */}
           <button
-            onClick={() => setIsIrrigating(v => !v)}
-            className={`inline-flex items-center gap-2 px-6 py-3 rounded-full text-white text-sm font-medium transition-all duration-300 shrink-0 ${
-              isIrrigating ? 'bg-green-600 ring-4 ring-green-300/50' : 'bg-green-950 hover:bg-green-800'
+            onClick={handleIrrigationClick}
+            disabled={irrigationLoading}
+            className={`inline-flex items-center gap-2 px-6 py-3 rounded-full text-white text-sm font-medium transition-all duration-300 shrink-0 disabled:opacity-60 disabled:cursor-not-allowed ${
+              isIrrigating
+                ? 'bg-red-500 hover:bg-red-600 ring-4 ring-red-300/50'
+                : 'bg-green-950 hover:bg-green-800'
             }`}
           >
-            <svg className={`w-4 h-4 ${isIrrigating ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-            </svg>
-            {isIrrigating ? 'Irrigating…' : 'Start Irrigation'}
+            {irrigationLoading ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+            ) : isIrrigating ? (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 animate-drip" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+              </svg>
+            )}
+            {irrigationLoading ? 'Please wait…' : isIrrigating ? 'Stop Irrigation' : 'Start Irrigation'}
           </button>
         </div>
 
-        {/* 3-col grid */}
+        {/* ── 3-col grid ── */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-[18px] mb-5">
 
           {/* COL 1: Crop image + moisture */}
@@ -500,9 +553,9 @@ const CropCarePlant = () => {
               <h3 className="font-['Playfair_Display',serif] text-base font-bold text-green-950 mb-3.5 flex items-center gap-1.5">
                 🌱 Soil & Root
               </h3>
-              <MetricRow label="Soil Moisture" value={sensorData?.soil_moisture}                                                                     unit="%" status={moistureStatus} />
-              <MetricRow label="Soil pH"        value={sensorData?.ph ? parseFloat(sensorData.ph).toFixed(1) : null}                                            status={phStatus} />
-              <MetricRow label="Soil Temp"      value={sensorData?.soil_temperature}                                                                 unit="°C" status={soilTempStatus} />
+              <MetricRow label="Soil Moisture" value={sensorData?.soil_moisture}                                                                      unit="%" status={moistureStatus} />
+              <MetricRow label="Soil pH"        value={sensorData?.ph ? parseFloat(sensorData.ph).toFixed(1) : null}                                             status={phStatus} />
+              <MetricRow label="Soil Temp"      value={sensorData?.soil_temperature}                                                                  unit="°C" status={soilTempStatus} />
               <MetricRow label="NPK Status"     status={npkStatus} />
               {npkDetails && (
                 <div className="mt-3 pt-3 border-t border-black/[0.06]">
@@ -528,10 +581,10 @@ const CropCarePlant = () => {
               <h3 className="font-['Playfair_Display',serif] text-base font-bold text-green-950 mb-3.5 flex items-center gap-1.5">
                 🌤 Environment
               </h3>
-              <MetricRow label="Air Temp" value={sensorData?.air_temperature}                                                                                     unit="°C" status={airTempStatus} />
-              <MetricRow label="Humidity" value={sensorData?.air_humidity}                                                                                        unit="%"  status={humidityStatus} />
+              <MetricRow label="Air Temp" value={sensorData?.air_temperature}                                                                                      unit="°C" status={airTempStatus} />
+              <MetricRow label="Humidity" value={sensorData?.air_humidity}                                                                                         unit="%"  status={humidityStatus} />
               <MetricRow label="Lux"      value={sensorData?.rainfall ? `${sensorData.rainfall} mm` : null} />
-              <MetricRow label="EC"       value={sensorData?.electrical_conductivity ? parseFloat(sensorData.electrical_conductivity).toFixed(2) : null}                    status={ecStatus} />
+              <MetricRow label="EC"       value={sensorData?.electrical_conductivity ? parseFloat(sensorData.electrical_conductivity).toFixed(2) : null}                     status={ecStatus} />
               {cropProfile?.air_temperature_min && (
                 <p className="text-[10px] text-gray-300 mt-2.5">
                   Temp {cropProfile.air_temperature_min}–{cropProfile.air_temperature_max}°C · Humidity {cropProfile.air_humidity_min}–{cropProfile.air_humidity_max}%
@@ -632,7 +685,7 @@ const CropCarePlant = () => {
           </div>
         </div>
 
-        {/* Charts */}
+        {/* ── Charts ── */}
         <div className="bg-white rounded-2xl p-6 border border-black/[0.05]">
           <h3 className="font-['Playfair_Display',serif] text-xl font-bold text-green-950 mb-5 flex items-center gap-2">
             📈 Trend & Analytics
@@ -674,7 +727,61 @@ const CropCarePlant = () => {
         </div>
       </div>
 
-      {/* Lightbox */}
+      {/* ── Irrigation Warning Modal ── */}
+      {showIrrigationModal && (
+        <div
+          className="animate-fade-in fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowIrrigationModal(false)}
+        >
+          <div
+            className="animate-slide-up bg-white rounded-2xl shadow-2xl max-w-sm w-full p-7"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Icon */}
+            <div className="flex justify-center mb-4">
+              <div className="w-14 h-14 rounded-full bg-blue-50 border-2 border-blue-200 flex items-center justify-center text-2xl">
+                💧
+              </div>
+            </div>
+
+            <h2 className="font-['Playfair_Display',serif] text-lg font-bold text-green-950 text-center mb-1">
+              Switch to Manual Mode?
+            </h2>
+            <p className="text-sm text-gray-500 text-center mb-1">
+              You're about to manually control irrigation for
+            </p>
+            <p className="text-sm font-semibold text-green-800 text-center mb-4">
+              {cropInfo?.name} · Garden {garden_id}
+            </p>
+
+            {/* Warning notice */}
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5 text-xs text-amber-800 flex gap-2.5 items-start">
+              <span className="text-base leading-none mt-0.5">⚠️</span>
+              <p>
+                <strong>Manual mode will be active</strong> while irrigation is running.
+                Automatic scheduling will be paused until you stop irrigation.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowIrrigationModal(false)}
+                className="flex-1 px-4 py-2.5 rounded-full border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => triggerIrrigation('on')}
+                className="flex-1 px-4 py-2.5 rounded-full bg-green-950 text-white text-sm font-medium hover:bg-green-800 transition-colors"
+              >
+                Start Irrigation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Lightbox ── */}
       {isModalOpen && modalImage && (
         <div onClick={closeImageModal} className="animate-fade-in fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4">
           <div className="relative max-w-[800px] w-full">

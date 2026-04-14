@@ -36,7 +36,6 @@ class IotController extends Controller
     try {
         $validated = $request->validate([
             'esp_api_key'             => 'required|string',
-            // crop_name REMOVED — crop is now determined by esp->crop_id
             'soil_temperature'        => 'nullable|numeric',
             'air_temperature'         => 'nullable|numeric',
             'air_humidity'            => 'nullable|numeric',

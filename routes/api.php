@@ -5,6 +5,7 @@ use App\Http\Controllers\Accounts\UserController;
 use App\Http\Controllers\DetectionResultController;
 use App\Http\Controllers\GardenController;
 use App\Http\Controllers\IotController;
+use App\Http\Controllers\IrrigationController;
 use App\Http\Controllers\NotificationController;
 use App\Models\Notification;
 use Illuminate\Http\Request;
@@ -166,6 +167,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/deleteCrop/{crop_id}', [GardenController::class, 'deleteCrop']);
     Route::delete('/deleteEsp/{espId}',[GardenController::class, 'deleteEsp']);
     Route::post('/claimDevice/{gardenId}', [GardenController::class, 'claimEspDevice']);
+    Route::post('/irrigation/toggle', [IrrigationController::class, 'toggle'])->middleware('auth:sanctum');
 
 
     //Admin Routes
