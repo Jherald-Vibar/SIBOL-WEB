@@ -157,126 +157,165 @@ class GardenController extends Controller
     ────────────────────────────────────────── */
 
     public function addCrop(Request $request, $gardenId)
-    {
-        $user = $request->user();
+{
+    $user = $request->user();
 
-        $validator = Validator::make($request->all(), [
-            'name'         => 'required|string|max:255',
-            'variety'      => 'required|string|max:255',
-            'planted_date' => 'required|date',
-            'image'        => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
-        ]);
+    $validator = Validator::make($request->all(), [
+        'name'         => 'required|string|max:255',
+        'variety'      => 'required|string|max:255',
+        'planted_date' => 'required|date',
+        'image'        => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:10240', // ✅ 10MB
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors'  => $validator->errors(),
-            ], 422);
-        }
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => 'Validation failed',
+            'errors'  => $validator->errors(),
+        ], 422);
+    }
 
-        try {
-            $validated = $validator->validated();
+    try {
+        $validated = $validator->validated();
 
-            $inputName = $validated['name'];
-            $baseName  = trim(preg_replace('/\s*\d+$/', '', $inputName));
+        $inputName = $validated['name'];
+        $baseName  = trim(preg_replace('/\s*\d+$/', '', $inputName));
 
-            $existInCropProfile = CropProfile::all()->first(function ($profile) use ($baseName) {
-                $profileBaseName = trim(preg_replace('/\s*\d+$/', '', $profile->name));
-                return $profileBaseName === $baseName;
-            });
+        // ✅ Try to find matching crop profile
+        $existInCropProfile = CropProfile::all()->first(function ($profile) use ($baseName) {
+            $profileBaseName = trim(preg_replace('/\s*\d+$/', '', $profile->name));
+            return strcasecmp($profileBaseName, $baseName) === 0;
+        });
+
+        // ✅ Fallback to default average profile if no match
+        $usingFallback = false;
+        if (!$existInCropProfile) {
+            $existInCropProfile = CropProfile::where('name', 'default')
+                ->orWhere('name', 'Default')
+                ->orWhere('name', 'Average Plant')
+                ->orWhere('name', 'average plant')
+                ->first();
 
             if (!$existInCropProfile) {
-                return response()->json([
-                    'message' => "Can't add because it doesn't exist in Crop Profile",
-                ], 422);
+                // ✅ Create a hardcoded average plant fallback if none exists in DB
+                $existInCropProfile = new CropProfile([
+                    'name'                        => 'Average Plant (Fallback)',
+                    'soil_temp_min'               => 15,
+                    'soil_temp_max'               => 30,
+                    'soil_moisture_min'           => 40,
+                    'soil_moisture_max'           => 80,
+                    'electrical_conductivity_min' => 0.5,
+                    'electrical_conductivity_max' => 3.0,
+                    'ph_min'                      => 5.5,
+                    'ph_max'                      => 7.5,
+                    'nitrogen_min'                => 20,
+                    'nitrogen_max'                => 80,
+                    'phosphorus_min'              => 10,
+                    'phosphorus_max'              => 60,
+                    'potassium_min'               => 20,
+                    'potassium_max'               => 80,
+                    'air_temperature_min'         => 18,
+                    'air_temperature_max'         => 35,
+                    'air_humidity_min'            => 40,
+                    'air_humidity_max'            => 85,
+                ]);
+                // ✅ Save it so future crops can reuse it
+                $existInCropProfile->save();
             }
 
-            $imageUrl = null;
-
-            if ($request->hasFile('image')) {
-                try {
-                    $uploadedFile = $request->file('image');
-
-                    if (!$uploadedFile->isValid()) {
-                        throw new \Exception('Uploaded file is not valid');
-                    }
-
-                    $cloudinary = $this->getCloudinaryInstance();
-                    $result     = $cloudinary->uploadApi()->upload(
-                        $uploadedFile->getRealPath(),
-                        [
-                            'folder'    => 'crops_images',
-                            'public_id' => 'crop_' . time() . '_' . uniqid(),
-                        ]
-                    );
-
-                    $imageUrl = $result['secure_url'];
-
-                    Log::info('Cloudinary upload successful for addCrop', [
-                        'url'       => $imageUrl,
-                        'public_id' => $result['public_id'],
-                    ]);
-
-                } catch (\Exception $e) {
-                    Log::error('Cloudinary upload failed for addCrop', [
-                        'error' => $e->getMessage(),
-                    ]);
-
-                    return response()->json([
-                        'message' => 'Failed to upload image to Cloudinary',
-                        'error'   => $e->getMessage(),
-                    ], 500);
-                }
-            }
-
-            $crop = Crop::create([
-                'user_id'         => $user->id,
-                'garden_id'       => $gardenId,
-                'crop_profile_id' => $existInCropProfile->id,
-                'name'            => $validated['name'],
-                'variety'         => $validated['variety'],
-                'image'           => $imageUrl,
-                'planted_at'      => $validated['planted_date'],
-            ]);
-
-            activity('crop')
-                ->causedBy($user)
-                ->performedOn($crop)
-                ->withProperties([
-                    'crop_name'  => $crop->name,
-                    'variety'    => $crop->variety,
-                    'garden_id'  => $gardenId,
-                    'planted_at' => $crop->planted_at,
-                    'ip'         => $request->ip(),
-                ])
-                ->log('User added a crop to garden');
-
-            $log = Activity::with('causer')->latest()->first();
-            event(new ActivityLogCreated($log));
-
-            $garden = Garden::find($gardenId);
-            $notificationService = new NotificationService();
-            $notificationService->checkCrop($crop, $user, $garden);
-
-            Log::info('Crop created successfully', ['crop_id' => $crop->id]);
-
-            return response()->json([
-                'message' => 'Crop created successfully',
-                'data'    => $crop,
-            ], 201);
-
-        } catch (\Exception $e) {
-            Log::error('Failed to create crop', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'message' => 'Failed to create crop',
-                'error'   => $e->getMessage(),
-            ], 500);
+            $usingFallback = true;
         }
+
+        // ✅ Handle image upload — 10MB
+        $imageUrl = null;
+        if ($request->hasFile('image')) {
+            try {
+                $uploadedFile = $request->file('image');
+
+                if (!$uploadedFile->isValid()) {
+                    throw new \Exception('Uploaded file is not valid');
+                }
+
+                $cloudinary = $this->getCloudinaryInstance();
+                $result     = $cloudinary->uploadApi()->upload(
+                    $uploadedFile->getRealPath(),
+                    [
+                        'folder'    => 'crops_images',
+                        'public_id' => 'crop_' . time() . '_' . uniqid(),
+                    ]
+                );
+
+                $imageUrl = $result['secure_url'];
+
+                Log::info('Cloudinary upload successful for addCrop', [
+                    'url'       => $imageUrl,
+                    'public_id' => $result['public_id'],
+                ]);
+
+            } catch (\Exception $e) {
+                Log::error('Cloudinary upload failed for addCrop', [
+                    'error' => $e->getMessage(),
+                ]);
+
+                return response()->json([
+                    'message' => 'Failed to upload image to Cloudinary',
+                    'error'   => $e->getMessage(),
+                ], 500);
+            }
+        }
+
+        $crop = Crop::create([
+            'user_id'         => $user->id,
+            'garden_id'       => $gardenId,
+            'crop_profile_id' => $existInCropProfile->id,
+            'name'            => $validated['name'],
+            'variety'         => $validated['variety'],
+            'image'           => $imageUrl,
+            'planted_at'      => $validated['planted_date'],
+        ]);
+
+        activity('crop')
+            ->causedBy($user)
+            ->performedOn($crop)
+            ->withProperties([
+                'crop_name'  => $crop->name,
+                'variety'    => $crop->variety,
+                'garden_id'  => $gardenId,
+                'planted_at' => $crop->planted_at,
+                'ip'         => $request->ip(),
+            ])
+            ->log('User added a crop to garden');
+
+        $log = Activity::with('causer')->latest()->first();
+        event(new ActivityLogCreated($log));
+
+        $garden = Garden::find($gardenId);
+        $notificationService = new NotificationService();
+        $notificationService->checkCrop($crop, $user, $garden);
+
+        Log::info('Crop created successfully', ['crop_id' => $crop->id]);
+
+        // ✅ Response with fallback warning if used
+        return response()->json([
+            'message'          => 'Crop created successfully',
+            'data'             => $crop,
+            'profile_matched'  => !$usingFallback,
+            'profile_warning'  => $usingFallback
+                ? "No matching crop profile found for '{$validated['name']}'. Using average plant thresholds as fallback. Contact your admin to add a specific profile."
+                : null,
+        ], 201);
+
+    } catch (\Exception $e) {
+        Log::error('Failed to create crop', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+
+        return response()->json([
+            'message' => 'Failed to create crop',
+            'error'   => $e->getMessage(),
+        ], 500);
     }
+}
 
     public function getCropData(Request $request, $garden_id)
     {
