@@ -505,7 +505,7 @@ const CropCareConfig = () => {
                 onDelete={c => setDeleteModal(c)}
                 onClaim={c => setClaimModal(c)}
                 onRemoveEsp={c => setRemoveEspModal(c)}
-                onView={c => navigate(`/user/crop-care/${garden_id}/${c.name}`)}
+                onView={c => navigate(`/user/crop-care/${garden_id}/${c.id}`)}
               />
             ))}
           </div>
