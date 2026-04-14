@@ -3,7 +3,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import Logo from '../assets/logo-left.png';
 import UserSidebar from '../Views/parts/UserSidebar';
 import UserNavbar from '../Views/parts/UserNavbar';
-import CoachMark from '../Views/parts/CoachMark';// adjust path if needed
+import Coachmark from '../Views/parts/CoachMark';// adjust path if needed
 
 const UserLayout = () => {
   const [allowed, setAllowed] = useState(null);
