@@ -11,7 +11,7 @@ import LogoutModal from './LogoutModal';
 
 const UserSidebar = ({
   collapsed = false,
-  onToggleCollapse, 
+  onToggleCollapse,
   showLogout = false,
   onLogoutOpen,
   onLogoutClose,
