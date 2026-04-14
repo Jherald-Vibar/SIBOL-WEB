@@ -113,16 +113,8 @@ const CropModal = ({ crop, onClose, onSave, loading }) => {
     name: crop?.name || "",
     variety: crop?.variety || "Vegetable",
     planted_date: crop?.planted_at ? new Date(crop.planted_at).toISOString().split("T")[0] : "",
-    image: null,
   });
-  const [preview, setPreview] = useState(crop?.image || null);
   const [error, setError] = useState("");
-
-  const handleFile = e => {
-    const file = e.target.files[0];
-    setForm(f => ({ ...f, image: file }));
-    setPreview(file ? URL.createObjectURL(file) : null);
-  };
 
   const handleSubmit = () => {
     if (!form.name.trim() || !form.variety || !form.planted_date) {
@@ -178,18 +170,6 @@ const CropModal = ({ crop, onClose, onSave, loading }) => {
             onChange={e => setForm(f => ({ ...f, planted_date: e.target.value }))}
             className="w-full px-3.5 py-2.5 border border-black/10 rounded-xl text-sm text-green-950 bg-[#f7f4ee] outline-none transition-all focus:border-green-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(46,139,87,0.1)]"
           />
-        </div>
-        <div>
-          <label className="block text-[11px] text-gray-400 uppercase tracking-wider mb-1.5 font-medium">Crop Image</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFile}
-            className="w-full px-3.5 py-2 border border-black/10 rounded-xl text-sm text-green-950 bg-[#f7f4ee] outline-none"
-          />
-          {preview && (
-            <img src={preview} alt="Preview" className="w-full h-36 object-cover rounded-xl mt-2 border border-black/[0.06]"/>
-          )}
         </div>
       </div>
       <ModalFooter onClose={onClose} onSubmit={handleSubmit} submitLabel={isEdit ? "Update Crop" : "Save Crop"} loading={loading}/>
@@ -303,7 +283,6 @@ const CropCard = ({ crop, onEdit, onDelete, onClaim, onRemoveEsp, onView }) => {
 
   return (
     <div className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(11,61,30,0.10)] group">
-      {/* Image */}
       <div className="relative h-44 overflow-hidden bg-[#f7f4ee]">
         {crop.image
           ? <img src={crop.image} alt={crop.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"/>
@@ -313,14 +292,9 @@ const CropCard = ({ crop, onEdit, onDelete, onClaim, onRemoveEsp, onView }) => {
       </div>
 
       <div className="p-4">
-        {/* Crop info */}
         <div className="font-['Lora',serif] text-base font-semibold text-green-950 mb-0.5">{crop.name}</div>
         <div className="text-xs text-gray-400 mb-3">{crop.variety} · Planted {planted}</div>
-
-        {/* Divider */}
         <div className="h-px bg-black/[0.05] mb-3"/>
-
-        {/* ESP section */}
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
             <EspIcon/>
@@ -334,46 +308,30 @@ const CropCard = ({ crop, onEdit, onDelete, onClaim, onRemoveEsp, onView }) => {
           </div>
           {esp
             ? (
-              <button
-                onClick={() => onRemoveEsp(crop)}
-                title="Remove device"
-                className="w-8 h-8 rounded-lg border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-red-50 hover:border-red-300 transition-all flex-shrink-0"
-              >
+              <button onClick={() => onRemoveEsp(crop)} title="Remove device"
+                className="w-8 h-8 rounded-lg border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-red-50 hover:border-red-300 transition-all flex-shrink-0">
                 <TrashIcon color="#E24B4A"/>
               </button>
-            )
-            : (
-              <button
-                onClick={() => onClaim(crop)}
-                className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-green-200 bg-green-50 text-green-800 text-xs font-medium cursor-pointer hover:bg-green-100 transition-all flex-shrink-0"
-              >
+            ) : (
+              <button onClick={() => onClaim(crop)}
+                className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-green-200 bg-green-50 text-green-800 text-xs font-medium cursor-pointer hover:bg-green-100 transition-all flex-shrink-0">
                 <ClaimIcon/> Claim
               </button>
             )
           }
         </div>
 
-        {/* Action buttons */}
         <div className="flex gap-1.5 mt-3">
-          <button
-            onClick={() => onView(crop)}
-            title="View data"
-            className="w-9 h-9 rounded-xl border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-green-50 hover:border-green-400 transition-all"
-          >
+          <button onClick={() => onView(crop)} title="View data"
+            className="w-9 h-9 rounded-xl border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-green-50 hover:border-green-400 transition-all">
             <ViewIcon/>
           </button>
-          <button
-            onClick={() => onEdit(crop)}
-            title="Edit crop"
-            className="w-9 h-9 rounded-xl border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-green-50 hover:border-green-400 transition-all text-green-700"
-          >
+          <button onClick={() => onEdit(crop)} title="Edit crop"
+            className="w-9 h-9 rounded-xl border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-green-50 hover:border-green-400 transition-all text-green-700">
             <EditIcon/>
           </button>
-          <button
-            onClick={() => onDelete(crop)}
-            title="Delete crop"
-            className="w-9 h-9 rounded-xl border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-red-50 hover:border-red-300 transition-all"
-          >
+          <button onClick={() => onDelete(crop)} title="Delete crop"
+            className="w-9 h-9 rounded-xl border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-red-50 hover:border-red-300 transition-all">
             <TrashIcon color="#E24B4A"/>
           </button>
         </div>
@@ -392,18 +350,14 @@ const CropCareConfig = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [globalError, setGlobalError] = useState("");
 
-  // Modal states
-  const [cropModal, setCropModal] = useState(null);   // null | { mode: 'add' | 'edit', crop }
-  const [claimModal, setClaimModal] = useState(null); // null | crop
-  const [deleteModal, setDeleteModal] = useState(null); // null | crop
-  const [removeEspModal, setRemoveEspModal] = useState(null); // null | crop
+  const [cropModal, setCropModal] = useState(null);
+  const [claimModal, setClaimModal] = useState(null);
+  const [deleteModal, setDeleteModal] = useState(null);
+  const [removeEspModal, setRemoveEspModal] = useState(null);
 
-  /* ── FETCH ── */
   const fetchCrops = async () => {
     try {
       const r = await axiosClient.get(`/getCropData/${garden_id}`);
-      // Merge esp data into each crop if your API returns it,
-      // otherwise fetch separately and merge here
       setCrops(r.data.data);
     } catch (err) {
       setGlobalError(err.response?.data?.message || "Failed to load crops.");
@@ -414,7 +368,6 @@ const CropCareConfig = () => {
 
   useEffect(() => { fetchCrops(); }, [garden_id]);
 
-  /* ── ADD / EDIT CROP ── */
   const handleSaveCrop = async (form) => {
     setActionLoading(true);
     try {
@@ -422,7 +375,6 @@ const CropCareConfig = () => {
       fd.append("name", form.name);
       fd.append("variety", form.variety);
       fd.append("planted_date", new Date(form.planted_date).toISOString().split("T")[0]);
-      if (form.image instanceof File) fd.append("image", form.image);
 
       if (cropModal.mode === 'edit') {
         fd.append("_method", "PUT");
@@ -448,7 +400,6 @@ const CropCareConfig = () => {
     }
   };
 
-  /* ── CLAIM DEVICE ── */
   const handleClaim = async (espId) => {
     setActionLoading(true);
     try {
@@ -456,7 +407,6 @@ const CropCareConfig = () => {
         "esp-number": espId,
         "crop_id": claimModal.id,
       });
-      // Optimistically update UI
       setCrops(prev => prev.map(c =>
         c.id === claimModal.id
           ? { ...c, esp: { serial_number: espId, status: 'inactive' } }
@@ -470,7 +420,6 @@ const CropCareConfig = () => {
     }
   };
 
-  /* ── DELETE CROP ── */
   const handleDeleteCrop = async () => {
     setActionLoading(true);
     try {
@@ -484,7 +433,6 @@ const CropCareConfig = () => {
     }
   };
 
-  /* ── REMOVE ESP ── */
   const handleRemoveEsp = async () => {
     setActionLoading(true);
     try {
@@ -507,8 +455,6 @@ const CropCareConfig = () => {
       `}</style>
 
       <div className="px-4 sm:px-8 lg:px-10 py-8 pb-24 md:pb-12 max-w-7xl mx-auto">
-
-        {/* Header */}
         <div className="flex items-end justify-between gap-4 flex-wrap pb-6 border-b border-green-950/10 mb-7">
           <div>
             <button
@@ -531,7 +477,6 @@ const CropCareConfig = () => {
           </button>
         </div>
 
-        {/* Global error */}
         {globalError && (
           <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 mb-5">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -540,7 +485,6 @@ const CropCareConfig = () => {
           </div>
         )}
 
-        {/* Loading */}
         {pageLoading ? (
           <div className="flex items-center justify-center py-24 gap-3 text-gray-400">
             <SpinIcon/> Loading crops…
@@ -561,14 +505,13 @@ const CropCareConfig = () => {
                 onDelete={c => setDeleteModal(c)}
                 onClaim={c => setClaimModal(c)}
                 onRemoveEsp={c => setRemoveEspModal(c)}
-                onView={c => navigate(`/user/crop-care/${garden_id}/${c.id}`)}
+                onView={c => navigate(`/user/crop-care/${garden_id}/${c.name}`)}
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* ── MODALS ── */}
       {cropModal && (
         <CropModal
           crop={cropModal.mode === 'edit' ? cropModal.crop : null}
