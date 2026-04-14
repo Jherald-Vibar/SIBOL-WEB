@@ -25,4 +25,4 @@ RUN echo "📁 Files in container:" && ls -lah && \
 EXPOSE 10000
 
 # ✅ Fixed for Render - uses shell form to expand $PORT
-CMD gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level info
+CMD sh -c "gunicorn app:app --bind 0.0.0.0:${PORT} --workers 1 --timeout 120 --log-level info"
