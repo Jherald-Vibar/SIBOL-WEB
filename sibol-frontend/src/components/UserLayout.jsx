@@ -3,6 +3,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import Logo from '../assets/logo-left.png';
 import UserSidebar from '../Views/parts/UserSidebar';
 import UserNavbar from '../Views/parts/UserNavbar';
+import CoachMark from '../Views/parts/CoachMark';// adjust path if needed
 
 const UserLayout = () => {
   const [allowed, setAllowed] = useState(null);
@@ -82,10 +83,10 @@ const UserLayout = () => {
   // ── Auth failed ──
   if (!allowed) return <Navigate to="/guest/login" replace />;
 
-  // ── Authenticated layout with persistent sidebar ──
+  // ── Authenticated layout ──
   return (
     <div className="flex flex-col md:flex-row min-h-screen">
-      {/* Sidebar lives HERE — never remounts on navigation */}
+      {/* Sidebar — never remounts on navigation */}
       <UserSidebar
         collapsed={collapsed}
         onToggleCollapse={() => setCollapsed(c => !c)}
@@ -95,16 +96,19 @@ const UserLayout = () => {
       />
 
       <div className="flex-1 flex flex-col min-h-screen">
-      {/* Navbar once, here */}
+        {/* Navbar */}
         <div className="bg-white shadow-sm sticky top-0 z-30">
-          <UserNavbar/>
+          <UserNavbar />
         </div>
 
-        {/* Page content — remove navbar from all individual pages */}
+        {/* Page content */}
         <main className="flex-1 flex flex-col overflow-auto pb-16 md:pb-0">
           <Outlet />
         </main>
       </div>
+
+      {/* ✅ CoachMark — auto-launches once on first login */}
+      <CoachMark autoLaunch={true} />
     </div>
   );
 };
