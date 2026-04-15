@@ -44,7 +44,7 @@ const evaluateAlerts = (data, profile) => {
 }
 
 const CropCarePlant = () => {
-  const { garden_id, crop_name, esp_id} = useParams()
+  const { garden_id, crop_id, esp_id } = useParams() // Changed from crop_name to crop_id
   const navigate = useNavigate()
   const gardenEchoRef  = useRef(null)
   const cropProfileRef = useRef(null)
@@ -61,7 +61,7 @@ const CropCarePlant = () => {
   const [modalImage,           setModalImage]           = useState(null)
   const [wsConnected,          setWsConnected]          = useState(false)
   const [lastUpdated,          setLastUpdated]          = useState(null)
-  const [imageRefreshKey,      setImageRefreshKey]      = useState(Date.now()) // For cache busting
+  const [imageRefreshKey,      setImageRefreshKey]      = useState(Date.now())
 
   // ── Irrigation state ──────────────────────────────────────────────────────
   const [isIrrigating,         setIsIrrigating]         = useState(false)
@@ -75,7 +75,8 @@ const CropCarePlant = () => {
   const fetchSensorData = async (showLoading = true) => {
     if (showLoading) setLoading(true)
     try {
-      const res = await axiosClient.get(`/getSensorDataCrop/${garden_id}/${crop_name}`)
+      // Use crop_id instead of crop_name
+      const res = await axiosClient.get(`/getSensorDataCrop/${garden_id}/${crop_id}`)
       if (res.data.success) {
         const { crop, crop_profile, latest, history, alerts: serverAlerts } = res.data.data
         setCropInfo(crop)
@@ -84,7 +85,7 @@ const CropCarePlant = () => {
         setAlerts(serverAlerts || [])
         setHistoryData(history || [])
         setLastUpdated(new Date())
-        setImageRefreshKey(Date.now()) // Refresh image cache
+        setImageRefreshKey(Date.now())
       }
     } catch (err) {
       if (showLoading) setError(err.response?.data?.message || 'Failed to fetch sensor data!')
@@ -95,7 +96,7 @@ const CropCarePlant = () => {
 
   // ── Connect / reconnect WebSocket ─────────────────────────────────────────
   const connectEcho = () => {
-    if (!garden_id || !crop_name) return
+    if (!garden_id || !crop_id) return
 
     if (gardenEchoRef.current) {
       gardenEchoRef.current.leaveChannel(`garden.${garden_id}`)
@@ -155,21 +156,28 @@ const CropCarePlant = () => {
         setWsConnected(true)
       })
       .listen('.detection.updated', (e) => {
-        // Handle live leaf detection updates
-        if (e.detection && e.detection.crop_name === crop_name) {
-          setCropInfo(prev => ({
-            ...prev,
-            detection_results: e.detection.results || prev?.detection_results,
-            image: e.detection.image_url || prev?.image
-          }))
-          setImageError(false) // Reset error state for new image
-          setImageRefreshKey(Date.now()) // Force image refresh
-          setLastUpdated(new Date())
+        console.log('🔔 Detection event received:', e)
 
-          // Show a temporary notification (optional)
-          if (e.detection.results && e.detection.results.length > 0) {
-            console.log('New leaf detection received!', e.detection.results)
-          }
+        // Handle live leaf detection updates - compare by crop_id
+        if (e.detection && e.detection.crop_id && parseInt(e.detection.crop_id) === parseInt(crop_id)) {
+          console.log('✅ Matching crop detected! Updating image...')
+          console.log('New image URL:', e.detection.image_url)
+
+          setCropInfo(prev => {
+            const updated = {
+              ...prev,
+              detection_results: e.detection.results || prev?.detection_results,
+              image: e.detection.image_url || prev?.image
+            }
+            return updated
+          })
+          setImageError(false)
+          setImageRefreshKey(Date.now())
+          setLastUpdated(new Date())
+        } else {
+          console.log('❌ Crop ID mismatch or no detection data')
+          console.log('Expected crop_id:', crop_id)
+          console.log('Received crop_id:', e.detection?.crop_id)
         }
       })
       .subscribed(() => setWsConnected(true))
@@ -183,7 +191,7 @@ const CropCarePlant = () => {
   }
 
   useEffect(() => {
-    if (!garden_id || !crop_name) return
+    if (!garden_id || !crop_id) return
     fetchSensorData(true)
     connectEcho()
     return () => {
@@ -191,23 +199,23 @@ const CropCarePlant = () => {
       gardenEchoRef.current?.disconnect()
       gardenEchoRef.current = null
     }
-  }, [garden_id, crop_name])
+  }, [garden_id, crop_id])
 
   // Poll for updates as fallback when WebSocket is disconnected
   useEffect(() => {
-    if (!garden_id || !crop_name) return
+    if (!garden_id || !crop_id) return
 
     let interval
     if (!wsConnected) {
       interval = setInterval(() => {
-        fetchSensorData(false) // Silent refresh
-      }, 30000) // Poll every 30 seconds
+        fetchSensorData(false)
+      }, 30000)
     }
 
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [garden_id, crop_name, wsConnected])
+  }, [garden_id, crop_id, wsConnected])
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && isModalOpen) closeImageModal() }
@@ -218,9 +226,9 @@ const CropCarePlant = () => {
   // ── Irrigation handlers ───────────────────────────────────────────────────
   const handleIrrigationClick = () => {
     if (!isIrrigating) {
-      setShowIrrigationModal(true) // show warning before starting
+      setShowIrrigationModal(true)
     } else {
-      triggerIrrigation('off')     // stop directly, no warning needed
+      triggerIrrigation('off')
     }
   }
 
@@ -446,12 +454,10 @@ const CropCarePlant = () => {
         @keyframes slideUp     { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:translateY(0) } }
         @keyframes pulse-dot   { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
         @keyframes drip        { 0%,100% { transform:translateY(0) scaleY(1); opacity:1 } 60% { transform:translateY(6px) scaleY(1.3); opacity:0.7 } }
-        @keyframes image-pulse { 0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
         .animate-fade-in       { animation: fadeIn  0.25s ease-out; }
         .animate-slide-up      { animation: slideUp 0.3s ease-out; }
         .animate-pulse-dot     { animation: pulse-dot 1.5s ease-in-out infinite; }
         .animate-drip          { animation: drip 1.2s ease-in-out infinite; }
-        .animate-image-pulse   { animation: image-pulse 1.5s ease-in-out infinite; }
       `}</style>
 
       <div className="px-5 md:px-9 py-7 pb-24 md:pb-10">
@@ -469,7 +475,7 @@ const CropCarePlant = () => {
               Back to Crops
             </button>
             <h1 className="font-['Playfair_Display',serif] text-[clamp(26px,3.5vw,40px)] font-bold text-green-950 leading-tight">
-              {cropInfo.name || 'Crop Details'}
+              {cropInfo?.name || 'Crop Details'}
             </h1>
             <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-400 items-center">
               <span>Garden {garden_id}</span>
@@ -545,7 +551,7 @@ const CropCarePlant = () => {
                 <>
                   <img
                     src={getImageUrl()}
-                    alt={crop_name}
+                    alt={cropInfo?.name || 'Crop'}
                     onError={() => setImageError(true)}
                     className={`w-full rounded-[14px] object-cover transition-all duration-500 border-[3px] ${tierBorderClass(moistureStatus.tier)} hover:scale-105 cursor-pointer`}
                     onClick={() => openImageModal(getImageUrl())}
@@ -601,16 +607,16 @@ const CropCarePlant = () => {
             )}
           </div>
 
-          {/* COL 2: Soil & Environment */}
+          {/* COL 2: Soil & Environment - keep same as before */}
           <div className="flex flex-col gap-4">
             <div className="bg-white rounded-2xl p-5 border border-black/[0.05] flex-1">
               <h3 className="font-['Playfair_Display',serif] text-base font-bold text-green-950 mb-3.5 flex items-center gap-1.5">
                 🌱 Soil & Root
               </h3>
-              <MetricRow label="Soil Moisture" value={sensorData?.soil_moisture}                                                                      unit="%" status={moistureStatus} />
-              <MetricRow label="Soil pH"        value={sensorData?.ph ? parseFloat(sensorData.ph).toFixed(1) : null}                                             status={phStatus} />
-              <MetricRow label="Soil Temp"      value={sensorData?.soil_temperature}                                                                  unit="°C" status={soilTempStatus} />
-              <MetricRow label="NPK Status"     status={npkStatus} />
+              <MetricRow label="Soil Moisture" value={sensorData?.soil_moisture} unit="%" status={moistureStatus} />
+              <MetricRow label="Soil pH" value={sensorData?.ph ? parseFloat(sensorData.ph).toFixed(1) : null} status={phStatus} />
+              <MetricRow label="Soil Temp" value={sensorData?.soil_temperature} unit="°C" status={soilTempStatus} />
+              <MetricRow label="NPK Status" status={npkStatus} />
               {npkDetails && (
                 <div className="mt-3 pt-3 border-t border-black/[0.06]">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2">NPK Breakdown</p>
@@ -635,10 +641,10 @@ const CropCarePlant = () => {
               <h3 className="font-['Playfair_Display',serif] text-base font-bold text-green-950 mb-3.5 flex items-center gap-1.5">
                 🌤 Environment
               </h3>
-              <MetricRow label="Air Temp" value={sensorData?.air_temperature}                                                                                      unit="°C" status={airTempStatus} />
-              <MetricRow label="Humidity" value={sensorData?.air_humidity}                                                                                         unit="%"  status={humidityStatus} />
-              <MetricRow label="Lux"      value={sensorData?.rainfall ? `${sensorData.rainfall} mm` : null} />
-              <MetricRow label="EC"       value={sensorData?.electrical_conductivity ? parseFloat(sensorData.electrical_conductivity).toFixed(2) : null}                     status={ecStatus} />
+              <MetricRow label="Air Temp" value={sensorData?.air_temperature} unit="°C" status={airTempStatus} />
+              <MetricRow label="Humidity" value={sensorData?.air_humidity} unit="%" status={humidityStatus} />
+              <MetricRow label="Lux" value={sensorData?.rainfall ? `${sensorData.rainfall} mm` : null} />
+              <MetricRow label="EC" value={sensorData?.electrical_conductivity ? parseFloat(sensorData.electrical_conductivity).toFixed(2) : null} status={ecStatus} />
               {cropProfile?.air_temperature_min && (
                 <p className="text-[10px] text-gray-300 mt-2.5">
                   Temp {cropProfile.air_temperature_min}–{cropProfile.air_temperature_max}°C · Humidity {cropProfile.air_humidity_min}–{cropProfile.air_humidity_max}%
@@ -647,7 +653,7 @@ const CropCarePlant = () => {
             </div>
           </div>
 
-          {/* COL 3: Leaf + Alerts */}
+          {/* COL 3: Leaf + Alerts - keep same as before */}
           <div className="flex flex-col gap-4">
             <div className="bg-white rounded-2xl p-5 border border-black/[0.05]">
               <h3 className="font-['Playfair_Display',serif] text-base font-bold text-green-950 mb-3.5 flex items-center justify-between">
@@ -671,7 +677,6 @@ const CropCarePlant = () => {
                       <span className="absolute -top-1 right-[calc(50%-59px)] bg-green-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
                         AI
                       </span>
-                      {/* Live update indicator */}
                       {wsConnected && (
                         <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse-dot border-2 border-white"></span>
                       )}
@@ -680,7 +685,7 @@ const CropCarePlant = () => {
                   <div className="flex flex-wrap gap-1.5 mb-3">
                     {cropInfo.detection_results.map((r, i) => {
                       const healthy = r.detected_class.toLowerCase().includes('healthy')
-                      const name    = r.detected_class.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+                      const name = r.detected_class.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
                       return (
                         <span key={i} className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${healthy ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-amber-100 text-amber-800 border border-amber-200'}`}>
                           {healthy ? '✓' : '⚠'} {name}
@@ -762,7 +767,7 @@ const CropCarePlant = () => {
                     <Tooltip content={<CustomTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     <Line type="monotone" dataKey="soilTemp" stroke="#8b5cf6" strokeWidth={2} name="Soil Temp" dot={{ r: 2 }} activeDot={{ r: 5 }} />
-                    <Line type="monotone" dataKey="airTemp"  stroke="#f59e0b" strokeWidth={2} name="Air Temp"  dot={{ r: 2 }} activeDot={{ r: 5 }} />
+                    <Line type="monotone" dataKey="airTemp" stroke="#f59e0b" strokeWidth={2} name="Air Temp" dot={{ r: 2 }} activeDot={{ r: 5 }} />
                   </LineChart>
                 </ResponsiveContainer>
               ) : <ChartEmpty />}
@@ -778,7 +783,7 @@ const CropCarePlant = () => {
                     <Tooltip content={<CustomTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     <Line type="monotone" dataKey="soilMoisture" stroke="#10b981" strokeWidth={2} name="Soil Moisture" dot={{ r: 2 }} activeDot={{ r: 5 }} />
-                    <Line type="monotone" dataKey="humidity"     stroke="#3b82f6" strokeWidth={2} name="Air Humidity"  dot={{ r: 2 }} activeDot={{ r: 5 }} />
+                    <Line type="monotone" dataKey="humidity" stroke="#3b82f6" strokeWidth={2} name="Air Humidity" dot={{ r: 2 }} activeDot={{ r: 5 }} />
                   </LineChart>
                 </ResponsiveContainer>
               ) : <ChartEmpty />}
@@ -797,7 +802,6 @@ const CropCarePlant = () => {
             className="animate-slide-up bg-white rounded-2xl shadow-2xl max-w-sm w-full p-7"
             onClick={e => e.stopPropagation()}
           >
-            {/* Icon */}
             <div className="flex justify-center mb-4">
               <div className="w-14 h-14 rounded-full bg-blue-50 border-2 border-blue-200 flex items-center justify-center text-2xl">
                 💧
@@ -814,7 +818,6 @@ const CropCarePlant = () => {
               {cropInfo?.name} · Garden {garden_id}
             </p>
 
-            {/* Warning notice */}
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5 text-xs text-amber-800 flex gap-2.5 items-start">
               <span className="text-base leading-none mt-0.5">⚠️</span>
               <p>
