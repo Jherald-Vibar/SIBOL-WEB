@@ -7,26 +7,36 @@ use PhpMqtt\Client\Facades\MQTT;
 
 class IrrigationController extends Controller
 {
-    public function toggle(Request $request)
+     public function toggle(Request $request)
     {
-        $request->validate([
-            'garden_id' => 'required',
-            'state'     => 'required|in:on,off',
-        ]);
+        try {
+            $request->validate([
+                'garden_id' => 'required',
+                'state'     => 'required|in:on,off',
+            ]);
 
-        $topic   = "garden/{$request->garden_id}/irrigation";
-        $payload = json_encode([
-            'state'      => $request->state,
-            'manual'     => true,
-            'triggered_at' => now()->toISOString(),
-        ]);
+            $topic   = "garden/{$request->garden_id}/irrigation";
+            $payload = json_encode([
+                'state'        => $request->state,
+                'manual'       => true,
+                'triggered_at' => now()->toISOString(),
+            ]);
 
-        MQTT::publish($topic, $payload);
+            MQTT::publish($topic, $payload);
 
-        return response()->json([
-            'success' => true,
-            'message' => "Irrigation turned {$request->state}",
-            'state'   => $request->state,
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => "Irrigation turned {$request->state}",
+                'state'   => $request->state,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error'   => $e->getMessage(),
+                'line'    => $e->getLine(),
+                'file'    => $e->getFile(),
+            ], 500);
+        }
     }
 }
