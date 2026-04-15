@@ -33,10 +33,10 @@ const TrashIcon = ({ color = "currentColor" }) => (
     <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
   </svg>
 );
-const ViewIcon = () => (
+const ViewIcon = ({ color = "#3B6D11" }) => (
   <svg width="14" height="14" viewBox="0 0 512 512" fill="none">
-    <path stroke="#3B6D11" strokeLinecap="round" strokeLinejoin="round" strokeWidth={36} d="M176 176v-40a40 40 0 0 1 40-40h208a40 40 0 0 1 40 40v240a40 40 0 0 1-40 40H216a40 40 0 0 1-40-40v-40"/>
-    <path stroke="#3B6D11" strokeLinecap="round" strokeLinejoin="round" strokeWidth={36} d="m272 336l80-80l-80-80M48 256h288"/>
+    <path stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={36} d="M176 176v-40a40 40 0 0 1 40-40h208a40 40 0 0 1 40 40v240a40 40 0 0 1-40 40H216a40 40 0 0 1-40-40v-40"/>
+    <path stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={36} d="m272 336l80-80l-80-80M48 256h288"/>
   </svg>
 );
 const ClaimIcon = () => (
@@ -322,9 +322,13 @@ const CropCard = ({ crop, onEdit, onDelete, onClaim, onRemoveEsp, onView }) => {
         </div>
 
         <div className="flex gap-1.5 mt-3">
-          <button onClick={() => onView(crop)} title="View data"
-            className="w-9 h-9 rounded-xl border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-green-50 hover:border-green-400 transition-all">
-            <ViewIcon/>
+          <button
+            onClick={() => onView(crop)}
+            disabled={!esp}
+            title={esp ? "View data" : "Claim a device first to view data"}
+            className={`w-9 h-9 rounded-xl border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer transition-all ${!esp ? 'opacity-30 cursor-not-allowed' : 'hover:bg-green-50 hover:border-green-400'}`}
+          >
+            <ViewIcon color={esp ? "#3B6D11" : "#9ca3af"}/>
           </button>
           <button onClick={() => onEdit(crop)} title="Edit crop"
             className="w-9 h-9 rounded-xl border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-green-50 hover:border-green-400 transition-all text-green-700">
@@ -407,11 +411,8 @@ const CropCareConfig = () => {
         "esp-number": espId,
         "crop_id": claimModal.id,
       });
-      setCrops(prev => prev.map(c =>
-        c.id === claimModal.id
-          ? { ...c, esp: { serial_number: espId, status: 'inactive' } }
-          : c
-      ));
+      // Refresh to get full updated object from server
+      fetchCrops();
       setClaimModal(null);
     } catch (err) {
       setGlobalError(err.response?.data?.message || "Device not found or already claimed.");
@@ -505,7 +506,12 @@ const CropCareConfig = () => {
                 onDelete={c => setDeleteModal(c)}
                 onClaim={c => setClaimModal(c)}
                 onRemoveEsp={c => setRemoveEspModal(c)}
-                onView={c => navigate(`/user/crop-care/${garden_id}/${c.id}`)}
+                onView={c => {
+                  if (c.esp) {
+                    // Navigate using the device serial number or ID
+                    navigate(`/user/crop-care/${garden_id}/${c.id}/${c.esp.serial_number}`);
+                  }
+                }}
               />
             ))}
           </div>

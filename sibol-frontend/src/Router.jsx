@@ -82,7 +82,7 @@ const router = createBrowserRouter ([
                         element: <CropCareConfig/>
                     },
                     {
-                        path: "/user/crop-care/:garden_id/:crop_name",
+                        path: "/user/crop-care/:garden_id/:crop_name/:esp_id",
                         element: <CropCarePlant/>
                     },
                     {

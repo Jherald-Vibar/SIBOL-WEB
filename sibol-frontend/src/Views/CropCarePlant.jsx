@@ -44,7 +44,7 @@ const evaluateAlerts = (data, profile) => {
 }
 
 const CropCarePlant = () => {
-  const { garden_id, crop_name } = useParams()
+  const { garden_id, crop_name, esp_id} = useParams()
   const navigate = useNavigate()
   const gardenEchoRef  = useRef(null)
   const cropProfileRef = useRef(null)
