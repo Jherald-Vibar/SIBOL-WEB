@@ -44,7 +44,7 @@ const evaluateAlerts = (data, profile) => {
 }
 
 const CropCarePlant = () => {
-  const { garden_id, crop_name } = useParams()
+  const { esp_id, crop_name } = useParams()
   const navigate = useNavigate()
   const gardenEchoRef  = useRef(null)
   const cropProfileRef = useRef(null)
@@ -74,7 +74,7 @@ const CropCarePlant = () => {
   const fetchSensorData = async () => {
     setLoading(true)
     try {
-      const res = await axiosClient.get(`/getSensorDataCrop/${garden_id}/${crop_name}`)
+      const res = await axiosClient.get(`/getSensorDataCrop/${esp_id}/${crop_name}`)
       if (res.data.success) {
         const { crop, crop_profile, latest, history, alerts: serverAlerts } = res.data.data
         setCropInfo(crop)
@@ -93,10 +93,10 @@ const CropCarePlant = () => {
 
   // ── Connect / reconnect WebSocket ─────────────────────────────────────────
   const connectEcho = () => {
-    if (!garden_id || !crop_name) return
+    if (!esp_id || !crop_name) return
 
     if (gardenEchoRef.current) {
-      gardenEchoRef.current.leaveChannel(`garden.${garden_id}`)
+      gardenEchoRef.current.leaveChannel(`esp.${esp_id}`)
       gardenEchoRef.current.disconnect()
       gardenEchoRef.current = null
     }
@@ -118,7 +118,7 @@ const CropCarePlant = () => {
     })
 
     gardenEchoRef.current
-      .channel(`garden.${garden_id}`)
+      .channel(`esp.${esp_id}`)
       .listen('.sensor.updated', (e) => {
         const d = e.sensor_data
 
@@ -163,15 +163,15 @@ const CropCarePlant = () => {
   }
 
   useEffect(() => {
-    if (!garden_id || !crop_name) return
+    if (!esp_id || !crop_name) return
     fetchSensorData()
     connectEcho()
     return () => {
-      gardenEchoRef.current?.leaveChannel(`garden.${garden_id}`)
+      gardenEchoRef.current?.leaveChannel(`esp.${esp_id}`)
       gardenEchoRef.current?.disconnect()
       gardenEchoRef.current = null
     }
-  }, [garden_id, crop_name])
+  }, [esp_id, crop_name])
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && isModalOpen) closeImageModal() }
@@ -193,7 +193,7 @@ const CropCarePlant = () => {
     setIrrigationLoading(true)
     try {
       await axiosClient.post('/irrigation/toggle', {
-        garden_id,
+        esp_id,
         state,
       })
       setIsIrrigating(state === 'on')
@@ -387,7 +387,7 @@ const CropCarePlant = () => {
         <p className="font-semibold text-green-950 mb-1">Error</p>
         <p className="text-sm text-gray-500">{error}</p>
         <button
-          onClick={() => navigate(`/user/crop-care/${garden_id}`)}
+          onClick={() => navigate(`/user/crop-care/${esp_id}`)}
           className="mt-4 inline-flex items-center gap-1.5 text-sm text-green-700 hover:text-green-950 transition-colors"
         >
           ← Back to Crops
@@ -416,7 +416,7 @@ const CropCarePlant = () => {
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-7">
           <div>
             <button
-              onClick={() => navigate(`/user/crop-care/${garden_id}`)}
+              onClick={() => navigate(`/user/crop-care/${esp_id}`)}
               className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-green-950 transition-colors mb-2 group"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:-translate-x-0.5 transition-transform">
@@ -428,7 +428,7 @@ const CropCarePlant = () => {
               {cropInfo.name || 'Crop Details'}
             </h1>
             <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-400 items-center">
-              <span>Garden {garden_id}</span>
+              <span>ESP {esp_id}</span>
 
               {/* WebSocket live indicator */}
               <span className="flex items-center gap-1.5">
@@ -751,7 +751,7 @@ const CropCarePlant = () => {
               You're about to manually control irrigation for
             </p>
             <p className="text-sm font-semibold text-green-800 text-center mb-4">
-              {cropInfo?.name} · Garden {garden_id}
+              {cropInfo?.name} · ESP {esp_id}
             </p>
 
             {/* Warning notice */}
