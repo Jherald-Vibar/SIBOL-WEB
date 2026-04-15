@@ -14,6 +14,7 @@ class DetectionUpdated implements ShouldBroadcast
 
     public function __construct(
         public int $gardenId,
+        public int $cropId,        // Add this parameter
         public string $cropName,
         public array $detectionData
     ) {}
@@ -34,9 +35,10 @@ class DetectionUpdated implements ShouldBroadcast
     {
         return [
             'detection' => [
+                'crop_id' => $this->cropId,        // Include crop_id
+                'crop_name' => $this->cropName,
                 'results' => $this->detectionData['results'] ?? [],
                 'image_url' => $this->detectionData['image_url'] ?? null,
-                'crop_name' => $this->cropName,
                 'timestamp' => now()->toISOString(),
             ],
         ];

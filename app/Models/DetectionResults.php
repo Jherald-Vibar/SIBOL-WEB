@@ -27,7 +27,7 @@ class DetectionResults extends Model
         'confidence' => 'float',
     ];
 
-    // Add this boot method to auto-broadcast when detection is created
+    // Add this boot method to auto-broadcast
     protected static function booted()
     {
         static::created(function ($detection) {
@@ -35,7 +35,7 @@ class DetectionResults extends Model
             $crop = $detection->crop;
 
             if ($crop && $crop->garden) {
-                // Get all recent detections for this crop
+                // Get recent detections for this crop
                 $recentDetections = DetectionResults::where('crop_id', $crop->id)
                     ->orderBy('created_at', 'desc')
                     ->limit(10)
@@ -49,9 +49,10 @@ class DetectionResults extends Model
                         ];
                     });
 
-                // Broadcast the update to all connected clients
+                // Broadcast the update with crop_id
                 broadcast(new DetectionUpdated(
                     $crop->garden->id,
+                    $crop->id,           // Pass the crop_id here
                     $crop->name,
                     [
                         'results' => $recentDetections,
@@ -65,7 +66,7 @@ class DetectionResults extends Model
     // Relationships
     public function sensorData()
     {
-        return $this->belongsTo(SensorData::class, 'sensor_id');
+        return $this->belongsTo(SensorData::class, 'sensor_data_id');
     }
 
     public function crop()
@@ -104,12 +105,5 @@ class DetectionResults extends Model
             return 'Yellow Leaf / Nutrient Deficiency';
         }
         return 'Unknown';
-    }
-
-    // Fix this method - it's causing a loop
-    // Remove or rename this method to avoid confusion
-    public function detectionResults()
-    {
-        return $this->hasMany(DetectionResults::class); // This creates a loop! Remove it.
     }
 }
