@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Esp;
 
 class IrrigationController extends Controller
 {
@@ -14,10 +15,20 @@ class IrrigationController extends Controller
 
             if (!$gardenId || !in_array($state, ['on', 'off'])) {
                 return response()->json([
-                    'success' => false,
-                    'error'   => 'garden_id and state (on/off) are required.',
-                    'received' => $request->all(), // 👈 shows exactly what Laravel received
+                    'success'  => false,
+                    'error'    => 'garden_id and state (on/off) are required.',
+                    'received' => $request->all(),
                 ], 422);
+            }
+
+            // Look up the ESP device linked to this garden
+            $espId = Esp::where('garden_id', $gardenId)->value('serial_number');
+
+            if (!$espId) {
+                return response()->json([
+                    'success' => false,
+                    'error'   => "No ESP device found for garden {$gardenId}.",
+                ], 404);
             }
 
             $host     = env('MQTT_HOST');
@@ -25,7 +36,7 @@ class IrrigationController extends Controller
             $username = env('MQTT_USERNAME');
             $password = env('MQTT_PASSWORD');
             $clientId = 'sibol-laravel-' . uniqid();
-            $topic    = "garden/{$gardenId}/irrigation";
+            $topic    = "esp/{$espId}/irrigation";  // ← now uses ESP serial number
             $payload  = json_encode([
                 'state'        => $state,
                 'manual'       => true,
@@ -59,10 +70,10 @@ class IrrigationController extends Controller
             $passwordLen  = strlen($password);
 
             $connectPayload =
-                "\x00\x04MQTT"          .
-                "\x04"                  .
-                "\xC2"                  .
-                "\x00\x3C"             .
+                "\x00\x04MQTT"                     .
+                "\x04"                             .
+                "\xC2"                             .
+                "\x00\x3C"                         .
                 chr(0) . chr($clientIdLen) . $clientId .
                 chr(0) . chr($usernameLen) . $username .
                 chr(0) . chr($passwordLen) . $password;
@@ -107,6 +118,7 @@ class IrrigationController extends Controller
                 'message' => "Irrigation turned {$state}",
                 'state'   => $state,
                 'topic'   => $topic,
+                'esp_id'  => $espId,
             ]);
 
         } catch (\Exception $e) {
