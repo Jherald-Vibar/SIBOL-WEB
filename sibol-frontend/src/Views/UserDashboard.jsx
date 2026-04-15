@@ -40,12 +40,18 @@ const UserDashboard = () => {
 
   const navigate = useNavigate();
 
-  const { airHumidityHistory, isConnected, setAirHumidityHistory } = useSensorData(gardenId);
+  // Passing selectedCrop here so the hook can re-establish
+  // connection to the specific ESP linked to this crop
+  const { airHumidityHistory, isConnected, setAirHumidityHistory } = useSensorData(selectedCrop || gardenId);
 
+  // MODIFIED: Fetch history specifically for the ESP linked to the selected crop
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const res = await axiosClient.get('/getAirHumidity');
+        // We now pass crop_id to the backend to find the correct ESP
+        const res = await axiosClient.get('/getAirHumidity', {
+            params: { crop_id: selectedCrop }
+        });
         const formattedData = Array.isArray(res.data) ? res.data : (res.data.data || []);
         if (typeof setAirHumidityHistory === 'function') {
           setAirHumidityHistory(formattedData);
@@ -55,14 +61,23 @@ const UserDashboard = () => {
         setError('Database connection error.');
       }
     };
-    if (gardenId) fetchHistory();
-  }, [gardenId, setAirHumidityHistory]);
+
+    // Only fetch if a crop is selected
+    if (selectedCrop) {
+        fetchHistory();
+    }
+  }, [selectedCrop, setAirHumidityHistory]);
 
   const chartData = airHumidityHistory;
 
   useEffect(() => {
     const crop = crops.find(c => c.id === parseInt(selectedCrop));
     setActiveCrop(crop || null);
+
+    // Update gardenId context if needed for the hook
+    if (crop?.garden?.id) {
+        setGardenId(crop.garden.id);
+    }
   }, [selectedCrop, crops]);
 
   useEffect(() => {
@@ -144,7 +159,7 @@ const UserDashboard = () => {
         * { box-sizing: border-box; }
       `}</style>
 
-      {/* ── Page header — matches CropProfile ── */}
+      {/* ── Page header ── */}
       <div className="w-full px-6 md:px-10 pt-9">
         <p className="text-[11px] font-medium tracking-[2px] uppercase text-[#2e8b57] mb-1.5">
           Good to see you
@@ -158,10 +173,10 @@ const UserDashboard = () => {
       {/* ── Content ── */}
       <div className="w-full px-6 md:px-10 pb-28 md:pb-14 flex flex-col gap-6">
 
-        {/* ── Row 1: Weather + Forecast + Advisory — stack on mobile, row on desktop ── */}
+        {/* ── Row 1: Weather + Forecast + Advisory ── */}
         <div className="flex flex-col md:flex-row gap-5">
 
-          {/* Weather card — full width on mobile */}
+          {/* Weather card */}
           <div className="relative w-full md:w-[280px] md:shrink-0 rounded-[20px] overflow-hidden border border-white/14 bg-gradient-to-br from-[rgba(26,102,54,0.82)] via-[rgba(11,61,30,0.88)] to-[rgba(11,61,30,0.92)] p-6">
             <Orb className="w-[200px] h-[200px] -top-[60px] -right-[60px] bg-[radial-gradient(circle,rgba(46,139,87,0.18)_0%,transparent_70%)]" />
             <Orb className="w-[120px] h-[120px] -bottom-5 -left-5 bg-[radial-gradient(circle,rgba(212,132,10,0.12)_0%,transparent_70%)]" />
@@ -214,7 +229,7 @@ const UserDashboard = () => {
             )}
           </div>
 
-          {/* Forecast card — full width on mobile, flex-1 on desktop */}
+          {/* Forecast card */}
           <div className="relative w-full md:flex-1 rounded-[20px] overflow-hidden bg-gradient-to-br from-[rgba(26,102,54,0.82)] via-[rgba(11,61,30,0.88)] to-[rgba(11,61,30,0.92)] border border-white/14 p-6">
             <Orb className="w-[300px] h-[300px] -top-[100px] -right-[80px] bg-[radial-gradient(circle,rgba(46,139,87,0.13)_0%,transparent_70%)]" />
             <div className="relative z-10 mb-5">
@@ -255,7 +270,7 @@ const UserDashboard = () => {
             )}
           </div>
 
-          {/* Advisory card — full width on mobile */}
+          {/* Advisory card */}
           <div className="relative w-full md:w-[240px] md:shrink-0 rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-6">
             <Orb className="w-[150px] h-[150px] -top-10 -right-10 bg-[radial-gradient(circle,rgba(46,139,87,0.13)_0%,transparent_70%)]" />
             <div className="relative z-10">
@@ -346,7 +361,7 @@ const UserDashboard = () => {
           </div>
         </div>
 
-        {/* ── Crops Section — stack on mobile, row on desktop ── */}
+        {/* ── Crops Section ── */}
         <div className="flex flex-col md:flex-row gap-5">
 
           {/* Available crops table */}
