@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\DetectionUpdated;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -25,6 +26,41 @@ class DetectionResults extends Model
         'harvest_tips' => 'array',
         'confidence' => 'float',
     ];
+
+    // Add this boot method to auto-broadcast when detection is created
+    protected static function booted()
+    {
+        static::created(function ($detection) {
+            // Get the crop and garden info
+            $crop = $detection->crop;
+
+            if ($crop && $crop->garden) {
+                // Get all recent detections for this crop
+                $recentDetections = DetectionResults::where('crop_id', $crop->id)
+                    ->orderBy('created_at', 'desc')
+                    ->limit(10)
+                    ->get()
+                    ->map(function($d) {
+                        return [
+                            'detected_class' => $d->detected_class,
+                            'confidence' => $d->confidence,
+                            'image_url' => $d->image_url,
+                            'created_at' => $d->created_at->toISOString(),
+                        ];
+                    });
+
+                // Broadcast the update to all connected clients
+                broadcast(new DetectionUpdated(
+                    $crop->garden->id,
+                    $crop->name,
+                    [
+                        'results' => $recentDetections,
+                        'image_url' => $detection->image_url,
+                    ]
+                ));
+            }
+        });
+    }
 
     // Relationships
     public function sensorData()
@@ -70,8 +106,10 @@ class DetectionResults extends Model
         return 'Unknown';
     }
 
-     public function detectionResults()
+    // Fix this method - it's causing a loop
+    // Remove or rename this method to avoid confusion
+    public function detectionResults()
     {
-        return $this->hasMany(DetectionResults::class);
+        return $this->hasMany(DetectionResults::class); // This creates a loop! Remove it.
     }
 }

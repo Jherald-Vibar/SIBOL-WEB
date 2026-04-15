@@ -61,6 +61,7 @@ const CropCarePlant = () => {
   const [modalImage,           setModalImage]           = useState(null)
   const [wsConnected,          setWsConnected]          = useState(false)
   const [lastUpdated,          setLastUpdated]          = useState(null)
+  const [imageRefreshKey,      setImageRefreshKey]      = useState(Date.now()) // For cache busting
 
   // ── Irrigation state ──────────────────────────────────────────────────────
   const [isIrrigating,         setIsIrrigating]         = useState(false)
@@ -71,8 +72,8 @@ const CropCarePlant = () => {
   useEffect(() => { cropProfileRef.current = cropProfile }, [cropProfile])
 
   // ── Initial fetch ─────────────────────────────────────────────────────────
-  const fetchSensorData = async () => {
-    setLoading(true)
+  const fetchSensorData = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     try {
       const res = await axiosClient.get(`/getSensorDataCrop/${garden_id}/${crop_name}`)
       if (res.data.success) {
@@ -83,11 +84,12 @@ const CropCarePlant = () => {
         setAlerts(serverAlerts || [])
         setHistoryData(history || [])
         setLastUpdated(new Date())
+        setImageRefreshKey(Date.now()) // Refresh image cache
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to fetch sensor data!')
+      if (showLoading) setError(err.response?.data?.message || 'Failed to fetch sensor data!')
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }
 
@@ -152,19 +154,37 @@ const CropCarePlant = () => {
         setLastUpdated(new Date())
         setWsConnected(true)
       })
+      .listen('.detection.updated', (e) => {
+        // Handle live leaf detection updates
+        if (e.detection && e.detection.crop_name === crop_name) {
+          setCropInfo(prev => ({
+            ...prev,
+            detection_results: e.detection.results || prev?.detection_results,
+            image: e.detection.image_url || prev?.image
+          }))
+          setImageError(false) // Reset error state for new image
+          setImageRefreshKey(Date.now()) // Force image refresh
+          setLastUpdated(new Date())
+
+          // Show a temporary notification (optional)
+          if (e.detection.results && e.detection.results.length > 0) {
+            console.log('New leaf detection received!', e.detection.results)
+          }
+        }
+      })
       .subscribed(() => setWsConnected(true))
       .error(()    => setWsConnected(false))
   }
 
   const handleReconnect = () => {
     setWsConnected(false)
-    fetchSensorData()
+    fetchSensorData(true)
     connectEcho()
   }
 
   useEffect(() => {
     if (!garden_id || !crop_name) return
-    fetchSensorData()
+    fetchSensorData(true)
     connectEcho()
     return () => {
       gardenEchoRef.current?.leaveChannel(`garden.${garden_id}`)
@@ -172,6 +192,22 @@ const CropCarePlant = () => {
       gardenEchoRef.current = null
     }
   }, [garden_id, crop_name])
+
+  // Poll for updates as fallback when WebSocket is disconnected
+  useEffect(() => {
+    if (!garden_id || !crop_name) return
+
+    let interval
+    if (!wsConnected) {
+      interval = setInterval(() => {
+        fetchSensorData(false) // Silent refresh
+      }, 30000) // Poll every 30 seconds
+    }
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [garden_id, crop_name, wsConnected])
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && isModalOpen) closeImageModal() }
@@ -337,6 +373,12 @@ const CropCarePlant = () => {
     K: { value: parseFloat(sensorData.potassium),  status: getIndividualNutrientStatus(sensorData.potassium,  cropProfile.potassium_min,  cropProfile.potassium_max),  range: `${cropProfile.potassium_min}-${cropProfile.potassium_max}` },
   } : null
 
+  // Get image URL with cache busting
+  const getImageUrl = () => {
+    if (!cropInfo?.image || imageError) return null
+    return `${cropInfo.image}?t=${imageRefreshKey}`
+  }
+
   // ── Sub-components ────────────────────────────────────────────────────────
   const StatusPill = ({ status }) => (
     <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${tierStyle(status.tier)}`}>
@@ -404,10 +446,12 @@ const CropCarePlant = () => {
         @keyframes slideUp     { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:translateY(0) } }
         @keyframes pulse-dot   { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
         @keyframes drip        { 0%,100% { transform:translateY(0) scaleY(1); opacity:1 } 60% { transform:translateY(6px) scaleY(1.3); opacity:0.7 } }
+        @keyframes image-pulse { 0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
         .animate-fade-in       { animation: fadeIn  0.25s ease-out; }
         .animate-slide-up      { animation: slideUp 0.3s ease-out; }
         .animate-pulse-dot     { animation: pulse-dot 1.5s ease-in-out infinite; }
         .animate-drip          { animation: drip 1.2s ease-in-out infinite; }
+        .animate-image-pulse   { animation: image-pulse 1.5s ease-in-out infinite; }
       `}</style>
 
       <div className="px-5 md:px-9 py-7 pb-24 md:pb-10">
@@ -500,11 +544,21 @@ const CropCarePlant = () => {
               {cropInfo?.image && !imageError ? (
                 <>
                   <img
-                    src={cropInfo.image}
+                    src={getImageUrl()}
                     alt={crop_name}
                     onError={() => setImageError(true)}
-                    className={`w-full rounded-[14px] object-cover transition-all duration-500 border-[3px] ${tierBorderClass(moistureStatus.tier)}`}
+                    className={`w-full rounded-[14px] object-cover transition-all duration-500 border-[3px] ${tierBorderClass(moistureStatus.tier)} hover:scale-105 cursor-pointer`}
+                    onClick={() => openImageModal(getImageUrl())}
                   />
+                  {/* Live badge for real-time updates */}
+                  {wsConnected && cropInfo?.detection_results?.length > 0 && (
+                    <div className="absolute -top-2 -right-2">
+                      <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                      </span>
+                    </div>
+                  )}
                   <div className="mt-2"><StatusPill status={moistureStatus} /></div>
                 </>
               ) : (
@@ -609,12 +663,18 @@ const CropCarePlant = () => {
                   {cropInfo.detection_results[0]?.image_url && (
                     <div className="relative flex justify-center mb-3">
                       <img
-                        src={cropInfo.detection_results[0].image_url}
+                        src={`${cropInfo.detection_results[0].image_url}?t=${imageRefreshKey}`}
                         alt="Leaf"
                         onClick={() => openImageModal(cropInfo.detection_results[0].image_url)}
-                        className="w-[110px] h-[110px] object-cover rounded-xl border-2 border-green-200 cursor-pointer hover:opacity-90 transition-opacity"
+                        className="w-[110px] h-[110px] object-cover rounded-xl border-2 border-green-200 cursor-pointer hover:opacity-90 transition-opacity hover:scale-105"
                       />
-                      <span className="absolute -top-1 right-[calc(50%-59px)] bg-green-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">AI</span>
+                      <span className="absolute -top-1 right-[calc(50%-59px)] bg-green-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                        AI
+                      </span>
+                      {/* Live update indicator */}
+                      {wsConnected && (
+                        <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse-dot border-2 border-white"></span>
+                      )}
                     </div>
                   )}
                   <div className="flex flex-wrap gap-1.5 mb-3">
@@ -788,7 +848,7 @@ const CropCarePlant = () => {
             <button onClick={closeImageModal} className="absolute -top-10 right-0 bg-transparent border-none text-white cursor-pointer text-xl hover:opacity-70 transition-opacity">
               ✕ Close
             </button>
-            <img src={modalImage} alt="Leaf detection" onClick={e => e.stopPropagation()} className="w-full rounded-2xl object-contain" />
+            <img src={`${modalImage}?t=${imageRefreshKey}`} alt="Leaf detection" onClick={e => e.stopPropagation()} className="w-full rounded-2xl object-contain" />
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-4 pb-3.5 pt-6 rounded-b-2xl">
               <p className="text-white text-sm font-medium">Leaf Detection Analysis — AI Processed</p>
               <p className="text-white/60 text-[11px] mt-0.5">Press ESC or click outside to close</p>
