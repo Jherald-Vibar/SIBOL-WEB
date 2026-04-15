@@ -314,31 +314,37 @@ class IotController extends Controller
 }
 
     public function getAirHumidity(Request $request) {
-        $user = $request->user();
-        $esp = Esp::where("user_id", $user->id)->first();
+    $user = $request->user();
 
-        if (!$esp) {
-            return response()->json([
-                'data' => [],
-                'message' => 'No ESP device found for this user'
-            ], 200);
-        }
+    // 1. Get the crop_id sent from the React frontend
+    $cropId = $request->query('crop_id');
 
-        $data = SensorData::where('esp_id', $esp->id)
-            ->orderBy('created_at', 'desc')
-            ->take(10)
-            ->get(['esp_id', 'air_temperature', 'air_humidity', 'created_at']);
+    // 2. Find the ESP that belongs to this specific user AND is linked to the selected crop
+    $esp = Esp::where("user_id", $user->id)
+              ->where("crop_id", $cropId)
+              ->first();
 
-        $data = $data->map(function($item) {
-            return [
-                'time' => $item->created_at->format('H:i'),
-                'temp' => round($item->air_temperature, 1),
-                'humidity' => round($item->air_humidity, 0),
-            ];
-        })->reverse()->values();
-
-        return response()->json($data);
+    // If no specific crop ESP found, or no crop selected yet
+    if (!$esp) {
+        return response()->json([], 200);
     }
+
+    // 3. Get sensor data for that specific ESP
+    $data = SensorData::where('esp_id', $esp->id)
+        ->orderBy('created_at', 'desc')
+        ->take(10)
+        ->get(['air_temperature', 'air_humidity', 'created_at']);
+
+    $formattedData = $data->map(function($item) {
+        return [
+            'time' => $item->created_at->format('H:i'),
+            'temp' => round($item->air_temperature, 1),
+            'humidity' => round($item->air_humidity, 0),
+        ];
+    })->reverse()->values();
+
+    return response()->json($formattedData);
+}
 
     public function getDataByDay(Request $request, $year, $month, $day) {
     $user = $request->user();
