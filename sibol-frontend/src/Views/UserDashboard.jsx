@@ -126,8 +126,10 @@ const UserDashboard = () => {
     .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
     .replace(/\//g, ' / ');
 
-  const handleMoreDetails = (crop) =>
-    navigate(`/user/crop-care/${crop.garden?.id}/${crop.id}`);
+  const handleMoreDetails = (crop) => {
+    const espId = crop.esp?.id || crop.esp_id || "no-esp";
+    navigate(`/user/crop-care/${crop.garden?.id}/${crop.id}/${espId}`);
+  }
 
   const formatPlantedDate = (d) =>
     d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
