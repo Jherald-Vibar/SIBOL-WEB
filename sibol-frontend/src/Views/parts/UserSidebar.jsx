@@ -9,6 +9,15 @@ import accountSettings from '../../assets/sidebar-icons/account-settings.png';
 import { LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import LogoutModal from './LogoutModal';
 
+// Coach IDs mapped per nav item so CoachMark can spotlight them individually
+const sidebarMenus = [
+  { name: 'Dashboard',        image: dashboard,       path: '/user/dashboard',        coachId: 'coach-nav-dashboard'  },
+  { name: 'Crop Care',        image: cropcare,        path: '/user/crop-care',        coachId: 'coach-nav-cropcare'   },
+  { name: 'Report',           image: reports,         path: '/user/report',           coachId: 'coach-nav-report'     },
+  { name: 'Crop Profile',     image: crophealth,      path: '/user/crop-profile',     coachId: 'coach-nav-cropprofile'},
+  { name: 'Account Settings', image: accountSettings, path: '/user/account-settings', coachId: 'coach-nav-account'    },
+];
+
 const UserSidebar = ({
   collapsed = false,
   onToggleCollapse,
@@ -18,24 +27,13 @@ const UserSidebar = ({
 }) => {
   const userName = localStorage.getItem('username');
 
-  const sidebarMenus = [
-    { name: 'Dashboard',        image: dashboard,       path: '/user/dashboard'        },
-    { name: 'Crop Care',        image: cropcare,        path: '/user/crop-care'        },
-    { name: 'Report',           image: reports,         path: '/user/report'           },
-    { name: 'Crop Profile',     image: crophealth,      path: '/user/crop-profile'     },
-    { name: 'Account Settings', image: accountSettings, path: '/user/account-settings' },
-  ];
-
   return (
     <>
       <LogoutModal isOpen={showLogout} onClose={onLogoutClose} />
 
-      {/* ── DESKTOP SIDEBAR ──
-          sticky + h-screen = sidebar is always viewport height, never page height.
-          This is the fix: logout is always near the bottom of the *screen*,
-          not the bottom of the scrollable page content.
-      */}
+      {/* ── DESKTOP SIDEBAR ── */}
       <div
+        id="coach-sidebar"
         className="hidden md:flex flex-col sticky top-0 h-screen bg-[#0b3d1e] py-7 font-['DM_Sans',sans-serif] relative overflow-hidden shrink-0"
         style={{
           width:        collapsed ? '68px' : '240px',
@@ -76,12 +74,13 @@ const UserSidebar = ({
           </p>
         )}
 
-        {/* ── Nav links — shrink-0 so they don't stretch ── */}
+        {/* ── Nav links ── */}
         <nav className="relative z-10 shrink-0">
           <ul className="flex flex-col gap-1">
             {sidebarMenus.map((menu, i) => (
               <li key={i}>
                 <NavLink
+                  id={menu.coachId}
                   to={menu.path}
                   title={collapsed ? menu.name : undefined}
                   className={({ isActive }) =>
@@ -125,13 +124,13 @@ const UserSidebar = ({
           </ul>
         </nav>
 
-        {/* ── This spacer fills remaining space, pushing logout to the bottom ── */}
+        {/* Spacer */}
         <div className="flex-1 min-h-0" />
 
-        {/* ── Divider ── */}
+        {/* Divider */}
         <div className="relative z-10 h-px bg-white/[0.08] mb-3 shrink-0" />
 
-        {/* ── Logout ── */}
+        {/* Logout */}
         <div className="relative z-10 shrink-0">
           <button
             onClick={onLogoutOpen}
@@ -153,7 +152,7 @@ const UserSidebar = ({
           </button>
         </div>
 
-        {/* ── Collapse toggle ── */}
+        {/* Collapse toggle */}
         <button
           onClick={onToggleCollapse}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -178,6 +177,7 @@ const UserSidebar = ({
           {sidebarMenus.slice(0, 5).map((menu, i) => (
             <NavLink
               key={i}
+              id={`${menu.coachId}-mobile`}
               to={menu.path}
               className={({ isActive }) =>
                 `relative flex flex-col items-center gap-1 px-2.5 py-2 rounded-xl transition-all duration-200

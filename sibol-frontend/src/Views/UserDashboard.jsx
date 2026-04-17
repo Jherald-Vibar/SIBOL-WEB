@@ -10,6 +10,7 @@ import {
   Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
+import CoachMark from './CoachMark';
 
 const SectionPill = ({ label }) => (
   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[#2e8b57]/20 bg-[#2e8b57]/[0.07] text-[10px] font-semibold tracking-[1.5px] uppercase text-[#2e8b57] mb-3.5">
@@ -23,34 +24,32 @@ const Orb = ({ className }) => (
 );
 
 const UserDashboard = () => {
-  const name = localStorage.getItem('username');
+  const name   = localStorage.getItem('username');
+  // Use a stable userId key — fall back to username if no dedicated id key exists
+  const userId = localStorage.getItem('userId') || localStorage.getItem('username') || 'guest';
   const apikey = import.meta.env.VITE_WEATHER_APIKEY;
 
-  const [location, setLocation] = useState(null);
-  const [weather, setWeather] = useState(null);
+  const [location,     setLocation]     = useState(null);
+  const [weather,      setWeather]      = useState(null);
   const [forecastData, setForecastData] = useState(null);
-  const [unit, setUnit] = useState('C');
-  const [date, setDate] = useState(new Date());
-  const [error, setError] = useState('');
+  const [unit,         setUnit]         = useState('C');
+  const [date,         setDate]         = useState(new Date());
+  const [error,        setError]        = useState('');
   const [selectedCrop, setSelectedCrop] = useState('');
-  const [activeCrop, setActiveCrop] = useState(null);
-  const [crops, setCrops] = useState([]);
+  const [activeCrop,   setActiveCrop]   = useState(null);
+  const [crops,        setCrops]        = useState([]);
   const [cropAdvisory, setCropAdvisory] = useState([]);
-  const [gardenId, setGardenId] = useState(null);
+  const [gardenId,     setGardenId]     = useState(null);
 
   const navigate = useNavigate();
 
-  // Passing selectedCrop here so the hook can re-establish
-  // connection to the specific ESP linked to this crop
   const { airHumidityHistory, isConnected, setAirHumidityHistory } = useSensorData(selectedCrop || gardenId);
 
-  // MODIFIED: Fetch history specifically for the ESP linked to the selected crop
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        // We now pass crop_id to the backend to find the correct ESP
         const res = await axiosClient.get('/getAirHumidity', {
-            params: { crop_id: selectedCrop }
+          params: { crop_id: selectedCrop },
         });
         const formattedData = Array.isArray(res.data) ? res.data : (res.data.data || []);
         if (typeof setAirHumidityHistory === 'function') {
@@ -61,11 +60,7 @@ const UserDashboard = () => {
         setError('Database connection error.');
       }
     };
-
-    // Only fetch if a crop is selected
-    if (selectedCrop) {
-        fetchHistory();
-    }
+    if (selectedCrop) fetchHistory();
   }, [selectedCrop, setAirHumidityHistory]);
 
   const chartData = airHumidityHistory;
@@ -73,11 +68,7 @@ const UserDashboard = () => {
   useEffect(() => {
     const crop = crops.find(c => c.id === parseInt(selectedCrop));
     setActiveCrop(crop || null);
-
-    // Update gardenId context if needed for the hook
-    if (crop?.garden?.id) {
-        setGardenId(crop.garden.id);
-    }
+    if (crop?.garden?.id) setGardenId(crop.garden.id);
   }, [selectedCrop, crops]);
 
   useEffect(() => {
@@ -121,31 +112,31 @@ const UserDashboard = () => {
       .catch(err => setError(err.response?.data?.message || 'Error Fetching Detection Results'));
   }, []);
 
-  const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+  const weekday      = date.toLocaleDateString('en-US', { weekday: 'long' });
   const formattedDate = date
     .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
     .replace(/\//g, ' / ');
 
   const handleMoreDetails = (crop) => {
-    const espId = crop.esp?.id || crop.esp_id || "no-esp";
+    const espId = crop.esp?.id || crop.esp_id || 'no-esp';
     navigate(`/user/crop-care/${crop.garden?.id}/${crop.id}/${espId}`);
-  }
+  };
 
   const formatPlantedDate = (d) =>
     d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
   const getWeatherIcon = (condition, large = false) => {
-    const c = condition.toLowerCase();
+    const c   = condition.toLowerCase();
     const cls = large ? 'w-14 h-14' : 'w-10 h-10';
-    if (c.includes('sun') || c.includes('clear')) return <Sun className={`${cls} text-amber-300`} fill="currentColor" />;
-    if (c.includes('rain') || c.includes('drizzle')) return <CloudRain className={`${cls} text-blue-300`} fill="currentColor" />;
-    if (c.includes('snow')) return <CloudSnow className={`${cls} text-blue-200`} fill="currentColor" />;
-    if (c.includes('wind')) return <Wind className={`${cls} text-slate-300`} />;
+    if (c.includes('sun') || c.includes('clear'))    return <Sun       className={`${cls} text-amber-300`} fill="currentColor" />;
+    if (c.includes('rain') || c.includes('drizzle')) return <CloudRain className={`${cls} text-blue-300`}  fill="currentColor" />;
+    if (c.includes('snow'))                          return <CloudSnow className={`${cls} text-blue-200`}  fill="currentColor" />;
+    if (c.includes('wind'))                          return <Wind      className={`${cls} text-slate-300`} />;
     return <Cloud className={`${cls} text-slate-300`} fill="currentColor" />;
   };
 
   const getShortDay = d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(d).getDay()];
-  const getTemp = (c, f) => unit === 'C' ? Math.round(c) : Math.round(f);
+  const getTemp     = (c, f) => unit === 'C' ? Math.round(c) : Math.round(f);
 
   return (
     <div className="min-h-screen w-full max-w-full bg-[#f7f4ee] font-['DM_Sans',sans-serif]">
@@ -160,6 +151,9 @@ const UserDashboard = () => {
         @keyframes spin { to { transform: rotate(360deg); } }
         * { box-sizing: border-box; }
       `}</style>
+
+      {/* CoachMark — per-user key via userId */}
+      <CoachMark userId={userId} />
 
       {/* ── Page header ── */}
       <div className="w-full px-6 md:px-10 pt-9">
@@ -178,8 +172,11 @@ const UserDashboard = () => {
         {/* ── Row 1: Weather + Forecast + Advisory ── */}
         <div className="flex flex-col md:flex-row gap-5">
 
-          {/* Weather card */}
-          <div className="relative w-full md:w-[280px] md:shrink-0 rounded-[20px] overflow-hidden border border-white/14 bg-gradient-to-br from-[rgba(26,102,54,0.82)] via-[rgba(11,61,30,0.88)] to-[rgba(11,61,30,0.92)] p-6">
+          {/* Weather card — id for coachmark step */}
+          <div
+            id="coach-weather"
+            className="relative w-full md:w-[280px] md:shrink-0 rounded-[20px] overflow-hidden border border-white/14 bg-gradient-to-br from-[rgba(26,102,54,0.82)] via-[rgba(11,61,30,0.88)] to-[rgba(11,61,30,0.92)] p-6"
+          >
             <Orb className="w-[200px] h-[200px] -top-[60px] -right-[60px] bg-[radial-gradient(circle,rgba(46,139,87,0.18)_0%,transparent_70%)]" />
             <Orb className="w-[120px] h-[120px] -bottom-5 -left-5 bg-[radial-gradient(circle,rgba(212,132,10,0.12)_0%,transparent_70%)]" />
 
@@ -272,8 +269,11 @@ const UserDashboard = () => {
             )}
           </div>
 
-          {/* Advisory card */}
-          <div className="relative w-full md:w-[240px] md:shrink-0 rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-6">
+          {/* Advisory card — id for coachmark step */}
+          <div
+            id="coach-advisory"
+            className="relative w-full md:w-[240px] md:shrink-0 rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-6"
+          >
             <Orb className="w-[150px] h-[150px] -top-10 -right-10 bg-[radial-gradient(circle,rgba(46,139,87,0.13)_0%,transparent_70%)]" />
             <div className="relative z-10">
               <SectionPill label="Advisory" />
@@ -312,8 +312,11 @@ const UserDashboard = () => {
           </div>
         </div>
 
-        {/* ── Chart Section ── */}
-        <div className="relative w-full rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-7">
+        {/* ── Chart Section — id for coachmark step ── */}
+        <div
+          id="coach-sensors"
+          className="relative w-full rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-7"
+        >
           <Orb className="w-[250px] h-[250px] -top-[80px] -right-[60px] bg-[radial-gradient(circle,rgba(212,132,10,0.12)_0%,transparent_70%)]" />
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-1">
@@ -349,7 +352,7 @@ const UserDashboard = () => {
                     <Tooltip
                       contentStyle={{ background: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 8px 24px rgba(11,61,30,0.12)', fontSize: '12px', padding: '10px 14px' }}
                     />
-                    <Line yAxisId="left" type="monotone" dataKey="temp" stroke="#ef4444" strokeWidth={2.5} dot={{ fill: '#ef4444', r: 4 }} activeDot={{ r: 6 }} name="Temperature" />
+                    <Line yAxisId="left"  type="monotone" dataKey="temp"     stroke="#ef4444" strokeWidth={2.5} dot={{ fill: '#ef4444', r: 4 }} activeDot={{ r: 6 }} name="Temperature" />
                     <Line yAxisId="right" type="monotone" dataKey="humidity" stroke="#2e8b57" strokeWidth={2.5} dot={{ fill: '#2e8b57', r: 4 }} activeDot={{ r: 6 }} name="Humidity" />
                   </LineChart>
                 </ResponsiveContainer>
@@ -363,8 +366,8 @@ const UserDashboard = () => {
           </div>
         </div>
 
-        {/* ── Crops Section ── */}
-        <div className="flex flex-col md:flex-row gap-5">
+        {/* ── Crops Section — id for coachmark step ── */}
+        <div id="coach-crops" className="flex flex-col md:flex-row gap-5">
 
           {/* Available crops table */}
           <div className="relative w-full md:flex-1 rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-7">
