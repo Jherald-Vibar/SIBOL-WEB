@@ -1,255 +1,184 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-/**
- * SIBOL CoachMark — Onboarding Overlay
- * Per-user: stores `sibol_toured_<userId>` in localStorage.
- * Pass `userId` prop (from localStorage or auth context).
- */
-
 const STEPS = [
   {
-    targetId:  'coach-sidebar',
-    title:     <>Your <em className="text-[#f0a830]">Sidebar</em></>,
-    body:      'This is your main navigation panel. Use it to move between Dashboard, Crop Care, Reports, Crop Profile, and Account Settings.',
+    targetId: 'coach-sidebar',
+    title: <>Your <em className="text-[#f0a830]">Sidebar</em></>,
+    body: 'This is your main navigation panel. Use it to move between Dashboard, Crop Care, Reports, and Settings.',
     placement: 'right',
   },
   {
-    targetId:  'coach-nav-dashboard',
-    title:     <><em className="text-[#f0a830]">Dashboard</em> Home</>,
-    body:      'Your central hub — weather, sensor readings, crop status, and alerts are all here at a glance.',
+    targetId: 'coach-nav-dashboard',
+    title: <><em className="text-[#f0a830]">Dashboard</em> Home</>,
+    body: 'Your central hub — weather, sensor readings, and crop status are all here at a glance.',
     placement: 'right',
   },
   {
-    targetId:  'coach-nav-cropcare',
-    title:     <>Crop <em className="text-[#f0a830]">Care</em></>,
-    body:      'Monitor and manage your individual crops. Dive into detailed sensor data and health history.',
+    targetId: 'coach-nav-cropcare',
+    title: <>Crop <em className="text-[#f0a830]">Care</em></>,
+    body: 'Monitor and manage your individual crops. Dive into detailed sensor data and health history.',
     placement: 'right',
   },
   {
-    targetId:  'coach-weather',
-    title:     <>Live <em className="text-[#f0a830]">Weather</em></>,
-    body:      'Current conditions at your farm location. Tap the C / F toggle to switch temperature units.',
+    targetId: 'coach-weather',
+    title: <>Live <em className="text-[#f0a830]">Weather</em></>,
+    body: 'Current conditions at your farm. Tap the C / F toggle to switch units.',
     placement: 'bottom',
   },
   {
-    targetId:  'coach-advisory',
-    title:     <>Crop <em className="text-[#f0a830]">Alerts</em></>,
-    body:      'System-generated advisories based on detected crop health and disease risk. Act early!',
+    targetId: 'coach-advisory',
+    title: <>Crop <em className="text-[#f0a830]">Alerts</em></>,
+    body: 'System-generated advisories based on detected crop health. Act early!',
     placement: 'bottom',
   },
   {
-    targetId:  'coach-sensors',
-    title:     <>Sensor <em className="text-[#f0a830]">Trends</em></>,
-    body:      'Real-time temperature and humidity readings from your IoT garden sensors, plotted over time.',
+    targetId: 'coach-sensors',
+    title: <>Sensor <em className="text-[#f0a830]">Trends</em></>,
+    body: 'Real-time readings from your IoT sensors, plotted over time.',
     placement: 'top',
   },
   {
-    targetId:  'coach-crops',
-    title:     <>Your <em className="text-[#f0a830]">Crops</em></>,
-    body:      'Browse planted crops and check their health. Select one and tap Details for full information.',
+    targetId: 'coach-crops',
+    title: <>Your <em className="text-[#f0a830]">Crops</em></>,
+    body: 'Browse planted crops and check their health status here.',
     placement: 'top',
   },
 ];
 
-const PAD = 10;  // spotlight padding around target
-const GAP = 16;  // gap between spotlight edge and tooltip card
-
-/** Returns the arrow direction label given card placement */
-const arrowSide = (placement) => {
-  switch (placement) {
-    case 'right':  return 'left';   // card is to the right  → arrow points left
-    case 'left':   return 'right';  // card is to the left   → arrow points right
-    case 'bottom': return 'top';    // card is below         → arrow points up
-    case 'top':    return 'bottom'; // card is above         → arrow points down
-    default:       return 'top';
-  }
-};
-
-const ARROW = 10; // arrow size px
+const PAD = 10;
+const GAP = 16;
+const ARROW = 10;
 
 const CoachMark = ({ open, onClose, userId }) => {
   const storageKey = userId ? `sibol_toured_${userId}` : 'sibol_toured';
 
-  const [active,    setActive]    = useState(false);
-  const [step,      setStep]      = useState(0);
-  const [done,      setDone]      = useState(false);
+  const [active, setActive] = useState(false);
+  const [step, setStep] = useState(0);
+  const [done, setDone] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [spotStyle, setSpotStyle] = useState({});
-  const [cardPos,   setCardPos]   = useState({ top: 0, left: 0, width: 272 });
-  const [arrowPos,  setArrowPos]  = useState({ side: 'top', offset: 0 });
+  const [cardPos, setCardPos] = useState({ top: 0, left: 0, width: 272 });
+  const [arrowPos, setArrowPos] = useState({ side: 'top', offset: 0 });
   const rafRef = useRef(null);
 
-  /* ── auto-launch once per user ── */
+  // Handle Resize
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Auto-launch
   useEffect(() => {
     if (open === undefined) {
       const toured = localStorage.getItem(storageKey);
       if (!toured) {
-        const t = setTimeout(() => setActive(true), 600);
+        const t = setTimeout(() => setActive(true), 1000);
         return () => clearTimeout(t);
       }
     }
   }, [storageKey, open]);
 
-  /* ── controlled mode ── */
+  // Controlled mode
   useEffect(() => {
     if (open !== undefined) setActive(open);
   }, [open]);
 
-  /* ── position spotlight + tooltip card + arrow ── */
   const position = useCallback(() => {
-    const s      = STEPS[step];
+    const s = STEPS[step];
     const target = document.getElementById(s.targetId);
     if (!target) return;
 
     const tr = target.getBoundingClientRect();
 
-    // spotlight rect
-    const spot = {
-      top:    tr.top    - PAD,
-      left:   tr.left   - PAD,
-      width:  tr.width  + PAD * 2,
+    // 1. Spotlight Style
+    setSpotStyle({
+      top: tr.top - PAD,
+      left: tr.left - PAD,
+      width: tr.width + PAD * 2,
       height: tr.height + PAD * 2,
-    };
-    setSpotStyle(spot);
+    });
 
-    const CW = 272;
-    const CH = 195; // estimated card height
-
-    let top, left, side, arrowOffset;
-
-    switch (s.placement) {
-      case 'right': {
-        left = tr.right + PAD + GAP;
-        // vertically centre card on target
-        top  = tr.top + tr.height / 2 - CH / 2;
-        side = 'left';
-        // arrow at vertical centre of card
-        arrowOffset = CH / 2 - ARROW;
-        break;
-      }
-      case 'left': {
-        left = tr.left - PAD - GAP - CW;
-        top  = tr.top + tr.height / 2 - CH / 2;
-        side = 'right';
-        arrowOffset = CH / 2 - ARROW;
-        break;
-      }
-      case 'bottom': {
-        top  = tr.bottom + PAD + GAP;
-        left = tr.left + tr.width / 2 - CW / 2;
-        side = 'top';
-        // arrow at horizontal centre of card
-        arrowOffset = CW / 2 - ARROW;
-        break;
-      }
-      case 'top':
-      default: {
-        top  = tr.top - PAD - GAP - CH;
-        left = tr.left + tr.width / 2 - CW / 2;
-        side = 'bottom';
-        arrowOffset = CW / 2 - ARROW;
-        break;
-      }
+    // 2. Scroll element into view (Crucial for mobile)
+    if (active) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-    // clamp card inside viewport
-    const clampedLeft = Math.max(8, Math.min(left, window.innerWidth  - CW - 8));
-    const clampedTop  = Math.max(8, Math.min(top,  window.innerHeight - CH - 8));
+    // 3. Card Positioning
+    if (window.innerWidth < 768) {
+      // MOBILE: Fixed Bottom Sheet
+      setCardPos({
+        top: 'auto',
+        left: 16,
+        width: window.innerWidth - 32,
+        bottom: 24
+      });
+      setArrowPos({ side: 'none', offset: 0 });
+    } else {
+      // DESKTOP: Original Relative Logic
+      const CW = 272;
+      const CH = 195;
+      let top, left, side, arrowOffset;
 
-    // adjust arrow offset if card was clamped
-    let adjustedArrowOffset = arrowOffset;
-    if (s.placement === 'bottom' || s.placement === 'top') {
-      adjustedArrowOffset = arrowOffset + (left - clampedLeft);
-      adjustedArrowOffset = Math.max(ARROW * 2, Math.min(adjustedArrowOffset, CW - ARROW * 4));
-    }
-    if (s.placement === 'right' || s.placement === 'left') {
-      adjustedArrowOffset = arrowOffset + (top - clampedTop);
-      adjustedArrowOffset = Math.max(ARROW * 2, Math.min(adjustedArrowOffset, CH - ARROW * 4));
-    }
+      switch (s.placement) {
+        case 'right':
+          left = tr.right + PAD + GAP;
+          top = tr.top + tr.height / 2 - CH / 2;
+          side = 'left';
+          arrowOffset = CH / 2 - ARROW;
+          break;
+        case 'bottom':
+          top = tr.bottom + PAD + GAP;
+          left = tr.left + tr.width / 2 - CW / 2;
+          side = 'top';
+          arrowOffset = CW / 2 - ARROW;
+          break;
+        case 'top':
+        default:
+          top = tr.top - PAD - GAP - CH;
+          left = tr.left + tr.width / 2 - CW / 2;
+          side = 'bottom';
+          arrowOffset = CW / 2 - ARROW;
+          break;
+      }
 
-    setCardPos({ top: clampedTop, left: clampedLeft, width: CW });
-    setArrowPos({ side, offset: adjustedArrowOffset });
-  }, [step]);
+      const clampedLeft = Math.max(8, Math.min(left, window.innerWidth - CW - 8));
+      const clampedTop = Math.max(8, Math.min(top, window.innerHeight - CH - 8));
+
+      setCardPos({ top: clampedTop, left: clampedLeft, width: CW, bottom: 'auto' });
+      setArrowPos({ side, offset: arrowOffset });
+    }
+  }, [step, active]);
 
   useEffect(() => {
     if (!active) return;
     position();
-    const onResize = () => {
+    const onRes = () => {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(position);
     };
-    window.addEventListener('resize', onResize);
-    return () => { window.removeEventListener('resize', onResize); cancelAnimationFrame(rafRef.current); };
+    window.addEventListener('resize', onRes);
+    window.addEventListener('scroll', onRes, true);
+    return () => {
+      window.removeEventListener('resize', onRes);
+      window.removeEventListener('scroll', onRes, true);
+      cancelAnimationFrame(rafRef.current);
+    };
   }, [active, step, position]);
 
-  /* ── handlers ── */
-  const finish = () => {
-    setActive(false);
-    setDone(true);
-    localStorage.setItem(storageKey, '1');
-    onClose?.();
-  };
-  const skip = () => {
-    setActive(false);
-    localStorage.setItem(storageKey, '1');
-    onClose?.();
-  };
+  const finish = () => { setActive(false); setDone(true); localStorage.setItem(storageKey, '1'); onClose?.(); };
+  const skip = () => { setActive(false); localStorage.setItem(storageKey, '1'); onClose?.(); };
   const next = () => step < STEPS.length - 1 ? setStep(s => s + 1) : finish();
   const prev = () => step > 0 && setStep(s => s - 1);
-  const restartTour = () => { setDone(false); setStep(0); setActive(true); };
 
-  /* ── arrow CSS ── */
   const arrowStyle = () => {
-    const base = {
-      position:    'absolute',
-      width:       0,
-      height:      0,
-      pointerEvents: 'none',
-    };
+    if (arrowPos.side === 'none') return { display: 'none' };
+    const base = { position: 'absolute', width: 0, height: 0, pointerEvents: 'none' };
     const color = '#ffffff';
-    const shadow = 'rgba(0,0,0,0.10)';
-
     switch (arrowPos.side) {
-      case 'left': // arrow points left (card is to the right of target)
-        return {
-          ...base,
-          top:         arrowPos.offset,
-          left:        -ARROW,
-          borderTop:   `${ARROW}px solid transparent`,
-          borderBottom:`${ARROW}px solid transparent`,
-          borderRight: `${ARROW}px solid ${color}`,
-          filter:      `drop-shadow(-2px 0 2px ${shadow})`,
-        };
-      case 'right': // arrow points right
-        return {
-          ...base,
-          top:         arrowPos.offset,
-          right:       -ARROW,
-          borderTop:   `${ARROW}px solid transparent`,
-          borderBottom:`${ARROW}px solid transparent`,
-          borderLeft:  `${ARROW}px solid ${color}`,
-          filter:      `drop-shadow(2px 0 2px ${shadow})`,
-        };
-      case 'top': // arrow points up (card is below target)
-        return {
-          ...base,
-          top:          -ARROW,
-          left:          arrowPos.offset,
-          borderLeft:   `${ARROW}px solid transparent`,
-          borderRight:  `${ARROW}px solid transparent`,
-          borderBottom: `${ARROW}px solid ${color}`,
-          filter:       `drop-shadow(0 -2px 2px ${shadow})`,
-        };
-      case 'bottom': // arrow points down (card is above target)
-      default:
-        return {
-          ...base,
-          bottom:      -ARROW,
-          left:         arrowPos.offset,
-          borderLeft:  `${ARROW}px solid transparent`,
-          borderRight: `${ARROW}px solid transparent`,
-          borderTop:   `${ARROW}px solid ${color}`,
-          filter:      `drop-shadow(0 2px 2px ${shadow})`,
-        };
+      case 'left': return { ...base, top: arrowPos.offset, left: -ARROW, borderTop: `${ARROW}px solid transparent`, borderBottom: `${ARROW}px solid transparent`, borderRight: `${ARROW}px solid ${color}` };
+      case 'top': return { ...base, top: -ARROW, left: arrowPos.offset, borderLeft: `${ARROW}px solid transparent`, borderRight: `${ARROW}px solid transparent`, borderBottom: `${ARROW}px solid ${color}` };
+      case 'bottom': default: return { ...base, bottom: -ARROW, left: arrowPos.offset, borderLeft: `${ARROW}px solid transparent`, borderRight: `${ARROW}px solid transparent`, borderTop: `${ARROW}px solid ${color}` };
     }
   };
 
@@ -258,154 +187,77 @@ const CoachMark = ({ open, onClose, userId }) => {
   return (
     <>
       {active && (
-        <div className="fixed inset-0 z-[9999]" style={{ pointerEvents: 'all' }}>
-
-          {/* ── Overlay with cutout ── */}
+        <div className="fixed inset-0 z-[10000] overflow-hidden">
+          {/* Overlay */}
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 bg-[rgba(11,61,30,0.75)]"
             style={{
-              background: 'rgba(11,61,30,0.72)',
-              clipPath: `polygon(
-                0% 0%, 100% 0%, 100% 100%, 0% 100%,
-                0% ${spotStyle.top}px,
-                ${spotStyle.left}px ${spotStyle.top}px,
-                ${spotStyle.left}px ${(spotStyle.top  || 0) + (spotStyle.height || 0)}px,
-                ${(spotStyle.left  || 0) + (spotStyle.width  || 0)}px ${(spotStyle.top || 0) + (spotStyle.height || 0)}px,
-                ${(spotStyle.left  || 0) + (spotStyle.width  || 0)}px ${spotStyle.top}px,
-                0% ${spotStyle.top}px
-              )`,
-              transition: 'clip-path 0.45s cubic-bezier(0.4,0,0.2,1)',
+              clipPath: `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% ${spotStyle.top}px, ${spotStyle.left}px ${spotStyle.top}px, ${spotStyle.left}px ${spotStyle.top + spotStyle.height}px, ${spotStyle.left + spotStyle.width}px ${spotStyle.top + spotStyle.height}px, ${spotStyle.left + spotStyle.width}px ${spotStyle.top}px, 0% ${spotStyle.top}px)`,
+              transition: 'clip-path 0.4s ease'
             }}
             onClick={skip}
           />
 
-          {/* ── Spotlight border ring ── */}
+          {/* Spotlight Border */}
           <div
-            className="absolute rounded-[14px] pointer-events-none"
-            style={{
-              ...spotStyle,
-              border:     '2px solid #d4840a',
-              boxShadow:  '0 0 0 4px rgba(212,132,10,0.22)',
-              transition: 'all 0.45s cubic-bezier(0.4,0,0.2,1)',
-            }}
+            className="absolute rounded-xl border-2 border-[#d4840a] shadow-[0_0_0_4px_rgba(212,132,10,0.2)] transition-all duration-400"
+            style={spotStyle}
           />
 
-          {/* ── Tooltip card ── */}
+          {/* Tooltip Card */}
           <div
-            className="fixed bg-white rounded-2xl p-5 shadow-2xl"
+            className="fixed bg-white rounded-2xl p-6 shadow-2xl transition-all duration-400"
             style={{
-              top:        cardPos.top,
-              left:       cardPos.left,
-              width:      cardPos.width,
-              transition: 'all 0.4s cubic-bezier(0.4,0,0.2,1)',
-              fontFamily: "'DM Sans', sans-serif",
-              position:   'fixed',
+              top: cardPos.top,
+              bottom: cardPos.bottom,
+              left: cardPos.left,
+              width: cardPos.width,
+              zIndex: 10001
             }}
           >
-            {/* Arrow pointer */}
             <div style={arrowStyle()} />
-
-            {/* Step pill */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[rgba(212,132,10,0.3)] bg-[rgba(212,132,10,0.1)] text-[10px] font-semibold tracking-widest uppercase text-[#d4840a] mb-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#d4840a] animate-pulse" />
-              Step {step + 1} of {STEPS.length}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="bg-[#d4840a]/10 text-[#d4840a] text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">
+                Step {step + 1} of {STEPS.length}
+              </span>
             </div>
-
-            <h3
-              className="font-bold text-[#0b3d1e] mb-1.5 leading-snug"
-              style={{ fontFamily: "'Playfair Display', serif", fontSize: 17 }}
-            >
+            <h3 className="text-lg font-bold text-[#0b3d1e] mb-2 leading-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
               {STEPS[step].title}
             </h3>
-
-            <p className="text-[12px] text-gray-500 leading-relaxed mb-4">
+            <p className="text-sm text-gray-500 mb-6 leading-relaxed">
               {STEPS[step].body}
             </p>
-
-            {/* Progress dots + nav buttons */}
             <div className="flex items-center justify-between">
-              <div className="flex gap-1.5">
+              <div className="flex gap-1">
                 {STEPS.map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-1.5 rounded-full transition-all duration-300"
-                    style={{
-                      width:      i === step ? 18 : 6,
-                      background: i === step ? '#d4840a' : 'rgba(11,61,30,0.15)',
-                    }}
-                  />
+                  <div key={i} className="h-1 rounded-full transition-all" style={{ width: i === step ? 16 : 4, background: i === step ? '#d4840a' : '#eee' }} />
                 ))}
               </div>
-
-              <div className="flex items-center gap-2">
-                {step > 0 ? (
-                  <button
-                    onClick={prev}
-                    className="text-[12px] text-gray-400 hover:text-[#0b3d1e] px-2 py-1.5 rounded-lg transition-colors"
-                  >
-                    ← Back
-                  </button>
-                ) : (
-                  <button
-                    onClick={skip}
-                    className="text-[12px] text-gray-400 hover:text-[#0b3d1e] px-2 py-1.5 rounded-lg transition-colors"
-                  >
-                    Skip
-                  </button>
-                )}
-                {step < STEPS.length - 1 ? (
-                  <button
-                    onClick={next}
-                    className="text-[12px] font-semibold text-white bg-[#0b3d1e] hover:bg-[#2e8b57] px-4 py-2 rounded-lg transition-all hover:-translate-y-px"
-                  >
-                    Next →
-                  </button>
-                ) : (
-                  <button
-                    onClick={finish}
-                    className="text-[12px] font-semibold text-white bg-[#d4840a] hover:bg-[#f0a830] px-4 py-2 rounded-lg transition-colors"
-                  >
-                    Finish ✓
-                  </button>
-                )}
+              <div className="flex gap-2">
+                <button onClick={step > 0 ? prev : skip} className="text-xs text-gray-400 px-3 py-2 font-medium">
+                  {step > 0 ? 'Back' : 'Skip'}
+                </button>
+                <button onClick={next} className="bg-[#0b3d1e] text-white text-xs font-bold px-5 py-2.5 rounded-xl">
+                  {step === STEPS.length - 1 ? 'Finish' : 'Next →'}
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Done screen ── */}
+      {/* Done Modal */}
       {done && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[rgba(11,61,30,0.75)]">
-          <div
-            className="bg-white rounded-2xl p-9 text-center max-w-xs mx-4 shadow-2xl"
-            style={{ fontFamily: "'DM Sans', sans-serif" }}
-          >
-            <div className="w-14 h-14 rounded-full bg-[rgba(46,139,87,0.1)] border-2 border-[rgba(46,139,87,0.25)] flex items-center justify-center mx-auto mb-4">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2e8b57" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 700, color: '#0b3d1e', marginBottom: 8 }}>
-              You're all <em style={{ color: '#f0a830' }}>set!</em>
+        <div className="fixed inset-0 z-[10002] flex items-center justify-center p-6 bg-black/60">
+          <div className="bg-white rounded-3xl p-8 text-center max-w-sm w-full shadow-2xl">
+            <div className="text-4xl mb-4">🌱</div>
+            <h2 className="text-2xl font-bold text-[#0b3d1e] mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>
+              You're a <em className="text-[#f0a830]">Pro!</em>
             </h2>
-            <p className="text-[13px] text-gray-500 leading-relaxed mb-5">
-              You now know the key areas of SIBOL. Start exploring your garden and keep your crops healthy.
-            </p>
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={() => setDone(false)}
-                className="text-[13px] font-semibold text-white bg-[#0b3d1e] hover:bg-[#2e8b57] py-3 px-6 rounded-xl transition-colors"
-              >
-                Start Exploring →
-              </button>
-              <button
-                onClick={restartTour}
-                className="text-[12px] text-gray-400 hover:text-[#0b3d1e] py-2 transition-colors"
-              >
-                Replay tour
-              </button>
-            </div>
+            <p className="text-gray-500 text-sm mb-6">You've explored the essentials of SIBOL. Time to grow some healthy crops!</p>
+            <button onClick={() => setDone(false)} className="w-full bg-[#0b3d1e] text-white py-4 rounded-2xl font-bold">
+              Let's Go!
+            </button>
           </div>
         </div>
       )}

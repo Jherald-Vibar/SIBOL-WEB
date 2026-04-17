@@ -175,7 +175,7 @@ const UserDashboard = () => {
           {/* Weather card — id for coachmark step */}
           <div
             id="coach-weather"
-            className="relative w-full md:w-[280px] md:shrink-0 rounded-[20px] overflow-hidden border border-white/14 bg-gradient-to-br from-[rgba(26,102,54,0.82)] via-[rgba(11,61,30,0.88)] to-[rgba(11,61,30,0.92)] p-6"
+            className="scroll-mt-32 relative w-full md:w-[280px] md:shrink-0 rounded-[20px] overflow-hidden border border-white/14 bg-gradient-to-br from-[rgba(26,102,54,0.82)] via-[rgba(11,61,30,0.88)] to-[rgba(11,61,30,0.92)] p-6"
           >
             <Orb className="w-[200px] h-[200px] -top-[60px] -right-[60px] bg-[radial-gradient(circle,rgba(46,139,87,0.18)_0%,transparent_70%)]" />
             <Orb className="w-[120px] h-[120px] -bottom-5 -left-5 bg-[radial-gradient(circle,rgba(212,132,10,0.12)_0%,transparent_70%)]" />
@@ -272,7 +272,7 @@ const UserDashboard = () => {
           {/* Advisory card — id for coachmark step */}
           <div
             id="coach-advisory"
-            className="relative w-full md:w-[240px] md:shrink-0 rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-6"
+            className="scroll-mt-32 relative w-full md:w-[240px] md:shrink-0 rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-6"
           >
             <Orb className="w-[150px] h-[150px] -top-10 -right-10 bg-[radial-gradient(circle,rgba(46,139,87,0.13)_0%,transparent_70%)]" />
             <div className="relative z-10">
@@ -315,7 +315,7 @@ const UserDashboard = () => {
         {/* ── Chart Section — id for coachmark step ── */}
         <div
           id="coach-sensors"
-          className="relative w-full rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-7"
+          className="scroll-mt-32 relative w-full rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-7"
         >
           <Orb className="w-[250px] h-[250px] -top-[80px] -right-[60px] bg-[radial-gradient(circle,rgba(212,132,10,0.12)_0%,transparent_70%)]" />
           <div className="relative z-10">
@@ -367,7 +367,7 @@ const UserDashboard = () => {
         </div>
 
         {/* ── Crops Section — id for coachmark step ── */}
-        <div id="coach-crops" className="flex flex-col md:flex-row gap-5">
+        <div id="coach-crops" className="scroll-mt-32 flex flex-col md:flex-row gap-5">
 
           {/* Available crops table */}
           <div className="relative w-full md:flex-1 rounded-[20px] overflow-hidden bg-white border border-[#0b3d1e]/[0.07] p-7">
