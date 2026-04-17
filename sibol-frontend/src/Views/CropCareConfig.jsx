@@ -753,7 +753,7 @@ const CropCareConfig = () => {
             onClick={() => setCropModal({ mode: 'add', crop: null })}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-950 text-white border-none rounded-full text-sm font-medium cursor-pointer hover:bg-green-800 transition-all"
           >
-            <PlusIcon/> New Crop
+            <PlusIcon/> Claim Device
           </button>
         </div>
 
@@ -780,7 +780,7 @@ const CropCareConfig = () => {
             <div className="w-16 h-16 rounded-full bg-green-950/5 flex items-center justify-center text-3xl mb-4">🌿</div>
             <p className="font-['Lora',serif] text-xl text-green-950 mb-1.5">No crops yet</p>
             <p className="text-sm text-gray-400 max-w-xs leading-relaxed">
-              Add your first crop to start monitoring its health in real time.
+              Claim your first device to start monitoring its crop health in real time.
             </p>
           </div>
         ) : (
