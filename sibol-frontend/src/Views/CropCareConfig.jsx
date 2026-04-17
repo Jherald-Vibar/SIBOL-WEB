@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axiosClient from "./axios";
 
@@ -39,12 +39,6 @@ const ViewIcon = ({ color = "#3B6D11" }) => (
     <path stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={36} d="m272 336l80-80l-80-80M48 256h288"/>
   </svg>
 );
-const ClaimIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#27500A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/>
-    <path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>
-  </svg>
-);
 const BackIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M19 12H5M12 5l-7 7 7 7"/>
@@ -53,6 +47,20 @@ const BackIcon = () => (
 const PlusIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+);
+const WifiIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+    <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+    <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+    <line x1="12" y1="20" x2="12.01" y2="20"/>
+  </svg>
+);
+const LeafIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/>
+    <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
   </svg>
 );
 
@@ -66,10 +74,202 @@ const StatusPill = ({ esp }) => {
   const active = esp.status === 'active';
   return (
     <span className={`absolute top-2.5 right-2.5 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium ${active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
-      <span className={`w-1.5 h-1.5 rounded-full inline-block ${active ? 'bg-green-500' : 'bg-gray-400'}`}/>
+      <span className={`w-1.5 h-1.5 rounded-full inline-block ${active ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}/>
       {esp.status}
     </span>
   );
+};
+
+/* ── DEVICE CONNECTED TOAST ── */
+const DeviceToast = ({ toasts, onDismiss }) => {
+  if (!toasts.length) return null;
+  return (
+    <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-2.5 pointer-events-none">
+      <style>{`
+        @keyframes toastIn {
+          from { opacity: 0; transform: translateY(16px) scale(0.95); }
+          to   { opacity: 1; transform: translateY(0)   scale(1);    }
+        }
+        @keyframes toastOut {
+          from { opacity: 1; transform: translateY(0)   scale(1);    }
+          to   { opacity: 0; transform: translateY(8px)  scale(0.96); }
+        }
+        @keyframes progressBar {
+          from { width: 100%; }
+          to   { width: 0%;   }
+        }
+        .toast-enter { animation: toastIn  0.35s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+        .toast-exit  { animation: toastOut 0.28s ease-in forwards; }
+        @keyframes wifiPulse {
+          0%,100% { opacity: 1;   transform: scale(1);    }
+          50%     { opacity: 0.6; transform: scale(1.15); }
+        }
+        .wifi-pulse { animation: wifiPulse 1.4s ease-in-out infinite; }
+      `}</style>
+      {toasts.map(t => (
+        <div
+          key={t.id}
+          className={`${t.exiting ? 'toast-exit' : 'toast-enter'} pointer-events-auto`}
+          style={{ fontFamily: "'DM Sans', sans-serif" }}
+        >
+          <div className="relative bg-white rounded-2xl border border-green-200 shadow-[0_8px_32px_rgba(11,61,30,0.18)] overflow-hidden w-[320px]">
+            {/* top accent bar */}
+            <div className="h-1 bg-gradient-to-r from-green-400 via-green-600 to-green-800"/>
+
+            <div className="flex items-start gap-3 px-4 pt-3.5 pb-4">
+              {/* icon */}
+              <div className="w-9 h-9 rounded-xl bg-green-950 flex items-center justify-center flex-shrink-0 text-white wifi-pulse">
+                <WifiIcon/>
+              </div>
+
+              {/* content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <LeafIcon style={{ color: '#3B6D11', width: 13, height: 13 }}/>
+                  <p className="text-[11px] font-semibold text-green-700 uppercase tracking-wider">Device Connected</p>
+                </div>
+                <p className="font-['Lora',serif] text-sm font-semibold text-green-950 leading-snug">
+                  Your device is connected!
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5 font-mono truncate">{t.serial}</p>
+                {t.crop && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Monitoring <span className="text-green-800 font-medium">{t.crop}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* dismiss */}
+              <button
+                onClick={() => onDismiss(t.id)}
+                className="w-6 h-6 rounded-full border border-black/10 flex items-center justify-center text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors cursor-pointer flex-shrink-0 mt-0.5 bg-transparent"
+              >
+                <XIcon/>
+              </button>
+            </div>
+
+            {/* progress bar */}
+            <div className="h-[3px] bg-green-50">
+              <div
+                className="h-full bg-green-400 rounded-full"
+                style={{ animation: `progressBar ${t.duration}ms linear forwards` }}
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/* ── WEBSOCKET HOOK ── */
+/*
+  Connects to your Laravel Echo / Pusher websocket.
+  Listens on channel: `esp.{serial_number}` for event `SensorDataReceived`
+  (or whatever your backend broadcasts).
+
+  Replace WS_URL with your actual websocket server URL.
+  This example uses a raw WebSocket — swap for Laravel Echo if preferred.
+*/
+const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:6001";
+
+const useDeviceWebSocket = (crops, onDeviceConnected) => {
+  const socketsRef = useRef({});
+  const cropsRef   = useRef(crops);
+  cropsRef.current = crops;
+
+  const connectToDevice = useCallback((serial) => {
+    if (socketsRef.current[serial]) return; // already connected
+
+    const ws = new WebSocket(`${WS_URL}/app/sibol?protocol=7&client=js&version=8.4.0&flash=false`);
+
+    ws.onopen = () => {
+      // Subscribe to a private/presence channel for this device
+      ws.send(JSON.stringify({
+        event: "pusher:subscribe",
+        data: { channel: `esp.${serial}` },
+      }));
+    };
+
+    ws.onmessage = (e) => {
+      try {
+        const payload = JSON.parse(e.data);
+        // Pusher protocol: event name is in payload.event
+        if (
+          payload.event === "sensor.data" ||          // adjust to your event name
+          payload.event === "App\\Events\\SensorDataReceived"
+        ) {
+          const crop = cropsRef.current.find(c => c.esp?.serial_number === serial);
+          onDeviceConnected(serial, crop?.name || null);
+        }
+      } catch (error) {}
+    };
+
+    ws.onerror = () => {};
+    ws.onclose = () => {
+      delete socketsRef.current[serial];
+    };
+
+    socketsRef.current[serial] = ws;
+  }, [onDeviceConnected]);
+
+  useEffect(() => {
+    // Open a socket for every crop that has an active device
+    crops.forEach(crop => {
+      if (crop.esp?.serial_number) {
+        connectToDevice(crop.esp.serial_number);
+      }
+    });
+
+    // Cleanup sockets for devices no longer in the list
+    const activeSerials = new Set(
+      crops.filter(c => c.esp?.serial_number).map(c => c.esp.serial_number)
+    );
+    Object.keys(socketsRef.current).forEach(serial => {
+      if (!activeSerials.has(serial)) {
+        socketsRef.current[serial]?.close();
+        delete socketsRef.current[serial];
+      }
+    });
+  }, [crops, connectToDevice]);
+
+  // Close all on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(socketsRef.current).forEach(ws => ws?.close());
+      socketsRef.current = {};
+    };
+  }, []);
+};
+
+/* ── TOAST MANAGER HOOK ── */
+const TOAST_DURATION = 5000; // ms
+
+const useToasts = () => {
+  const [toasts, setToasts] = useState([]);
+  const timersRef = useRef({});
+
+  const addToast = useCallback((serial, crop) => {
+    const id = `${serial}-${Date.now()}`;
+    setToasts(prev => [...prev, { id, serial, crop, exiting: false, duration: TOAST_DURATION }]);
+
+    timersRef.current[id] = setTimeout(() => dismissToast(id), TOAST_DURATION);
+  }, []);
+
+  const dismissToast = useCallback((id) => {
+    clearTimeout(timersRef.current[id]);
+    // Mark as exiting for exit animation
+    setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 300);
+  }, []);
+
+  useEffect(() => {
+    return () => Object.values(timersRef.current).forEach(clearTimeout);
+  }, []);
+
+  return { toasts, addToast, dismissToast };
 };
 
 /* ── MODAL WRAPPER ── */
@@ -78,8 +278,10 @@ const Modal = ({ onClose, children }) => (
     className="fixed inset-0 bg-black/45 backdrop-blur-sm z-50 flex items-center justify-center p-4"
     onClick={e => { if (e.target === e.currentTarget) onClose(); }}
   >
-    <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
-      style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div
+      className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+      style={{ fontFamily: "'DM Sans', sans-serif" }}
+    >
       {children}
     </div>
   </div>
@@ -94,136 +296,185 @@ const ModalHeader = ({ title, onClose, danger }) => (
   </div>
 );
 
-const ModalFooter = ({ onClose, onSubmit, submitLabel, loading, disabled }) => (
-  <div className="flex justify-end gap-2 px-6 py-4 border-t border-black/[0.06] sticky bottom-0 bg-white">
-    <button onClick={onClose} className="px-5 py-2 rounded-full border border-black/10 bg-transparent text-gray-400 text-sm font-medium cursor-pointer hover:bg-gray-50 transition-colors">
-      Cancel
-    </button>
-    <button onClick={onSubmit} disabled={loading || disabled}
-      className="flex items-center gap-1.5 px-6 py-2 rounded-full bg-green-950 border-none text-white text-sm font-medium cursor-pointer hover:bg-green-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-      {loading ? <><SpinIcon/> Saving…</> : submitLabel}
-    </button>
-  </div>
-);
-
-/* ── ADD / EDIT CROP MODAL ── */
+/* ── ADD / EDIT CROP MODAL (2-step) ── */
 const CropModal = ({ crop, onClose, onSave, loading }) => {
   const isEdit = !!crop;
-  const [form, setForm] = useState({
-    name: crop?.name || "",
-    variety: crop?.variety || "Vegetable",
-    planted_date: crop?.planted_at ? new Date(crop.planted_at).toISOString().split("T")[0] : "",
+  const [step, setStep]     = useState(isEdit ? 2 : 1);
+  const [espId, setEspId]   = useState("");
+  const [espError, setEspError] = useState("");
+  const [form, setForm]     = useState({
+    name:         crop?.name    || "",
+    variety:      crop?.variety || "Vegetable",
+    planted_date: crop?.planted_at
+      ? new Date(crop.planted_at).toISOString().split("T")[0]
+      : "",
   });
-  const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
+  const espInputRef = useRef(null);
+
+  useEffect(() => {
+    if (step === 1) setTimeout(() => espInputRef.current?.focus(), 100);
+  }, [step]);
+
+  const handleNext = () => {
+    if (!espId.trim()) { setEspError("Please enter a Device ID."); return; }
+    setEspError("");
+    setStep(2);
+  };
 
   const handleSubmit = () => {
     if (!form.name.trim() || !form.variety || !form.planted_date) {
-      setError("All fields are required."); return;
+      setFormError("All fields are required."); return;
     }
-    setError("");
-    onSave(form);
+    setFormError("");
+    onSave({ ...form, espId: isEdit ? null : espId.trim() });
   };
 
   return (
     <Modal onClose={onClose}>
-      <ModalHeader title={isEdit ? "Edit Crop" : "New Crop"} onClose={onClose}/>
-      <div className="px-6 py-5 flex flex-col gap-4">
-        {error && (
-          <div className="flex items-center gap-2 px-3.5 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-            {error}
-          </div>
-        )}
-        <div>
-          <label className="block text-[11px] text-gray-400 uppercase tracking-wider mb-1.5 font-medium">Crop Name</label>
-          <input
-            type="text"
-            value={form.name}
-            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-            placeholder="e.g. Pechay, Kamote…"
-            className="w-full px-3.5 py-2.5 border border-black/10 rounded-xl text-sm text-green-950 bg-[#f7f4ee] outline-none transition-all focus:border-green-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(46,139,87,0.1)]"
-          />
+      <ModalHeader
+        title={isEdit ? "Edit Crop" : step === 1 ? "New Crop — Device" : "New Crop — Details"}
+        onClose={onClose}
+      />
+
+      {/* Step indicator */}
+      {!isEdit && (
+        <div className="flex items-center gap-2 px-6 pt-4 pb-0">
+          {[1, 2].map(s => (
+            <React.Fragment key={s}>
+              <div className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${step >= s ? 'text-green-800' : 'text-gray-400'}`}>
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold transition-colors ${step >= s ? 'bg-green-950 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                  {s}
+                </span>
+                {s === 1 ? 'Device' : 'Details'}
+              </div>
+              {s < 2 && <div className={`flex-1 h-px transition-colors ${step > s ? 'bg-green-300' : 'bg-gray-100'}`}/>}
+            </React.Fragment>
+          ))}
         </div>
-        <div>
-          <label className="block text-[11px] text-gray-400 uppercase tracking-wider mb-1.5 font-medium">Variety</label>
-          <div className="flex gap-3">
-            {['Vegetable', 'Fruit'].map(v => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setForm(f => ({ ...f, variety: v }))}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-medium transition-all cursor-pointer ${
-                  form.variety === v
-                    ? 'border-green-600 bg-green-50 text-green-800'
-                    : 'border-black/10 bg-[#f7f4ee] text-gray-500 hover:border-black/20'
-                }`}
-              >
-                {v === 'Vegetable' ? '🥬' : '🍓'} {v}
+      )}
+
+      {/* ── STEP 1: Device ID ── */}
+      {step === 1 && (
+        <div className="px-6 py-5 flex flex-col gap-4">
+          {espError && (
+            <div className="flex items-center gap-2 px-3.5 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+              {espError}
+            </div>
+          )}
+          <div className="bg-green-50 border border-green-200 rounded-xl px-3.5 py-3 text-sm text-green-800">
+            A device is required to start monitoring your crop.
+          </div>
+          <div>
+            <label className="block text-[11px] text-gray-400 uppercase tracking-wider mb-1.5 font-medium">ESP Device ID</label>
+            <input
+              ref={espInputRef}
+              type="text"
+              value={espId}
+              onChange={e => { setEspId(e.target.value); setEspError(""); }}
+              placeholder="e.g. AA:BB:CC:DD:EE:FF"
+              className="w-full px-3.5 py-2.5 border border-black/10 rounded-xl font-mono text-sm text-green-950 bg-[#f7f4ee] outline-none transition-all focus:border-green-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(46,139,87,0.1)]"
+            />
+          </div>
+          <div className="bg-[#f7f4ee] rounded-xl px-3.5 py-3">
+            <p className="text-xs font-semibold text-gray-600 mb-1.5">Where to find your Device ID</p>
+            <ul className="text-xs text-gray-500 leading-relaxed space-y-0.5 list-disc pl-4">
+              <li>Printed on a sticker on your ESP32 board</li>
+              <li>Inside your device packaging</li>
+              <li>In the SIBOL setup sheet included in the box</li>
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* ── STEP 2: Crop details ── */}
+      {step === 2 && (
+        <div className="px-6 py-5 flex flex-col gap-4">
+          {formError && (
+            <div className="flex items-center gap-2 px-3.5 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+              {formError}
+            </div>
+          )}
+          <div>
+            <label className="block text-[11px] text-gray-400 uppercase tracking-wider mb-1.5 font-medium">Crop Name</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. Pechay, Kamote…"
+              className="w-full px-3.5 py-2.5 border border-black/10 rounded-xl text-sm text-green-950 bg-[#f7f4ee] outline-none transition-all focus:border-green-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(46,139,87,0.1)]"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-gray-400 uppercase tracking-wider mb-1.5 font-medium">Variety</label>
+            <div className="flex gap-3">
+              {['Vegetable', 'Fruit'].map(v => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, variety: v }))}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-medium transition-all cursor-pointer ${
+                    form.variety === v
+                      ? 'border-green-600 bg-green-50 text-green-800'
+                      : 'border-black/10 bg-[#f7f4ee] text-gray-500 hover:border-black/20'
+                  }`}
+                >
+                  {v === 'Vegetable' ? '🥬' : '🍓'} {v}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] text-gray-400 uppercase tracking-wider mb-1.5 font-medium">Planted Date</label>
+            <input
+              type="date"
+              value={form.planted_date}
+              onChange={e => setForm(f => ({ ...f, planted_date: e.target.value }))}
+              className="w-full px-3.5 py-2.5 border border-black/10 rounded-xl text-sm text-green-950 bg-[#f7f4ee] outline-none transition-all focus:border-green-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(46,139,87,0.1)]"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="flex justify-end gap-2 px-6 py-4 border-t border-black/[0.06] sticky bottom-0 bg-white">
+        {step === 1 && (
+          <button onClick={onClose} className="px-5 py-2 rounded-full border border-black/10 bg-transparent text-gray-400 text-sm font-medium cursor-pointer hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+        )}
+        {step === 2 && (
+          <>
+            {!isEdit ? (
+              <button onClick={() => setStep(1)} className="px-5 py-2 rounded-full border border-black/10 bg-transparent text-gray-400 text-sm font-medium cursor-pointer hover:bg-gray-50 transition-colors">
+                Back
               </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <label className="block text-[11px] text-gray-400 uppercase tracking-wider mb-1.5 font-medium">Planted Date</label>
-          <input
-            type="date"
-            value={form.planted_date}
-            onChange={e => setForm(f => ({ ...f, planted_date: e.target.value }))}
-            className="w-full px-3.5 py-2.5 border border-black/10 rounded-xl text-sm text-green-950 bg-[#f7f4ee] outline-none transition-all focus:border-green-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(46,139,87,0.1)]"
-          />
-        </div>
-      </div>
-      <ModalFooter onClose={onClose} onSubmit={handleSubmit} submitLabel={isEdit ? "Update Crop" : "Save Crop"} loading={loading}/>
-    </Modal>
-  );
-};
-
-/* ── CLAIM DEVICE MODAL ── */
-const ClaimModal = ({ crop, onClose, onClaim, loading }) => {
-  const [espId, setEspId] = useState("");
-  const [error, setError] = useState("");
-  const inputRef = useRef(null);
-
-  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
-
-  const handleSubmit = () => {
-    if (!espId.trim()) { setError("Please enter a Device ID."); return; }
-    setError("");
-    onClaim(espId.trim());
-  };
-
-  return (
-    <Modal onClose={onClose}>
-      <ModalHeader title="Claim Device" onClose={onClose}/>
-      <div className="px-6 py-5 flex flex-col gap-4">
-        {error && (
-          <div className="flex items-center gap-2 px-3.5 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-            {error}
-          </div>
+            ) : (
+              <button onClick={onClose} className="px-5 py-2 rounded-full border border-black/10 bg-transparent text-gray-400 text-sm font-medium cursor-pointer hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+            )}
+          </>
         )}
-        <div className="bg-green-50 border border-green-200 rounded-xl px-3.5 py-3 text-sm text-green-800">
-          Assigning a device to <strong>{crop?.name}</strong>. It will automatically send data to this crop once connected.
-        </div>
-        <div>
-          <label className="block text-[11px] text-gray-400 uppercase tracking-wider mb-1.5 font-medium">ESP Device ID</label>
-          <input
-            ref={inputRef}
-            type="text"
-            value={espId}
-            onChange={e => { setEspId(e.target.value); setError(""); }}
-            placeholder="e.g. AA:BB:CC:DD:EE:FF"
-            className="w-full px-3.5 py-2.5 border border-black/10 rounded-xl font-mono text-sm text-green-950 bg-[#f7f4ee] outline-none transition-all focus:border-green-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(46,139,87,0.1)]"
-          />
-        </div>
-        <div className="bg-[#f7f4ee] rounded-xl px-3.5 py-3">
-          <p className="text-xs font-semibold text-gray-600 mb-1.5">Where to find your Device ID</p>
-          <ul className="text-xs text-gray-500 leading-relaxed space-y-0.5 list-disc pl-4">
-            <li>Printed on a sticker on your ESP32 board</li>
-            <li>Inside your device packaging</li>
-            <li>In the SIBOL setup sheet included in the box</li>
-          </ul>
-        </div>
+
+        {step === 1 ? (
+          <button
+            onClick={handleNext}
+            disabled={!espId.trim()}
+            className="flex items-center gap-1.5 px-6 py-2 rounded-full bg-green-950 border-none text-white text-sm font-medium cursor-pointer hover:bg-green-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Next →
+          </button>
+        ) : (
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-6 py-2 rounded-full bg-green-950 border-none text-white text-sm font-medium cursor-pointer hover:bg-green-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {loading ? <><SpinIcon/> Saving…</> : isEdit ? 'Update Crop' : 'Save Crop'}
+          </button>
+        )}
       </div>
-      <ModalFooter onClose={onClose} onSubmit={handleSubmit} submitLabel="Claim Device" loading={loading} disabled={!espId.trim()}/>
     </Modal>
   );
 };
@@ -244,8 +495,11 @@ const DeleteCropModal = ({ crop, onClose, onConfirm, loading }) => (
       <button onClick={onClose} className="px-5 py-2 rounded-full border border-black/10 bg-transparent text-gray-400 text-sm font-medium cursor-pointer hover:bg-gray-50">
         Cancel
       </button>
-      <button onClick={onConfirm} disabled={loading}
-        className="flex items-center gap-1.5 px-6 py-2 rounded-full bg-red-600 border-none text-white text-sm font-medium cursor-pointer hover:bg-red-700 disabled:opacity-40">
+      <button
+        onClick={onConfirm}
+        disabled={loading}
+        className="flex items-center gap-1.5 px-6 py-2 rounded-full bg-red-600 border-none text-white text-sm font-medium cursor-pointer hover:bg-red-700 disabled:opacity-40"
+      >
         {loading ? <><SpinIcon/> Deleting…</> : 'Yes, delete'}
       </button>
     </div>
@@ -268,8 +522,11 @@ const RemoveEspModal = ({ esp, onClose, onConfirm, loading }) => (
       <button onClick={onClose} className="px-5 py-2 rounded-full border border-black/10 bg-transparent text-gray-400 text-sm font-medium cursor-pointer hover:bg-gray-50">
         Cancel
       </button>
-      <button onClick={onConfirm} disabled={loading}
-        className="flex items-center gap-1.5 px-6 py-2 rounded-full bg-red-600 border-none text-white text-sm font-medium cursor-pointer hover:bg-red-700 disabled:opacity-40">
+      <button
+        onClick={onConfirm}
+        disabled={loading}
+        className="flex items-center gap-1.5 px-6 py-2 rounded-full bg-red-600 border-none text-white text-sm font-medium cursor-pointer hover:bg-red-700 disabled:opacity-40"
+      >
         {loading ? <><SpinIcon/> Removing…</> : 'Remove'}
       </button>
     </div>
@@ -277,8 +534,10 @@ const RemoveEspModal = ({ esp, onClose, onConfirm, loading }) => (
 );
 
 /* ── CROP CARD ── */
-const CropCard = ({ crop, onEdit, onDelete, onClaim, onRemoveEsp, onView }) => {
-  const planted = new Date(crop.planted_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+const CropCard = ({ crop, onEdit, onDelete, onRemoveEsp, onView }) => {
+  const planted = new Date(crop.planted_at).toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric',
+  });
   const esp = crop.esp;
 
   return (
@@ -295,9 +554,11 @@ const CropCard = ({ crop, onEdit, onDelete, onClaim, onRemoveEsp, onView }) => {
         <div className="font-['Lora',serif] text-base font-semibold text-green-950 mb-0.5">{crop.name}</div>
         <div className="text-xs text-gray-400 mb-3">{crop.variety} · Planted {planted}</div>
         <div className="h-px bg-black/[0.05] mb-3"/>
+
+        {/* Device row */}
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
-            <EspIcon/>
+            <EspIcon color={esp ? "#3B6D11" : "#9ca3af"}/>
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Monitoring device</div>
@@ -306,36 +567,41 @@ const CropCard = ({ crop, onEdit, onDelete, onClaim, onRemoveEsp, onView }) => {
               : <div className="text-xs text-gray-400 italic">No device assigned</div>
             }
           </div>
-          {esp
-            ? (
-              <button onClick={() => onRemoveEsp(crop)} title="Remove device"
-                className="w-8 h-8 rounded-lg border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-red-50 hover:border-red-300 transition-all flex-shrink-0">
-                <TrashIcon color="#E24B4A"/>
-              </button>
-            ) : (
-              <button onClick={() => onClaim(crop)}
-                className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-green-200 bg-green-50 text-green-800 text-xs font-medium cursor-pointer hover:bg-green-100 transition-all flex-shrink-0">
-                <ClaimIcon/> Claim
-              </button>
-            )
-          }
+          {esp && (
+            <button
+              onClick={() => onRemoveEsp(crop)}
+              title="Remove device"
+              className="w-8 h-8 rounded-lg border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-red-50 hover:border-red-300 transition-all flex-shrink-0"
+            >
+              <TrashIcon color="#E24B4A"/>
+            </button>
+          )}
         </div>
 
+        {/* Action buttons */}
         <div className="flex gap-1.5 mt-3">
           <button
             onClick={() => onView(crop)}
             disabled={!esp}
-            title={esp ? "View data" : "Claim a device first to view data"}
-            className={`w-9 h-9 rounded-xl border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer transition-all ${!esp ? 'opacity-30 cursor-not-allowed' : 'hover:bg-green-50 hover:border-green-400'}`}
+            title={esp ? "View data" : "Add a device to view data"}
+            className={`w-9 h-9 rounded-xl border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer transition-all ${
+              !esp ? 'opacity-30 cursor-not-allowed' : 'hover:bg-green-50 hover:border-green-400'
+            }`}
           >
             <ViewIcon color={esp ? "#3B6D11" : "#9ca3af"}/>
           </button>
-          <button onClick={() => onEdit(crop)} title="Edit crop"
-            className="w-9 h-9 rounded-xl border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-green-50 hover:border-green-400 transition-all text-green-700">
+          <button
+            onClick={() => onEdit(crop)}
+            title="Edit crop"
+            className="w-9 h-9 rounded-xl border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-green-50 hover:border-green-400 transition-all text-green-700"
+          >
             <EditIcon/>
           </button>
-          <button onClick={() => onDelete(crop)} title="Delete crop"
-            className="w-9 h-9 rounded-xl border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-red-50 hover:border-red-300 transition-all">
+          <button
+            onClick={() => onDelete(crop)}
+            title="Delete crop"
+            className="w-9 h-9 rounded-xl border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-red-50 hover:border-red-300 transition-all"
+          >
             <TrashIcon color="#E24B4A"/>
           </button>
         </div>
@@ -344,21 +610,33 @@ const CropCard = ({ crop, onEdit, onDelete, onClaim, onRemoveEsp, onView }) => {
   );
 };
 
-/* ── MAIN PAGE ── */
+/* ══════════════════════════════════════════════
+   MAIN PAGE
+═══════════════════════════════════════════════ */
 const CropCareConfig = () => {
   const { garden_id } = useParams();
   const navigate = useNavigate();
 
-  const [crops, setCrops] = useState([]);
-  const [pageLoading, setPageLoading] = useState(true);
+  const [crops, setCrops]               = useState([]);
+  const [pageLoading, setPageLoading]   = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [globalError, setGlobalError] = useState("");
+  const [globalError, setGlobalError]   = useState("");
 
-  const [cropModal, setCropModal] = useState(null);
-  const [claimModal, setClaimModal] = useState(null);
-  const [deleteModal, setDeleteModal] = useState(null);
+  const [cropModal,      setCropModal]      = useState(null);
+  const [deleteModal,    setDeleteModal]    = useState(null);
   const [removeEspModal, setRemoveEspModal] = useState(null);
 
+  /* ── Toasts ── */
+  const { toasts, addToast, dismissToast } = useToasts();
+
+  /* ── WebSocket ── */
+  const handleDeviceConnected = useCallback((serial, cropName) => {
+    addToast(serial, cropName);
+  }, [addToast]);
+
+  useDeviceWebSocket(crops, handleDeviceConnected);
+
+  /* ── Data fetching ── */
   const fetchCrops = async () => {
     try {
       const r = await axiosClient.get(`/getCropData/${garden_id}`);
@@ -372,25 +650,38 @@ const CropCareConfig = () => {
 
   useEffect(() => { fetchCrops(); }, [garden_id]);
 
+  /* ── Save crop (add = 2-step: create + claim) ── */
   const handleSaveCrop = async (form) => {
     setActionLoading(true);
     try {
       const fd = new FormData();
-      fd.append("name", form.name);
-      fd.append("variety", form.variety);
+      fd.append("name",         form.name);
+      fd.append("variety",      form.variety);
       fd.append("planted_date", new Date(form.planted_date).toISOString().split("T")[0]);
 
       if (cropModal.mode === 'edit') {
         fd.append("_method", "PUT");
         const res = await axiosClient.post(`/updateCrop/${cropModal.crop.id}`, fd, {
-          headers: { "Content-Type": "multipart/form-data" }
+          headers: { "Content-Type": "multipart/form-data" },
         });
-        setCrops(prev => prev.map(c => c.id === cropModal.crop.id ? { ...res.data.data, esp: c.esp } : c));
+        setCrops(prev =>
+          prev.map(c => c.id === cropModal.crop.id ? { ...res.data.data, esp: c.esp } : c)
+        );
       } else {
+        // 1. Create the crop
         const res = await axiosClient.post(`/addCrop/${garden_id}`, fd, {
-          headers: { "Content-Type": "multipart/form-data" }
+          headers: { "Content-Type": "multipart/form-data" },
         });
-        setCrops(prev => [...prev, { ...res.data.data, esp: null }]);
+        const newCrop = res.data.data;
+
+        // 2. Claim & link the device
+        await axiosClient.post(`/claimDevice/${garden_id}`, {
+          "esp-number": form.espId,
+          "crop_id":    newCrop.id,
+        });
+
+        // 3. Refresh to get esp object attached
+        fetchCrops();
       }
       setCropModal(null);
     } catch (err) {
@@ -404,23 +695,7 @@ const CropCareConfig = () => {
     }
   };
 
-  const handleClaim = async (espId) => {
-    setActionLoading(true);
-    try {
-      await axiosClient.post(`/claimDevice/${garden_id}`, {
-        "esp-number": espId,
-        "crop_id": claimModal.id,
-      });
-      // Refresh to get full updated object from server
-      fetchCrops();
-      setClaimModal(null);
-    } catch (err) {
-      setGlobalError(err.response?.data?.message || "Device not found or already claimed.");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
+  /* ── Delete crop ── */
   const handleDeleteCrop = async () => {
     setActionLoading(true);
     try {
@@ -434,13 +709,14 @@ const CropCareConfig = () => {
     }
   };
 
+  /* ── Remove device ── */
   const handleRemoveEsp = async () => {
     setActionLoading(true);
     try {
       await axiosClient.delete(`/deleteEsp/${removeEspModal.esp.id}`);
-      setCrops(prev => prev.map(c =>
-        c.id === removeEspModal.id ? { ...c, esp: null } : c
-      ));
+      setCrops(prev =>
+        prev.map(c => c.id === removeEspModal.id ? { ...c, esp: null } : c)
+      );
       setRemoveEspModal(null);
     } catch (err) {
       setGlobalError(err.response?.data?.message || "Failed to remove device.");
@@ -449,6 +725,7 @@ const CropCareConfig = () => {
     }
   };
 
+  /* ── Render ── */
   return (
     <div className="bg-[#f7f4ee] min-h-screen" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`
@@ -456,6 +733,8 @@ const CropCareConfig = () => {
       `}</style>
 
       <div className="px-4 sm:px-8 lg:px-10 py-8 pb-24 md:pb-12 max-w-7xl mx-auto">
+
+        {/* Header */}
         <div className="flex items-end justify-between gap-4 flex-wrap pb-6 border-b border-green-950/10 mb-7">
           <div>
             <button
@@ -478,14 +757,20 @@ const CropCareConfig = () => {
           </button>
         </div>
 
+        {/* Global error */}
         {globalError && (
           <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 mb-5">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
             <span className="flex-1">{globalError}</span>
-            <button onClick={() => setGlobalError("")} className="text-red-400 hover:text-red-600 cursor-pointer bg-transparent border-none"><XIcon/></button>
+            <button onClick={() => setGlobalError("")} className="text-red-400 hover:text-red-600 cursor-pointer bg-transparent border-none">
+              <XIcon/>
+            </button>
           </div>
         )}
 
+        {/* Content */}
         {pageLoading ? (
           <div className="flex items-center justify-center py-24 gap-3 text-gray-400">
             <SpinIcon/> Loading crops…
@@ -494,7 +779,9 @@ const CropCareConfig = () => {
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="w-16 h-16 rounded-full bg-green-950/5 flex items-center justify-center text-3xl mb-4">🌿</div>
             <p className="font-['Lora',serif] text-xl text-green-950 mb-1.5">No crops yet</p>
-            <p className="text-sm text-gray-400 max-w-xs leading-relaxed">Add your first crop to start monitoring its health in real time.</p>
+            <p className="text-sm text-gray-400 max-w-xs leading-relaxed">
+              Add your first crop to start monitoring its health in real time.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -504,13 +791,9 @@ const CropCareConfig = () => {
                 crop={crop}
                 onEdit={c => setCropModal({ mode: 'edit', crop: c })}
                 onDelete={c => setDeleteModal(c)}
-                onClaim={c => setClaimModal(c)}
                 onRemoveEsp={c => setRemoveEspModal(c)}
                 onView={c => {
-                  if (c.esp) {
-                    // Navigate using the device serial number or ID
-                    navigate(`/user/crop-care/${garden_id}/${c.id}/${c.esp.serial_number}`);
-                  }
+                  if (c.esp) navigate(`/user/crop-care/${garden_id}/${c.id}/${c.esp.serial_number}`);
                 }}
               />
             ))}
@@ -518,6 +801,7 @@ const CropCareConfig = () => {
         )}
       </div>
 
+      {/* Modals */}
       {cropModal && (
         <CropModal
           crop={cropModal.mode === 'edit' ? cropModal.crop : null}
@@ -526,16 +810,6 @@ const CropCareConfig = () => {
           loading={actionLoading}
         />
       )}
-
-      {claimModal && (
-        <ClaimModal
-          crop={claimModal}
-          onClose={() => setClaimModal(null)}
-          onClaim={handleClaim}
-          loading={actionLoading}
-        />
-      )}
-
       {deleteModal && (
         <DeleteCropModal
           crop={deleteModal}
@@ -544,7 +818,6 @@ const CropCareConfig = () => {
           loading={actionLoading}
         />
       )}
-
       {removeEspModal && (
         <RemoveEspModal
           esp={removeEspModal.esp}
@@ -553,6 +826,9 @@ const CropCareConfig = () => {
           loading={actionLoading}
         />
       )}
+
+      {/* 🔔 Device connected toasts */}
+      <DeviceToast toasts={toasts} onDismiss={dismissToast}/>
     </div>
   );
 };
