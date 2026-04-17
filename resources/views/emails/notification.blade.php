@@ -12,7 +12,7 @@
     .pulse { width: 5px; height: 5px; border-radius: 50%; background: #a8c5a0; display: inline-block; }
     .playfair { font-family: 'Playfair Display', serif; }
     .header-title { font-size: 26px; font-weight: 700; color: #fff; margin: 0 0 6px; line-height: 1.2; }
-    .header-sub { font-size: 13px; color: rgba(255,255,255,0.5); margin: 0; }
+    .header-sub { font-size: 13px; color: rgba(255, 255, 255, 0.991); margin: 0; }
     .body { padding: 28px 32px; }
     .notif-card { background: rgba(46,139,87,0.05); border-left: 3px solid #2e8b57; border-radius: 0 14px 14px 0; padding: 16px 18px; margin-bottom: 14px; }
     .notif-type { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #2e8b57; margin-bottom: 6px; }
@@ -57,7 +57,7 @@
         <p style="font-size:13px; color:#6b7280; line-height:1.6; margin:0 0 18px;">
           Visit your dashboard to view live sensor data and take action on this notification.
         </p>
-        <a href="{{ config('app.url') }}/user/dashboard" class="btn">View Dashboard →</a>
+        <a href="https://sibol-frontend.onrender.com/user/dashboard" class="btn">View Dashboard →</a>
       </div>
 
       {{-- Footer --}}
