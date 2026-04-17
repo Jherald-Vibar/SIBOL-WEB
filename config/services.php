@@ -39,5 +39,11 @@ return [
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect'      => env('GOOGLE_REDIRECT_URI'),
     ],
+    'infobip' => [
+        'api_key'  => env('INFOBIP_API_KEY'),
+        'base_url' => env('INFOBIP_BASE_URL'),
+        'sender'   => env('INFOBIP_SENDER', 'SIBOL'),
+]   ,
+
 
 ];

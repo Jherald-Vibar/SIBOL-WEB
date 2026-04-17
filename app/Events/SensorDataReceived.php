@@ -2,8 +2,10 @@
 
   namespace App\Events;
 
-  use App\Models\SensorData;
-  use Illuminate\Broadcasting\Channel;
+use App\Models\Notification;
+use App\Models\SensorData;
+use App\Services\InfobipSmsService;
+use Illuminate\Broadcasting\Channel;
   use Illuminate\Broadcasting\InteractsWithSockets;
   use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
   use Illuminate\Foundation\Events\Dispatchable;
@@ -16,7 +18,25 @@
       public function __construct(
           public SensorData $sensorData,
           public int $gardenId
-      ) {}
+      ) {
+          if ((float) $this->sensorData->soil_moisture < 5) {
+              $user = $this->sensorData->garden->user;
+
+              Notification::create([
+                  'user_id' => $user->id,
+                  'type'    => 'soil_moisture',
+                  'title'   => 'Low Soil Moisture',
+                  'message' => "Soil moisture is at {$this->sensorData->soil_moisture}%. Irrigation needed immediately.",
+              ]);
+
+              if ($user->phone) {
+                  app(InfobipSmsService::class)->send(
+                      $user->phone,
+                      "🚨 SIBOL: Soil moisture is at {$this->sensorData->soil_moisture}% in your garden. Irrigation needed now!"
+                  );
+              }
+          }
+      }
 
       public function broadcastOn(): array
       {
