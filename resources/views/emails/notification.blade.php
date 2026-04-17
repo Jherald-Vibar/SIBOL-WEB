@@ -9,10 +9,10 @@
     .card { background: #ffffff; border-radius: 20px; overflow: hidden; border: 1px solid rgba(11,61,30,0.08); }
     .header { background: linear-gradient(135deg, rgba(26,102,54,0.95) 0%, rgba(11,61,30,0.98) 100%); padding: 36px 32px 28px; }
     .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; border: 1px solid rgba(168,197,160,0.25); background: rgba(46,139,87,0.18); font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(168,197,160,0.9); margin-bottom: 14px; }
-    .pulse { width: 5px; height: 5px; border-radius: 50%; background: #a8c5a0; display: inline-block; }
+    .pulse { width: 5px; height: 5px; border-radius: 50%; background: #a8c5a0; display: inline-block; color: white; }
     .playfair { font-family: 'Playfair Display', serif; }
     .header-title { font-size: 26px; font-weight: 700; color: #fff; margin: 0 0 6px; line-height: 1.2; }
-    .header-sub { font-size: 13px; color: rgba(255, 255, 255, 0.991); margin: 0; }
+    .header-sub { font-size: 13px; color: white; margin: 0; }
     .body { padding: 28px 32px; }
     .notif-card { background: rgba(46,139,87,0.05); border-left: 3px solid #2e8b57; border-radius: 0 14px 14px 0; padding: 16px 18px; margin-bottom: 14px; }
     .notif-type { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #2e8b57; margin-bottom: 6px; }
@@ -35,7 +35,7 @@
         <div class="pill">
           <span class="pulse"></span> New Notification
         </div>
-        <div class="playfair header-title">
+        <div class="playfair header-title text-white" >
           You have a new <em style="color:#f0a830;">alert</em>
         </div>
         <p class="header-sub">Your farm monitoring system detected something that needs attention.</p>
