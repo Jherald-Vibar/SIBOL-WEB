@@ -20,7 +20,9 @@ use Illuminate\Broadcasting\Channel;
           public int $gardenId
       ) {
           if ((float) $this->sensorData->soil_moisture < 5) {
-              $user = $this->sensorData->garden->user;
+              $user = $this->sensorData->crop?->garden?->user;
+
+              if (!$user) return;
 
               Notification::create([
                   'user_id' => $user->id,
@@ -29,10 +31,10 @@ use Illuminate\Broadcasting\Channel;
                   'message' => "Soil moisture is at {$this->sensorData->soil_moisture}%. Irrigation needed immediately.",
               ]);
 
-              if ($user->phone) {
+              if ($user->cp_number) {
                   app(InfobipSmsService::class)->send(
-                      $user->phone,
-                      "🚨 SIBOL: Soil moisture is at {$this->sensorData->soil_moisture}% in your garden. Irrigation needed now!"
+                      $user->cp_number,
+                      "🚨 SIBOL Alert: Soil moisture is critically low at {$this->sensorData->soil_moisture}% in your garden. Irrigation needed now!"
                   );
               }
           }

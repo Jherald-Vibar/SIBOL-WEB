@@ -15,18 +15,24 @@ class DetectionUpdated implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-   public function __construct(
+    public function __construct(
         public int $gardenId,
         public int $cropId,
         public string $cropName,
         public array $detectionData
     ) {
         $unhealthyResults = collect($this->detectionData['results'] ?? [])
-            ->filter(fn($result) => strtolower($result['detected_class'] ?? '') !== 'healthy')
+            ->filter(fn($result) => !str_contains(
+                strtolower($result['detected_class'] ?? ''),
+                'healthy'
+            ))
             ->values();
 
         if ($unhealthyResults->isNotEmpty()) {
-            $user = Garden::find($this->gardenId)?->user;
+            // Garden → user
+            $user = Garden::with('user')->find($this->gardenId)?->user;
+
+            if (!$user) return;
 
             $issueList = $unhealthyResults->map(function ($r) {
                 $label      = $r['detected_class'] ?? 'Unknown';
@@ -40,13 +46,13 @@ class DetectionUpdated implements ShouldBroadcast
                 'user_id' => $user->id,
                 'type'    => 'plant_detection',
                 'title'   => "Unhealthy Detection on {$this->cropName}",
-                'message' => "Issues found: {$issueList}",
+                'message' => "Issues detected: {$issueList}",
             ]);
 
-            if ($user?->phone) {
+            if ($user->cp_number) {
                 app(InfobipSmsService::class)->send(
-                    $user->phone,
-                    "🌿 SIBOL: {$this->cropName} has issues detected — {$issueList}. Check your dashboard!"
+                    $user->cp_number,
+                    "🌿 SIBOL Alert: {$this->cropName} has been flagged — {$issueList}. Check your dashboard immediately!"
                 );
             }
         }
