@@ -17,6 +17,7 @@ const CropProfile = () => {
         setError(null);
         const response = await axiosClient.get('/user/crop-profile');
         setCrops(response.data);
+        console.log(response.data);
       } catch (error) {
         console.error('Error fetching crops:', error);
         setError(error.response?.data?.message || error.message || 'Failed to fetch crops');
