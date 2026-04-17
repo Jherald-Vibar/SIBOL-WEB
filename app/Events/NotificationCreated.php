@@ -2,7 +2,7 @@
 
 namespace App\Events;
 
-use App\Mail\NotificationMail;
+use App\Mail\NotificationEmail;
 use App\Models\Notification;
 use Illuminate\Broadcasting\PrivateChannel; // ← change this import
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -18,7 +18,7 @@ class NotificationCreated implements ShouldBroadcast
     {
         // Send email as soon as the event is instantiated
         Mail::to($this->notification->user->email)
-            ->queue(new NotificationMail($this->notification->toArray()));
+            ->queue(new NotificationEmail($this->notification->toArray()));
     }
 
     public function broadcastOn(): PrivateChannel
