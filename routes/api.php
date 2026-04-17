@@ -69,6 +69,20 @@ Route::get('/debug-broadcast', function () {
     }
 });
 
+Route::get('/debug-sms', function () {
+    $result = app(App\Services\TwilioSmsService::class)->send(
+        '+639685452834', // your own number
+        'Test from Render'
+    );
+
+    return response()->json([
+        'sent'   => $result,
+        'sid'    => config('services.twilio.sid') ? 'loaded' : 'MISSING',
+        'token'  => config('services.twilio.token') ? 'loaded' : 'MISSING',
+        'from'   => config('services.twilio.from') ?? 'MISSING',
+    ]);
+});
+
 Route::post('/broadcasting/auth', function (Request $request) {
     $user = $request->user();
 
