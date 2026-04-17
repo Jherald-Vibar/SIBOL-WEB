@@ -46,7 +46,7 @@ class DetectionUpdated implements ShouldBroadcast
                 'user_id' => $user->id,
                 'type'    => 'plant_detection',
                 'title'   => "Unhealthy Detection on {$this->cropName}",
-                'message' => "Issues detected: {$issueList}",
+                'description' => "Issues detected: {$issueList}",
             ]);
 
             if ($user->cp_number) {

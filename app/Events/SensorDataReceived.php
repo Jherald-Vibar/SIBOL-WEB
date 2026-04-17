@@ -28,7 +28,7 @@ use Illuminate\Broadcasting\Channel;
                   'user_id' => $user->id,
                   'type'    => 'soil_moisture',
                   'title'   => 'Low Soil Moisture',
-                  'message' => "Soil moisture is at {$this->sensorData->soil_moisture}%. Irrigation needed immediately.",
+                  'description' => "Soil moisture is at {$this->sensorData->soil_moisture}%. Irrigation needed immediately.",
               ]);
 
               if ($user->cp_number) {
