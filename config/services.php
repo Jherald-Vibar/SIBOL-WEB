@@ -43,7 +43,12 @@ return [
         'api_key'  => env('INFOBIP_API_KEY'),
         'base_url' => env('INFOBIP_BASE_URL'),
         'sender'   => env('INFOBIP_SENDER', 'SIBOL'),
-]   ,
+    ],
+    'twilio' => [
+        'sid'   => env('TWILIO_SID'),
+        'token' => env('TWILIO_AUTH_TOKEN'),
+        'from'  => env('TWILIO_PHONE_NUMBER'),
+    ],
 
 
 ];

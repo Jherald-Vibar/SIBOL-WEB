@@ -4,7 +4,7 @@ namespace App\Events;
 
 use App\Models\Garden;
 use App\Models\Notification;
-use App\Services\InfobipSmsService;
+use App\Services\TwilioSmsService;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -50,7 +50,7 @@ class DetectionUpdated implements ShouldBroadcast
             ]);
 
             if ($user->cp_number) {
-                app(InfobipSmsService::class)->send(
+                app(TwilioSmsService::class)->send(
                     $user->cp_number,
                     "🌿 SIBOL Alert: {$this->cropName} has been flagged — {$issueList}. Check your dashboard immediately!"
                 );

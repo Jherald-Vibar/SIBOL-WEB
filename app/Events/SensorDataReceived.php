@@ -5,6 +5,7 @@
 use App\Models\Notification;
 use App\Models\SensorData;
 use App\Services\InfobipSmsService;
+use App\Services\TwilioSmsService;
 use Illuminate\Broadcasting\Channel;
   use Illuminate\Broadcasting\InteractsWithSockets;
   use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -32,7 +33,7 @@ use Illuminate\Broadcasting\Channel;
               ]);
 
               if ($user->cp_number) {
-                  app(InfobipSmsService::class)->send(
+                  app(TwilioSmsService::class)->send(
                       $user->cp_number,
                       "🚨 SIBOL Alert: Soil moisture is critically low at {$this->sensorData->soil_moisture}% in your garden. Irrigation needed now!"
                   );

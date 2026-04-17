@@ -16,7 +16,8 @@
         "laravel/tinker": "^2.10.1",
         "php-mqtt/laravel-client": "^1.8",
         "pusher/pusher-php-server": "^7.2",
-        "spatie/laravel-activitylog": "^4.12"
+        "spatie/laravel-activitylog": "^4.12",
+        "twilio/sdk": "^8.11"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
