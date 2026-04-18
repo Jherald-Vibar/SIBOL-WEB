@@ -31,8 +31,8 @@ const CropProfile = () => {
 
   // Updated columns: merged temperature+humidity into air/humidity, added soil temperature & soil moisture
   const colMeta = [
-    { label: 'Soil Temperature', key: 'soilTemperature', badge: 'bg-amber-50 text-amber-800 border border-amber-100' },
-    { label: 'Soil Moisture',    key: 'soilMoisture',    badge: 'bg-sky-50 text-sky-800 border border-sky-100' },
+    { label: 'Soil Temperature', key: 'soil_temp', badge: 'bg-amber-50 text-amber-800 border border-amber-100' },
+    { label: 'Soil Moisture',    key: 'moisture',    badge: 'bg-sky-50 text-sky-800 border border-sky-100' },
     { label: 'PH',               key: 'soilPH',          badge: 'bg-emerald-50 text-emerald-800 border border-emerald-100' },
     { label: 'NPK',              key: 'npk',             badge: 'bg-green-50 text-green-800 border border-green-100' },
     { label: 'EC',               key: 'ec',              badge: 'bg-indigo-50 text-indigo-800 border border-indigo-100' },
