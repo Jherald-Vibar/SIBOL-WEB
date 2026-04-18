@@ -6,26 +6,45 @@ const AccountSettings = () => {
   const navigate = useNavigate();
 
   // ── Read user from localStorage ──
-  const storedName     = localStorage.getItem('username') || '';
-  const storedEmail    = localStorage.getItem('email')    || '';
-  const storedPhone    = localStorage.getItem('location') || '';
-  const storedImage    = localStorage.getItem('image')    || '';
+  const storedName     = localStorage.getItem('username')  || '';
+  const storedEmail    = localStorage.getItem('email')     || '';
+  const storedPhone    = localStorage.getItem('cp_number') || '';   // ✅ Fixed: was 'location'
+  const storedImage    = localStorage.getItem('image')     || '';
   const storedGoogleId = localStorage.getItem('google_id') || '';
   const isGoogleUser   = !!storedGoogleId;
 
   const [error,   setError]   = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew,     setShowNew]     = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // ── Editable profile fields ──
+  const [profile, setProfile] = useState({
+    name:     storedName,
+    cp_number: storedPhone,
+  });
+
   const [form, setForm] = useState({
     current_password: '',
     new_password: '',
     confirm_password: '',
   });
+
+  const handleProfileChange = (e) => {
+    const { name, value } = e.target;
+    // Numbers only for phone
+    if (name === 'cp_number') {
+      setProfile({ ...profile, cp_number: value.replace(/\D/g, '') });
+    } else {
+      setProfile({ ...profile, [name]: value });
+    }
+    setError(''); setSuccess('');
+  };
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -34,6 +53,22 @@ const AccountSettings = () => {
 
   const passwordsMatch =
     form.new_password === form.confirm_password || form.confirm_password === '';
+
+  // ── Save profile ──
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setError(''); setSuccess('');
+    if (!profile.name.trim()) { setError('Full name is required!'); return; }
+    setProfileLoading(true);
+    try {
+      await axiosClient.put('/updateProfile', profile);
+      localStorage.setItem('username',  profile.name);
+      localStorage.setItem('cp_number', profile.cp_number);
+      setSuccess('Profile updated successfully!');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update profile!');
+    } finally { setProfileLoading(false); }
+  };
 
   // ── Change password ──
   const handleChangePass = async (e) => {
@@ -156,52 +191,101 @@ const AccountSettings = () => {
                 />
               ) : (
                 <div className="w-14 h-14 rounded-full bg-[#0b3d1e] flex items-center justify-center text-white text-xl font-bold font-['Playfair_Display',serif]">
-                  {storedName?.charAt(0)?.toUpperCase() || '?'}
+                  {profile.name?.charAt(0)?.toUpperCase() || '?'}
                 </div>
               )}
               <div>
-                <p className="font-semibold text-[#0b3d1e] text-base">{storedName || '—'}</p>
+                <p className="font-semibold text-[#0b3d1e] text-base">{profile.name || '—'}</p>
                 <p className="text-xs text-gray-400">{storedEmail || '—'}</p>
               </div>
             </div>
 
-            {/* Full Name */}
-            <div>
-              <p className="text-[20px] font-semibold text-[#0B3D1E] mb-2">Full Name</p>
-              <div className={inputBox}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="#9ca3af" className="shrink-0">
-                  <path d="M12 4a4 4 0 0 1 4 4a4 4 0 0 1-4 4a4 4 0 0 1-4-4a4 4 0 0 1 4-4m0 2a2 2 0 0 0-2 2a2 2 0 0 0 2 2a2 2 0 0 0 2-2a2 2 0 0 0-2-2m0 7c2.67 0 8 1.33 8 4v3H4v-3c0-2.67 5.33-4 8-4m0 1.9c-2.97 0-6.1 1.46-6.1 2.1v1.1h12.2V17c0-.64-3.13-2.1-6.1-2.1"/>
-                </svg>
-                <input type="text" value={storedName} readOnly className={readOnlyInput} />
+            {/* ── Editable Profile Form ── */}
+            <form onSubmit={handleSaveProfile}>
+              {/* Full Name */}
+              <div className="mb-4">
+                <p className="text-[20px] font-semibold text-[#0B3D1E] mb-2">Full Name</p>
+                <div className={inputBox}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="#9ca3af" className="shrink-0">
+                    <path d="M12 4a4 4 0 0 1 4 4a4 4 0 0 1-4 4a4 4 0 0 1-4-4a4 4 0 0 1 4-4m0 2a2 2 0 0 0-2 2a2 2 0 0 0 2 2a2 2 0 0 0 2-2a2 2 0 0 0-2-2m0 7c2.67 0 8 1.33 8 4v3H4v-3c0-2.67 5.33-4 8-4m0 1.9c-2.97 0-6.1 1.46-6.1 2.1v1.1h12.2V17c0-.64-3.13-2.1-6.1-2.1"/>
+                  </svg>
+                  <input
+                    type="text"
+                    name="name"
+                    value={profile.name}
+                    onChange={handleProfileChange}
+                    placeholder="Your full name"
+                    className={inputText}
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Contacts */}
-            <div>
-              <p className="text-[20px] font-semibold text-[#0B3D1E] mb-2">Contacts</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Email */}
-                <div>
-                  <p className="text-[13px] text-[#0B3D1E] font-semibold mb-1.5">Email</p>
-                  <div className={inputBox}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                      <rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
-                    </svg>
-                    <input type="email" value={storedEmail} readOnly className={readOnlyInput} />
+              {/* Contacts */}
+              <div className="mb-4">
+                <p className="text-[20px] font-semibold text-[#0B3D1E] mb-2">Contacts</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Email — always read-only */}
+                  <div>
+                    <p className="text-[13px] text-[#0B3D1E] font-semibold mb-1.5">
+                      Email
+                      <span className="ml-1.5 text-[10px] text-gray-400 font-normal normal-case">(cannot be changed)</span>
+                    </p>
+                    <div className={inputBox} style={{ background: '#f9fafb' }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                        <rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                      </svg>
+                      <input type="email" value={storedEmail} readOnly className={readOnlyInput} />
+                    </div>
                   </div>
-                </div>
-                {/* Phone */}
-                <div>
-                  <p className="text-[13px] text-[#0B3D1E] font-semibold mb-1.5">Phone</p>
-                  <div className={inputBox}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.35 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6 6l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
-                    </svg>
-                    <input type="tel" value={storedPhone} readOnly className={readOnlyInput} placeholder="—" />
+                  {/* Phone — editable */}
+                  <div>
+                    <p className="text-[13px] text-[#0B3D1E] font-semibold mb-1.5">Phone</p>
+                    <div className={inputBox}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.35 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6 6l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                      </svg>
+                      <input
+                        type="text"
+                        name="cp_number"
+                        value={profile.cp_number}
+                        onChange={handleProfileChange}
+                        inputMode="numeric"
+                        placeholder="09xxxxxxxxx"
+                        className={inputText}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+
+              {/* Save profile button */}
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={profileLoading}
+                  className="flex items-center gap-1.5 bg-green-950 hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold px-4 py-2 rounded-lg transition-all"
+                >
+                  {profileLoading ? (
+                    <>
+                      <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25"/>
+                        <path fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" opacity="0.75"/>
+                      </svg>
+                      Saving…
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6m3-10H5V5h10z"/>
+                      </svg>
+                      Save Changes
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+
+            <div className="border-t border-gray-100" />
 
             {/* Password — hidden for Google users */}
             {!isGoogleUser && (
