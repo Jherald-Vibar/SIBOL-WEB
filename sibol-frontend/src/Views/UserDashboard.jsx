@@ -224,7 +224,7 @@ const UserDashboard = () => {
                 </div>
               </div>
             ) : (
-              <div className="relative z-10 text-center text-[13px] text-white/50 py-5">Fetching weather...</div>
+              <div className="relative z-10 text-center text-[13px] text-white/50 py-5">Loading weather...</div>
             )}
           </div>
 
