@@ -66,7 +66,7 @@ print(f"Working directory: {os.getcwd()}", flush=True)
 print("=" * 80, flush=True)
 
 # Load YOLO11s model
-MODEL_PATH = os.environ.get('MODEL_PATH', 'models/my_models.pt')
+MODEL_PATH = os.environ.get('MODEL_PATH', 'models/my_modelv3.pt')
 model = None
 
 def load_model():
