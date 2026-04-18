@@ -152,6 +152,36 @@ class UserController extends Controller
         }
     }
 
+    public function updateProfile(Request $request) {
+      $user = $request->user();
+
+      $validator = Validator::make($request->all(), [
+        'name' => 'required',
+        'email' => 'required',
+        'cp_number' => 'required',
+        'location' => 'required',
+      ]);
+
+      if($validator->fails()) {
+        return response()->json([
+          'Message' => $validator->errors(),
+        ]);
+      }
+
+      $validated = $validator->validated();
+
+      $user->update([
+        'name' => $validated['name'] ?? $user->name,
+        'email' => $validated['email'] ?? $user->email,
+        'cp_number' => $validated['cp_number'] ?? $user->cp_number,
+        'location' => $validated['location'] ?? $user->location,
+      ]);
+
+      return response()->json([
+        'message' => "User Updated Successfully!",
+      ]);
+    }
+
 
     public function redirect() {
       $httpClient = new Client(['verify' => false]);
