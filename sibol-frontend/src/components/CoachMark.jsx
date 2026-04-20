@@ -1,13 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// ─── Step definitions ──────────────────────────────────────────────────────────
-// phase: 'tour' = highlight UI, no navigation
-//        'onboard' = wizard step (may navigate to a new page first)
-// navigate: route to push before spotlighting the target
-// cta: custom label for the primary button (defaults to "Next →")
-// ──────────────────────────────────────────────────────────────────────────────
-
 const STEPS = [
   // ── Phase 1: Tour ─────────────────────────────────────────────────────────
   {
@@ -42,7 +35,7 @@ const STEPS = [
     phase: 'tour',
     targetId: 'coach-nav-cropprofile',
     title: <>Crop <em className="text-[#f0a830]">Profile</em></>,
-    body: 'Manage your crop profiles and gardens. This is also where you\'ll add new gardens.',
+    body: "Manage your crop profiles and gardens. This is also where you'll add new gardens.",
     placement: 'right',
   },
   {
@@ -84,7 +77,7 @@ const STEPS = [
   // ── Phase 2: Onboarding wizard ─────────────────────────────────────────────
   {
     phase: 'onboard',
-    navigate: null, // stays wherever we are — transition card
+    navigate: null,
     targetId: null,
     title: <>Let's set up your <em className="text-[#f0a830]">Farm</em></>,
     body: "You've seen the whole app! Now let's get you set up. We'll help you create your first garden, add a crop, and claim your IoT device. It only takes a minute.",
@@ -102,10 +95,10 @@ const STEPS = [
   },
   {
     phase: 'onboard',
-    navigate: `/user/crop-care/`,
+    navigate: '/user/crop-care/',
     targetId: 'coach-add-crop-btn',
     title: <>Add your first <em className="text-[#f0a830]">Crop</em></>,
-    body: "Inside your garden, add a crop. Choose the plant type and planted date — SIBOL will start monitoring it right away.",
+    body: 'Inside your garden, add a crop. Choose the plant type and planted date — SIBOL will start monitoring it right away.',
     placement: 'bottom',
     cta: 'Add Crop →',
   },
@@ -120,28 +113,64 @@ const STEPS = [
   },
 ];
 
-// ─── Layout constants ──────────────────────────────────────────────────────────
-const PAD = 10;
-const GAP = 16;
+const PAD   = 10;
+const GAP   = 16;
 const ARROW = 10;
+// Max ms to wait for a target element to appear after navigation
+const ELEMENT_WAIT_TIMEOUT = 8000;
 
-// ─── CoachMark component ───────────────────────────────────────────────────────
+// ─── Wait for a DOM element by id using MutationObserver ──────────────────────
+// Returns a cancel function. Resolves immediately if element already exists.
+function waitForElement(id, onFound, onTimeout) {
+  const existing = document.getElementById(id);
+  if (existing) {
+    onFound(existing);
+    return () => {};
+  }
+
+  let cancelled = false;
+
+  const timer = setTimeout(() => {
+    if (cancelled) return;
+    observer.disconnect();
+    onTimeout?.();
+  }, ELEMENT_WAIT_TIMEOUT);
+
+  const observer = new MutationObserver(() => {
+    if (cancelled) return;
+    const el = document.getElementById(id);
+    if (el) {
+      clearTimeout(timer);
+      observer.disconnect();
+      onFound(el);
+    }
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  return () => {
+    cancelled = true;
+    clearTimeout(timer);
+    observer.disconnect();
+  };
+}
+
+// ─── CoachMark ────────────────────────────────────────────────────────────────
 const CoachMark = ({ open, onClose, userId }) => {
   const storageKey = userId ? `sibol_toured_${userId}` : 'sibol_toured';
   const navigate   = useNavigate();
 
-  const [active,     setActive]     = useState(false);
-  const [step,       setStep]       = useState(0);
-  const [done,       setDone]       = useState(false);
-  const [navigating, setNavigating] = useState(false);
-  const [spotStyle,  setSpotStyle]  = useState({});
-  const [cardPos,    setCardPos]    = useState({ top: 0, left: 0, width: 272 });
-  const [arrowPos,   setArrowPos]   = useState({ side: 'top', offset: 0 });
-  const rafRef       = useRef(null);
-  // ── FIX: track the current target so the retry loop knows which element to wait for
-  const targetIdRef  = useRef(null);
+  const [active,    setActive]    = useState(false);
+  const [step,      setStep]      = useState(0);
+  const [done,      setDone]      = useState(false);
+  const [spotStyle, setSpotStyle] = useState({});
+  const [cardPos,   setCardPos]   = useState({ top: 0, left: 0, width: 272 });
+  const [arrowPos,  setArrowPos]  = useState({ side: 'top', offset: 0 });
 
-  // ── Auto-launch (uncontrolled mode) ──────────────────────────────────────
+  const rafRef         = useRef(null);
+  const cancelWaitRef  = useRef(null); // holds the MutationObserver cancel fn
+
+  // ── Auto-launch ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (open === undefined) {
       const toured = localStorage.getItem(storageKey);
@@ -157,35 +186,9 @@ const CoachMark = ({ open, onClose, userId }) => {
     if (open !== undefined) setActive(open);
   }, [open]);
 
-  // ── Position the spotlight & card ─────────────────────────────────────────
-  const position = useCallback(() => {
-    const s = STEPS[step];
-
-    // Center card (no target) — used for transition / intro steps
-    if (!s.targetId || s.placement === 'center') {
-      const CW = 320;
-      const CH = 210;
-      setSpotStyle({ top: -999, left: -999, width: 0, height: 0 });
-      setCardPos({
-        top:    window.innerHeight / 2 - CH / 2,
-        left:   window.innerWidth  / 2 - CW / 2,
-        width:  CW,
-        bottom: 'auto',
-      });
-      setArrowPos({ side: 'none', offset: 0 });
-      return;
-    }
-
-    const target = document.getElementById(s.targetId);
-
-    // ── FIX 3: If element not yet in DOM, keep retrying via rAF instead of silently bailing
-    if (!target) {
-      // Only keep retrying if this step's targetId is still the active one
-      if (targetIdRef.current === s.targetId) {
-        rafRef.current = requestAnimationFrame(position);
-      }
-      return;
-    }
+  // ── Position card around a known element ──────────────────────────────────
+  const positionOnElement = useCallback((target, s) => {
+    if (!target) return;
 
     const tr = target.getBoundingClientRect();
 
@@ -201,125 +204,167 @@ const CoachMark = ({ open, onClose, userId }) => {
     if (window.innerWidth < 768) {
       setCardPos({ top: 'auto', left: 16, width: window.innerWidth - 32, bottom: 24 });
       setArrowPos({ side: 'none', offset: 0 });
-    } else {
-      const CW = 288;
-      const CH = 200;
-      let top, left, side, arrowOffset;
-
-      switch (s.placement) {
-        case 'right':
-          left        = tr.right + PAD + GAP;
-          top         = tr.top + tr.height / 2 - CH / 2;
-          side        = 'left';
-          arrowOffset = CH / 2 - ARROW;
-          break;
-        case 'bottom':
-          top         = tr.bottom + PAD + GAP;
-          left        = tr.left + tr.width / 2 - CW / 2;
-          side        = 'top';
-          arrowOffset = CW / 2 - ARROW;
-          break;
-        case 'top':
-        default:
-          top         = tr.top - PAD - GAP - CH;
-          left        = tr.left + tr.width / 2 - CW / 2;
-          side        = 'bottom';
-          arrowOffset = CW / 2 - ARROW;
-          break;
-      }
-
-      const clampedLeft = Math.max(8, Math.min(left, window.innerWidth  - CW - 8));
-      const clampedTop  = Math.max(8, Math.min(top,  window.innerHeight - CH - 8));
-
-      setCardPos({ top: clampedTop, left: clampedLeft, width: CW, bottom: 'auto' });
-      setArrowPos({ side, offset: arrowOffset });
+      return;
     }
-  }, [step]);
 
-  // ── FIX 1: Added `navigating` to dependency array so position() fires after nav settles
+    const CW = 288;
+    const CH = 200;
+    let top, left, side, arrowOffset;
+
+    switch (s.placement) {
+      case 'right':
+        left        = tr.right + PAD + GAP;
+        top         = tr.top + tr.height / 2 - CH / 2;
+        side        = 'left';
+        arrowOffset = CH / 2 - ARROW;
+        break;
+      case 'bottom':
+        top         = tr.bottom + PAD + GAP;
+        left        = tr.left + tr.width / 2 - CW / 2;
+        side        = 'top';
+        arrowOffset = CW / 2 - ARROW;
+        break;
+      case 'top':
+      default:
+        top         = tr.top - PAD - GAP - CH;
+        left        = tr.left + tr.width / 2 - CW / 2;
+        side        = 'bottom';
+        arrowOffset = CW / 2 - ARROW;
+        break;
+    }
+
+    setCardPos({
+      top:    Math.max(8, Math.min(top,  window.innerHeight - CH - 8)),
+      left:   Math.max(8, Math.min(left, window.innerWidth  - CW - 8)),
+      width:  CW,
+      bottom: 'auto',
+    });
+    setArrowPos({ side, offset: arrowOffset });
+  }, []);
+
+  // ── Main position dispatcher — handles center steps + waits for element ───
+  const position = useCallback((targetStep) => {
+    const s = STEPS[targetStep !== undefined ? targetStep : step];
+    if (!s) return;
+
+    // Cancel any previous pending observer
+    cancelWaitRef.current?.();
+    cancelWaitRef.current = null;
+
+    if (!s.targetId || s.placement === 'center') {
+      // Center floating card — no DOM element needed
+      const CW = 320, CH = 210;
+      setSpotStyle({ top: -999, left: -999, width: 0, height: 0 });
+      setCardPos({
+        top:    window.innerHeight / 2 - CH / 2,
+        left:   window.innerWidth  / 2 - CW / 2,
+        width:  CW,
+        bottom: 'auto',
+      });
+      setArrowPos({ side: 'none', offset: 0 });
+      return;
+    }
+
+    // Wait for element (resolves instantly if already mounted)
+    cancelWaitRef.current = waitForElement(
+      s.targetId,
+      (el) => positionOnElement(el, s),
+      () => console.warn(`CoachMark: #${s.targetId} never appeared (timeout)`),
+    );
+  }, [step, positionOnElement]);
+
+  // ── Re-run positioning whenever step or active changes ────────────────────
   useEffect(() => {
-    if (!active || navigating) return;
-
-    // Cancel any pending rAF retry from the previous step
-    cancelAnimationFrame(rafRef.current);
-
-    // Update the ref so stale retry loops know to stop
-    targetIdRef.current = STEPS[step]?.targetId ?? null;
+    if (!active) return;
 
     position();
 
-    const onRes = () => {
+    const onResize = () => {
       cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(position);
+      rafRef.current = requestAnimationFrame(() => position());
     };
-    window.addEventListener('resize', onRes);
-    window.addEventListener('scroll', onRes, true);
-    return () => {
-      window.removeEventListener('resize', onRes);
-      window.removeEventListener('scroll', onRes, true);
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, [active, step, position, navigating]); // ← FIX 1: `navigating` added here
+    window.addEventListener('resize', onResize);
+    window.addEventListener('scroll', onResize, true);
 
-  // ── Navigation helper: go to route then re-position after settle ───────────
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onResize, true);
+      cancelAnimationFrame(rafRef.current);
+      // Don't cancel waitRef here — let the observer keep running across the effect cycle
+    };
+  }, [active, step, position]);
+
+  // ── Cleanup on unmount ─────────────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      cancelWaitRef.current?.();
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  // ── Step navigation — navigate first, THEN set step ───────────────────────
+  // Setting step triggers the useEffect → position() → MutationObserver,
+  // so the observer is already watching by the time the new page renders.
   const goToStep = useCallback((newStep) => {
     const s = STEPS[newStep];
-    setStep(newStep);
+    cancelWaitRef.current?.();
+    cancelWaitRef.current = null;
 
-    if (s.navigate) {
-      setNavigating(true);
+    if (s?.navigate) {
       navigate(s.navigate);
-      // ── FIX 2: Increased timeout from 600ms → 900ms to give the page time to fully mount
-      setTimeout(() => setNavigating(false), 900);
     }
+    // Set step AFTER navigate so the new route starts rendering while
+    // the MutationObserver immediately begins watching for the element.
+    setStep(newStep);
   }, [navigate]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
-  const finish = () => {
+  const finish = useCallback(() => {
+    cancelWaitRef.current?.();
     setActive(false);
     setDone(true);
     localStorage.setItem(storageKey, '1');
     onClose?.();
-  };
+  }, [storageKey, onClose]);
 
-  const skip = () => {
+  const skip = useCallback(() => {
+    cancelWaitRef.current?.();
     setActive(false);
     localStorage.setItem(storageKey, '1');
     onClose?.();
-  };
+  }, [storageKey, onClose]);
 
-  const next = () => {
+  const next = useCallback(() => {
     if (step < STEPS.length - 1) goToStep(step + 1);
     else finish();
-  };
+  }, [step, goToStep, finish]);
 
-  const prev = () => {
+  const prev = useCallback(() => {
     if (step > 0) goToStep(step - 1);
-  };
+  }, [step, goToStep]);
 
-  // ── Arrow style ────────────────────────────────────────────────────────────
+  // ── Arrow CSS ──────────────────────────────────────────────────────────────
   const arrowStyle = () => {
     if (arrowPos.side === 'none') return { display: 'none' };
     const base  = { position: 'absolute', width: 0, height: 0, pointerEvents: 'none' };
     const color = '#ffffff';
     switch (arrowPos.side) {
-      case 'left':   return { ...base, top: arrowPos.offset, left: -ARROW, borderTop: `${ARROW}px solid transparent`, borderBottom: `${ARROW}px solid transparent`, borderRight: `${ARROW}px solid ${color}` };
-      case 'top':    return { ...base, top: -ARROW, left: arrowPos.offset, borderLeft: `${ARROW}px solid transparent`, borderRight: `${ARROW}px solid transparent`, borderBottom: `${ARROW}px solid ${color}` };
+      case 'left':
+        return { ...base, top: arrowPos.offset, left: -ARROW, borderTop: `${ARROW}px solid transparent`, borderBottom: `${ARROW}px solid transparent`, borderRight: `${ARROW}px solid ${color}` };
+      case 'top':
+        return { ...base, top: -ARROW, left: arrowPos.offset, borderLeft: `${ARROW}px solid transparent`, borderRight: `${ARROW}px solid transparent`, borderBottom: `${ARROW}px solid ${color}` };
       case 'bottom':
-      default:       return { ...base, bottom: -ARROW, left: arrowPos.offset, borderLeft: `${ARROW}px solid transparent`, borderRight: `${ARROW}px solid transparent`, borderTop: `${ARROW}px solid ${color}` };
+      default:
+        return { ...base, bottom: -ARROW, left: arrowPos.offset, borderLeft: `${ARROW}px solid transparent`, borderRight: `${ARROW}px solid transparent`, borderTop: `${ARROW}px solid ${color}` };
     }
   };
 
-  // ── Phase label helpers ────────────────────────────────────────────────────
-  const tourSteps    = STEPS.filter(s => s.phase === 'tour').length;
-  const currentStep  = STEPS[step];
-  const phaseLabel   = currentStep?.phase === 'onboard' ? 'Setup' : 'Tour';
-  const phaseStep    = currentStep?.phase === 'onboard'
-    ? step - tourSteps + 1
-    : step + 1;
-  const phaseTotal   = currentStep?.phase === 'onboard'
-    ? STEPS.length - tourSteps
-    : tourSteps;
+  // ── Phase labels ───────────────────────────────────────────────────────────
+  const tourSteps   = STEPS.filter(s => s.phase === 'tour').length;
+  const currentStep = STEPS[step];
+  const phaseLabel  = currentStep?.phase === 'onboard' ? 'Setup' : 'Tour';
+  const phaseStep   = currentStep?.phase === 'onboard' ? step - tourSteps + 1 : step + 1;
+  const phaseTotal  = currentStep?.phase === 'onboard' ? STEPS.length - tourSteps : tourSteps;
 
   if (!active && !done) return null;
 
@@ -350,7 +395,7 @@ const CoachMark = ({ open, onClose, userId }) => {
             <div className="absolute inset-0 bg-[rgba(11,61,30,0.75)]" onClick={skip} />
           )}
 
-          {/* ── Spotlight border ── */}
+          {/* ── Spotlight ring ── */}
           {currentStep?.targetId && currentStep.placement !== 'center' && (
             <div
               className="absolute rounded-xl border-2 border-[#d4840a] shadow-[0_0_0_4px_rgba(212,132,10,0.2)] transition-all duration-400"
