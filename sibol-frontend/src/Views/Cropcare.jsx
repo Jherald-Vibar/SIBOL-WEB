@@ -198,6 +198,7 @@ const Cropcare = () => {
                   <div className="flex items-center gap-1">
                     {/* Open */}
                     <button
+                      id={`coach-open-garden-${gard.id}`}
                       onClick={() => goGarden(gard.id)}
                       disabled={loading}
                       title="Open garden"

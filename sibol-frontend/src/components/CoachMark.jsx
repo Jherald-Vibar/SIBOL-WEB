@@ -2,12 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // ─── Step definitions ──────────────────────────────────────────────────────────
-// phase: 'tour' = highlight UI, no navigation
-//        'onboard' = wizard step (may navigate to a new page first)
-// navigate: route to push before spotlighting the target
-// cta: custom label for the primary button (defaults to "Next →")
-// ──────────────────────────────────────────────────────────────────────────────
-
 const STEPS = [
   // ── Phase 1: Tour ─────────────────────────────────────────────────────────
   {
@@ -84,7 +78,7 @@ const STEPS = [
   // ── Phase 2: Onboarding wizard ─────────────────────────────────────────────
   {
     phase: 'onboard',
-    navigate: null, // stays wherever we are — transition card
+    navigate: null,
     targetId: null,
     title: <>Let's set up your <em className="text-[#f0a830]">Farm</em></>,
     body: "You've seen the whole app! Now let's get you set up. We'll help you create your first garden, add a crop, and claim your IoT device. It only takes a minute.",
@@ -92,13 +86,32 @@ const STEPS = [
     cta: "Let's go →",
   },
   {
+    // Step index 11 — "Create Garden" step
+    // Behaviour: clicks the New Garden button to open the modal,
+    // then WAITS for the sibol:garden-created event before auto-advancing.
     phase: 'onboard',
     navigate: '/user/crop-care',
     targetId: 'coach-add-garden-btn',
     title: <>Create your first <em className="text-[#f0a830]">Garden</em></>,
-    body: 'Tap the button to create your first garden. Give it a name and location so SIBOL can track your crops.',
+    body: 'Tap "Create Garden" to open the form. Fill in a name and location, then save — we\'ll take you straight to your new garden!',
     placement: 'bottom',
     cta: 'Create Garden →',
+    // Special flag — coachmark clicks the button and waits for the event
+    triggerTarget: true,
+    waitForEvent: 'sibol:garden-created',
+  },
+  {
+    // Step index 12 — entered right after garden-created fires.
+    // targetId is set dynamically to coach-open-garden-{id} via createdGardenId state.
+    phase: 'onboard',
+    navigate: null, // stay on /user/crop-care
+    targetId: '__garden_open_btn__', // sentinel — replaced at runtime
+    title: <>Open your <em className="text-[#f0a830]">Garden</em></>,
+    body: "Your garden is ready! Tap the open button to go inside and start managing your crops.",
+    placement: 'bottom',
+    cta: 'Open Garden →',
+    // Clicking Next on this step clicks the open button automatically
+    triggerTarget: true,
   },
   {
     phase: 'onboard',
@@ -120,9 +133,12 @@ const STEPS = [
   },
 ];
 
+const GARDEN_STEP_IDX      = 11; // index of the "Create Garden" step
+const GARDEN_OPEN_STEP_IDX = 12; // index of the "Open Garden" step
+
 // ─── Layout constants ──────────────────────────────────────────────────────────
-const PAD = 10;
-const GAP = 16;
+const PAD  = 10;
+const GAP  = 16;
 const ARROW = 10;
 
 // ─── CoachMark component ───────────────────────────────────────────────────────
@@ -130,15 +146,18 @@ const CoachMark = ({ open, onClose, userId }) => {
   const storageKey = userId ? `sibol_toured_${userId}` : 'sibol_toured';
   const navigate   = useNavigate();
 
-  const [active,     setActive]     = useState(false);
-  const [step,       setStep]       = useState(0);
-  const [done,       setDone]       = useState(false);
-  const [navigating, setNavigating] = useState(false);
-  const [spotStyle,  setSpotStyle]  = useState({});
-  const [cardPos,    setCardPos]    = useState({ top: 0, left: 0, width: 272 });
-  const [arrowPos,   setArrowPos]   = useState({ side: 'top', offset: 0 });
+  const [active,          setActive]          = useState(false);
+  const [step,            setStep]            = useState(0);
+  const [done,            setDone]            = useState(false);
+  const [navigating,      setNavigating]      = useState(false);
+  const [waitingForEvent, setWaitingForEvent] = useState(false);
+  const [createdGardenId, setCreatedGardenId] = useState(null);
+  const [spotStyle,       setSpotStyle]       = useState({});
+  const [cardPos,         setCardPos]         = useState({ top: 0, left: 0, width: 272 });
+  const [arrowPos,        setArrowPos]        = useState({ side: 'top', offset: 0 });
+
   const rafRef     = useRef(null);
-  const pollRef    = useRef(null); // ref to hold the polling interval
+  const pollRef    = useRef(null);
 
   // ── Auto-launch (uncontrolled mode) ──────────────────────────────────────
   useEffect(() => {
@@ -156,63 +175,82 @@ const CoachMark = ({ open, onClose, userId }) => {
     if (open !== undefined) setActive(open);
   }, [open]);
 
-  // ── Cleanup poll on unmount ────────────────────────────────────────────────
+  // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      cancelAnimationFrame(rafRef.current);
     };
   }, []);
 
-  // ── Position the spotlight & card ─────────────────────────────────────────
-  const position = useCallback(() => {
-    const s = STEPS[step];
+  // ── Listen for garden-created event ───────────────────────────────────────
+  // When the user successfully saves a garden, Cropcare dispatches
+  // 'sibol:garden-created' with { detail: { id } }.
+  // We capture the id, turn off the waiting state, and auto-advance.
+  useEffect(() => {
+    if (!waitingForEvent) return;
 
-    // Center card (no target) — used for transition / intro steps
-    if (!s.targetId || s.placement === 'center') {
-      const CW = 320;
-      const CH = 210;
+    const handler = (e) => {
+      const id = e.detail?.id;
+      setCreatedGardenId(id || null);
+      setWaitingForEvent(false);
+      // Small delay so the garden card renders in the DOM before we spotlight it
+      setTimeout(() => goToStep(GARDEN_OPEN_STEP_IDX, id), 600);
+    };
+
+    window.addEventListener('sibol:garden-created', handler);
+    return () => window.removeEventListener('sibol:garden-created', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingForEvent]);
+
+  // ── Resolve the real targetId for the "Open Garden" step ──────────────────
+  // Returns the id of the open-button for the newly created garden,
+  // or falls back to the sentinel so position() can still find it.
+  const resolveTargetId = useCallback((s, gardenId) => {
+    if (s.targetId === '__garden_open_btn__') {
+      return gardenId ? `coach-open-garden-${gardenId}` : '__garden_open_btn__';
+    }
+    return s.targetId;
+  }, []);
+
+  // ── Position the spotlight & card ─────────────────────────────────────────
+  const position = useCallback((overrideGardenId) => {
+    const s        = STEPS[step];
+    const gardenId = overrideGardenId ?? createdGardenId;
+    const targetId = resolveTargetId(s, gardenId);
+
+    if (!targetId || s.placement === 'center') {
+      const CW = 320, CH = 210;
       setSpotStyle({ top: -999, left: -999, width: 0, height: 0 });
-      setCardPos({
-        top:    window.innerHeight / 2 - CH / 2,
-        left:   window.innerWidth  / 2 - CW / 2,
-        width:  CW,
-        bottom: 'auto',
-      });
+      setCardPos({ top: window.innerHeight / 2 - CH / 2, left: window.innerWidth / 2 - CW / 2, width: CW, bottom: 'auto' });
       setArrowPos({ side: 'none', offset: 0 });
       return;
     }
 
-    const target = document.getElementById(s.targetId);
+    const target = document.getElementById(targetId);
     if (!target) return;
     const tr = target.getBoundingClientRect();
 
-    setSpotStyle({
-      top:    tr.top    - PAD,
-      left:   tr.left   - PAD,
-      width:  tr.width  + PAD * 2,
-      height: tr.height + PAD * 2,
-    });
-
+    setSpotStyle({ top: tr.top - PAD, left: tr.left - PAD, width: tr.width + PAD * 2, height: tr.height + PAD * 2 });
     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
     if (window.innerWidth < 768) {
       setCardPos({ top: 'auto', left: 16, width: window.innerWidth - 32, bottom: 24 });
       setArrowPos({ side: 'none', offset: 0 });
     } else {
-      const CW = 288;
-      const CH = 200;
+      const CW = 288, CH = 200;
       let top, left, side, arrowOffset;
 
       switch (s.placement) {
         case 'right':
-          left        = tr.right + PAD + GAP;
-          top         = tr.top + tr.height / 2 - CH / 2;
+          left        = tr.right  + PAD + GAP;
+          top         = tr.top    + tr.height / 2 - CH / 2;
           side        = 'left';
           arrowOffset = CH / 2 - ARROW;
           break;
         case 'bottom':
           top         = tr.bottom + PAD + GAP;
-          left        = tr.left + tr.width / 2 - CW / 2;
+          left        = tr.left   + tr.width  / 2 - CW / 2;
           side        = 'top';
           arrowOffset = CW / 2 - ARROW;
           break;
@@ -227,19 +265,15 @@ const CoachMark = ({ open, onClose, userId }) => {
 
       const clampedLeft = Math.max(8, Math.min(left, window.innerWidth  - CW - 8));
       const clampedTop  = Math.max(8, Math.min(top,  window.innerHeight - CH - 8));
-
       setCardPos({ top: clampedTop, left: clampedLeft, width: CW, bottom: 'auto' });
       setArrowPos({ side, offset: arrowOffset });
     }
-  }, [step]);
+  }, [step, createdGardenId, resolveTargetId]);
 
   useEffect(() => {
-    if (!active || navigating) return;
+    if (!active || navigating || waitingForEvent) return;
     position();
-    const onRes = () => {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(position);
-    };
+    const onRes = () => { cancelAnimationFrame(rafRef.current); rafRef.current = requestAnimationFrame(() => position()); };
     window.addEventListener('resize', onRes);
     window.addEventListener('scroll', onRes, true);
     return () => {
@@ -247,73 +281,85 @@ const CoachMark = ({ open, onClose, userId }) => {
       window.removeEventListener('scroll', onRes, true);
       cancelAnimationFrame(rafRef.current);
     };
-  }, [active, step, position, navigating]);
+  }, [active, step, position, navigating, waitingForEvent]);
 
-  // ── Navigation helper: poll for the target element after route change ──────
-  const goToStep = useCallback((newStep) => {
-    const s = STEPS[newStep];
+  // ── Navigation / polling helper ────────────────────────────────────────────
+  const goToStep = useCallback((newStep, gardenId) => {
+    const s          = STEPS[newStep];
+    const resolvedId = s.targetId === '__garden_open_btn__'
+      ? (gardenId ? `coach-open-garden-${gardenId}` : '__garden_open_btn__')
+      : s.targetId;
+
     setStep(newStep);
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
 
-    // Clear any existing poll
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
+    if (s.navigate) { setNavigating(true); navigate(s.navigate); }
 
-    if (s.navigate) {
-      setNavigating(true);
-      navigate(s.navigate);
-    }
-
-    if (s.targetId) {
-      // Poll every 100ms until the target element appears in the DOM (max 3s / 30 attempts)
+    if (resolvedId) {
       let attempts = 0;
       pollRef.current = setInterval(() => {
         attempts++;
-        const el = document.getElementById(s.targetId);
+        const el = document.getElementById(resolvedId);
         if (el || attempts >= 30) {
           clearInterval(pollRef.current);
           pollRef.current = null;
           setNavigating(false);
-          // Re-run position after a single rAF to let React flush any pending renders
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              setStep(prev => prev); // trigger position useEffect
-            });
-          });
+          requestAnimationFrame(() => requestAnimationFrame(() => position(gardenId)));
         }
       }, 100);
     } else {
-      // No target (center card) — short delay is fine
       setTimeout(() => setNavigating(false), 300);
     }
-  }, [navigate]);
+  }, [navigate, position]);
 
-  // ── Actions ────────────────────────────────────────────────────────────────
+  // ── Next action ────────────────────────────────────────────────────────────
+  const next = () => {
+    const s = STEPS[step];
+
+    // "Create Garden" step — click the button, then wait for the event
+    if (step === GARDEN_STEP_IDX && s.triggerTarget) {
+      const btn = document.getElementById(s.targetId);
+      if (btn) {
+        btn.click();               // opens the modal
+        setWaitingForEvent(true);  // handler above will advance when garden saves
+      }
+      return; // do NOT call goToStep yet — we wait for sibol:garden-created
+    }
+
+    // "Open Garden" step — click the open button, then advance
+    if (step === GARDEN_OPEN_STEP_IDX && s.triggerTarget) {
+      const resolvedId = createdGardenId
+        ? `coach-open-garden-${createdGardenId}`
+        : '__garden_open_btn__';
+      const btn = document.getElementById(resolvedId);
+      if (btn) btn.click();
+      // After clicking open, advance coachmark to next step
+      if (step < STEPS.length - 1) goToStep(step + 1);
+      else finish();
+      return;
+    }
+
+    if (step < STEPS.length - 1) goToStep(step + 1);
+    else finish();
+  };
+
+  const prev = () => { if (step > 0) goToStep(step - 1); };
+
+  // ── Finish / skip ──────────────────────────────────────────────────────────
   const finish = () => {
     setActive(false);
     setDone(true);
+    setWaitingForEvent(false);
     localStorage.setItem(storageKey, '1');
     onClose?.();
   };
 
   const skip = () => {
     setActive(false);
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
+    setWaitingForEvent(false);
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     localStorage.setItem(storageKey, '1');
     onClose?.();
-  };
-
-  const next = () => {
-    if (step < STEPS.length - 1) goToStep(step + 1);
-    else finish();
-  };
-
-  const prev = () => {
-    if (step > 0) goToStep(step - 1);
   };
 
   // ── Arrow style ────────────────────────────────────────────────────────────
@@ -333,141 +379,126 @@ const CoachMark = ({ open, onClose, userId }) => {
   const tourSteps   = STEPS.filter(s => s.phase === 'tour').length;
   const currentStep = STEPS[step];
   const phaseLabel  = currentStep?.phase === 'onboard' ? 'Setup' : 'Tour';
-  const phaseStep   = currentStep?.phase === 'onboard'
-    ? step - tourSteps + 1
-    : step + 1;
-  const phaseTotal  = currentStep?.phase === 'onboard'
-    ? STEPS.length - tourSteps
-    : tourSteps;
+  const phaseStep   = currentStep?.phase === 'onboard' ? step - tourSteps + 1 : step + 1;
+  const phaseTotal  = currentStep?.phase === 'onboard' ? STEPS.length - tourSteps : tourSteps;
 
   if (!active && !done) return null;
+
+  // ── Waiting overlay (garden modal is open, coachmark steps back) ───────────
+  const isWaiting = waitingForEvent;
 
   return (
     <>
       {active && (
-        <div className="fixed inset-0 z-[10000] overflow-hidden">
+        <div className="fixed inset-0 z-[10000] overflow-hidden" style={{ pointerEvents: isWaiting ? 'none' : undefined }}>
 
-          {/* ── Overlay with cutout ── */}
-          {currentStep?.targetId && currentStep.placement !== 'center' ? (
-            <div
-              className="absolute inset-0 bg-[rgba(11,61,30,0.75)]"
-              style={{
-                clipPath: `polygon(
-                  0% 0%, 100% 0%, 100% 100%, 0% 100%,
-                  0% ${spotStyle.top}px,
-                  ${spotStyle.left}px ${spotStyle.top}px,
-                  ${spotStyle.left}px ${spotStyle.top + spotStyle.height}px,
-                  ${spotStyle.left + spotStyle.width}px ${spotStyle.top + spotStyle.height}px,
-                  ${spotStyle.left + spotStyle.width}px ${spotStyle.top}px,
-                  0% ${spotStyle.top}px
-                )`,
-                transition: 'clip-path 0.4s ease',
-              }}
-              onClick={skip}
-            />
-          ) : (
-            <div className="absolute inset-0 bg-[rgba(11,61,30,0.75)]" onClick={skip} />
-          )}
-
-          {/* ── Spotlight border ── */}
-          {currentStep?.targetId && currentStep.placement !== 'center' && (
-            <div
-              className="absolute rounded-xl border-2 border-[#d4840a] shadow-[0_0_0_4px_rgba(212,132,10,0.2)] transition-all duration-400"
-              style={spotStyle}
-            />
-          )}
-
-          {/* ── Tooltip card ── */}
-          <div
-            className="fixed bg-white rounded-2xl p-6 shadow-2xl transition-all duration-400"
-            style={{
-              top:    cardPos.top,
-              bottom: cardPos.bottom,
-              left:   cardPos.left,
-              width:  cardPos.width,
-              zIndex: 10001,
-            }}
-          >
-            <div style={arrowStyle()} />
-
-            {/* Phase badge */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider ${
-                currentStep?.phase === 'onboard'
-                  ? 'bg-[#0b3d1e]/10 text-[#0b3d1e]'
-                  : 'bg-[#d4840a]/10 text-[#d4840a]'
-              }`}>
-                {phaseLabel} {phaseStep} / {phaseTotal}
-              </span>
-              {currentStep?.phase === 'onboard' && (
-                <span className="text-[10px] px-2 py-1 rounded-full bg-[#2e8b57]/10 text-[#2e8b57] font-bold uppercase tracking-wider">
-                  Setup
-                </span>
+          {/* Overlay with cutout — hidden while waiting so the modal is usable */}
+          {!isWaiting && (
+            <>
+              {currentStep?.targetId && currentStep.placement !== 'center' ? (
+                <div
+                  className="absolute inset-0 bg-[rgba(11,61,30,0.75)]"
+                  style={{
+                    clipPath: `polygon(
+                      0% 0%, 100% 0%, 100% 100%, 0% 100%,
+                      0% ${spotStyle.top}px,
+                      ${spotStyle.left}px ${spotStyle.top}px,
+                      ${spotStyle.left}px ${spotStyle.top + spotStyle.height}px,
+                      ${spotStyle.left + spotStyle.width}px ${spotStyle.top + spotStyle.height}px,
+                      ${spotStyle.left + spotStyle.width}px ${spotStyle.top}px,
+                      0% ${spotStyle.top}px
+                    )`,
+                    transition: 'clip-path 0.4s ease',
+                  }}
+                  onClick={skip}
+                />
+              ) : (
+                <div className="absolute inset-0 bg-[rgba(11,61,30,0.75)]" onClick={skip} />
               )}
-            </div>
 
-            <h3
-              className="text-lg font-bold text-[#0b3d1e] mb-2 leading-tight"
-              style={{ fontFamily: "'Playfair Display', serif" }}
+              {/* Spotlight border */}
+              {currentStep?.targetId && currentStep.placement !== 'center' && (
+                <div
+                  className="absolute rounded-xl border-2 border-[#d4840a] shadow-[0_0_0_4px_rgba(212,132,10,0.2)] transition-all duration-400"
+                  style={spotStyle}
+                />
+              )}
+            </>
+          )}
+
+          {/* Waiting pill — shown while the garden modal is open */}
+          {isWaiting && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[10002] flex items-center gap-3 bg-[#0b3d1e] text-white px-5 py-3 rounded-full shadow-2xl text-sm font-medium">
+              <svg className="animate-spin shrink-0" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+              </svg>
+              Fill in the form and tap <strong className="text-[#f0a830]">Save Garden</strong> to continue…
+            </div>
+          )}
+
+          {/* Tooltip card — hidden while waiting */}
+          {!isWaiting && (
+            <div
+              className="fixed bg-white rounded-2xl p-6 shadow-2xl transition-all duration-400"
+              style={{ top: cardPos.top, bottom: cardPos.bottom, left: cardPos.left, width: cardPos.width, zIndex: 10001 }}
             >
-              {currentStep?.title}
-            </h3>
+              <div style={arrowStyle()} />
 
-            <p className="text-sm text-gray-500 mb-5 leading-relaxed">
-              {currentStep?.body}
-            </p>
-
-            {/* Progress dots */}
-            <div className="flex items-center justify-between">
-              <div className="flex gap-1">
-                {STEPS.map((s, i) => (
-                  <div
-                    key={i}
-                    className="h-1 rounded-full transition-all"
-                    style={{
-                      width:      i === step ? 16 : 4,
-                      background: i === step
-                        ? (s.phase === 'onboard' ? '#0b3d1e' : '#d4840a')
-                        : i < step ? '#d4840a44' : '#eee',
-                    }}
-                  />
-                ))}
+              {/* Phase badge */}
+              <div className="flex items-center gap-2 mb-3">
+                <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider ${
+                  currentStep?.phase === 'onboard' ? 'bg-[#0b3d1e]/10 text-[#0b3d1e]' : 'bg-[#d4840a]/10 text-[#d4840a]'
+                }`}>
+                  {phaseLabel} {phaseStep} / {phaseTotal}
+                </span>
+                {currentStep?.phase === 'onboard' && (
+                  <span className="text-[10px] px-2 py-1 rounded-full bg-[#2e8b57]/10 text-[#2e8b57] font-bold uppercase tracking-wider">
+                    Setup
+                  </span>
+                )}
               </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={step > 0 ? prev : skip}
-                  className="text-xs text-gray-400 px-3 py-2 font-medium"
-                >
-                  {step > 0 ? 'Back' : 'Skip'}
-                </button>
-                <button
-                  onClick={next}
-                  className={`text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-colors ${
-                    currentStep?.phase === 'onboard'
-                      ? 'bg-[#2e8b57] hover:bg-[#1a6636]'
-                      : 'bg-[#0b3d1e] hover:bg-[#1a6636]'
-                  }`}
-                >
-                  {step === STEPS.length - 1
-                    ? 'Finish'
-                    : currentStep?.cta || 'Next →'}
-                </button>
+              <h3 className="text-lg font-bold text-[#0b3d1e] mb-2 leading-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
+                {currentStep?.title}
+              </h3>
+              <p className="text-sm text-gray-500 mb-5 leading-relaxed">{currentStep?.body}</p>
+
+              {/* Progress dots */}
+              <div className="flex items-center justify-between">
+                <div className="flex gap-1">
+                  {STEPS.map((s, i) => (
+                    <div key={i} className="h-1 rounded-full transition-all" style={{
+                      width:      i === step ? 16 : 4,
+                      background: i === step ? (s.phase === 'onboard' ? '#0b3d1e' : '#d4840a') : i < step ? '#d4840a44' : '#eee',
+                    }} />
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  <button onClick={step > 0 ? prev : skip} className="text-xs text-gray-400 px-3 py-2 font-medium">
+                    {step > 0 ? 'Back' : 'Skip'}
+                  </button>
+                  <button
+                    onClick={next}
+                    className={`text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-colors ${
+                      currentStep?.phase === 'onboard' ? 'bg-[#2e8b57] hover:bg-[#1a6636]' : 'bg-[#0b3d1e] hover:bg-[#1a6636]'
+                    }`}
+                  >
+                    {step === STEPS.length - 1 ? 'Finish' : currentStep?.cta || 'Next →'}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
-      {/* ── Done modal ── */}
+      {/* Done modal */}
       {done && (
         <div className="fixed inset-0 z-[10002] flex items-center justify-center p-6 bg-black/60">
           <div className="bg-white rounded-3xl p-8 text-center max-w-sm w-full shadow-2xl">
             <div className="text-4xl mb-4">🌱</div>
-            <h2
-              className="text-2xl font-bold text-[#0b3d1e] mb-2"
-              style={{ fontFamily: "'Playfair Display', serif" }}
-            >
+            <h2 className="text-2xl font-bold text-[#0b3d1e] mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>
               You're all set, <em className="text-[#f0a830]">Farmer!</em>
             </h2>
             <p className="text-gray-500 text-sm mb-6">
