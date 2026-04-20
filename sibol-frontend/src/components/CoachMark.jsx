@@ -93,7 +93,7 @@ const STEPS = [
   },
   {
     phase: 'onboard',
-    navigate: '/user/crop-profile',
+    navigate: '/user/crop-care',
     targetId: 'coach-add-garden-btn',
     title: <>Create your first <em className="text-[#f0a830]">Garden</em></>,
     body: 'Tap the button to create your first garden. Give it a name and location so SIBOL can track your crops.',
@@ -102,7 +102,7 @@ const STEPS = [
   },
   {
     phase: 'onboard',
-    navigate: '/user/crop-profile',
+    navigate: `/user/crop-care/`,
     targetId: 'coach-add-crop-btn',
     title: <>Add your first <em className="text-[#f0a830]">Crop</em></>,
     body: "Inside your garden, add a crop. Choose the plant type and planted date — SIBOL will start monitoring it right away.",

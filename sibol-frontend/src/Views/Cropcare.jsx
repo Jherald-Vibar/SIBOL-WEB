@@ -144,6 +144,7 @@ const Cropcare = () => {
             <p className="text-[13px] text-[#5a6472] mt-1">Select a garden to begin monitoring crop health.</p>
           </div>
           <button
+            id="coach-add-garden-btn"
             onClick={handleModal}
             className="inline-flex items-center gap-2 px-5 py-[11px] rounded-full bg-[#0b3d1e] text-white text-[13px] font-medium whitespace-nowrap shrink-0 hover:bg-[#1a6636] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#0b3d1e]/25 transition-all duration-200"
           >
