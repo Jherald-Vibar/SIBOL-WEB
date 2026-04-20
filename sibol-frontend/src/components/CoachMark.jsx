@@ -130,14 +130,16 @@ const CoachMark = ({ open, onClose, userId }) => {
   const storageKey = userId ? `sibol_toured_${userId}` : 'sibol_toured';
   const navigate   = useNavigate();
 
-  const [active,    setActive]    = useState(false);
-  const [step,      setStep]      = useState(0);
-  const [done,      setDone]      = useState(false);
-  const [navigating, setNavigating] = useState(false); // debounce while route changes
-  const [spotStyle, setSpotStyle] = useState({});
-  const [cardPos,   setCardPos]   = useState({ top: 0, left: 0, width: 272 });
-  const [arrowPos,  setArrowPos]  = useState({ side: 'top', offset: 0 });
-  const rafRef      = useRef(null);
+  const [active,     setActive]     = useState(false);
+  const [step,       setStep]       = useState(0);
+  const [done,       setDone]       = useState(false);
+  const [navigating, setNavigating] = useState(false);
+  const [spotStyle,  setSpotStyle]  = useState({});
+  const [cardPos,    setCardPos]    = useState({ top: 0, left: 0, width: 272 });
+  const [arrowPos,   setArrowPos]   = useState({ side: 'top', offset: 0 });
+  const rafRef       = useRef(null);
+  // ── FIX: track the current target so the retry loop knows which element to wait for
+  const targetIdRef  = useRef(null);
 
   // ── Auto-launch (uncontrolled mode) ──────────────────────────────────────
   useEffect(() => {
@@ -163,7 +165,7 @@ const CoachMark = ({ open, onClose, userId }) => {
     if (!s.targetId || s.placement === 'center') {
       const CW = 320;
       const CH = 210;
-      setSpotStyle({ top: -999, left: -999, width: 0, height: 0 }); // hide spotlight
+      setSpotStyle({ top: -999, left: -999, width: 0, height: 0 });
       setCardPos({
         top:    window.innerHeight / 2 - CH / 2,
         left:   window.innerWidth  / 2 - CW / 2,
@@ -175,7 +177,16 @@ const CoachMark = ({ open, onClose, userId }) => {
     }
 
     const target = document.getElementById(s.targetId);
-    if (!target) return;
+
+    // ── FIX 3: If element not yet in DOM, keep retrying via rAF instead of silently bailing
+    if (!target) {
+      // Only keep retrying if this step's targetId is still the active one
+      if (targetIdRef.current === s.targetId) {
+        rafRef.current = requestAnimationFrame(position);
+      }
+      return;
+    }
+
     const tr = target.getBoundingClientRect();
 
     setSpotStyle({
@@ -225,9 +236,18 @@ const CoachMark = ({ open, onClose, userId }) => {
     }
   }, [step]);
 
+  // ── FIX 1: Added `navigating` to dependency array so position() fires after nav settles
   useEffect(() => {
     if (!active || navigating) return;
+
+    // Cancel any pending rAF retry from the previous step
+    cancelAnimationFrame(rafRef.current);
+
+    // Update the ref so stale retry loops know to stop
+    targetIdRef.current = STEPS[step]?.targetId ?? null;
+
     position();
+
     const onRes = () => {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(position);
@@ -239,7 +259,7 @@ const CoachMark = ({ open, onClose, userId }) => {
       window.removeEventListener('scroll', onRes, true);
       cancelAnimationFrame(rafRef.current);
     };
-  }, [active, step, position, navigating]);
+  }, [active, step, position, navigating]); // ← FIX 1: `navigating` added here
 
   // ── Navigation helper: go to route then re-position after settle ───────────
   const goToStep = useCallback((newStep) => {
@@ -249,8 +269,8 @@ const CoachMark = ({ open, onClose, userId }) => {
     if (s.navigate) {
       setNavigating(true);
       navigate(s.navigate);
-      // Give the page 600 ms to mount its DOM before spotlighting
-      setTimeout(() => setNavigating(false), 600);
+      // ── FIX 2: Increased timeout from 600ms → 900ms to give the page time to fully mount
+      setTimeout(() => setNavigating(false), 900);
     }
   }, [navigate]);
 
