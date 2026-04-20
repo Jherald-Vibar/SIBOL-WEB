@@ -284,4 +284,14 @@ class UserController extends Controller
 
         return redirect()->route('loginForm')->with('success', 'Password reset success!');
     }
+
+    public function deleteAccount(Request $request) {
+      $user = $request->user();
+
+      $user->delete();
+
+      return response()->json([
+        'message' => "User Deleted!"
+      ], 204);
+    }
 }

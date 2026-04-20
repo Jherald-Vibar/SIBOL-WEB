@@ -183,6 +183,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/claimDevice/{gardenId}', [GardenController::class, 'claimEspDevice']);
     Route::post('/irrigation/toggle', [IrrigationController::class, 'toggle'])->middleware('auth:sanctum');
     Route::put('/updateProfile', [UserController::class, 'updateProfile']);
+    Route::delete('/deleteAccount', [UserController::class, 'deleteAccount']);
 
 
     //Admin Routes
