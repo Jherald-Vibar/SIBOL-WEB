@@ -42,7 +42,7 @@ const STEPS = [
     phase: 'tour',
     targetId: 'coach-nav-cropprofile',
     title: <>Crop <em className="text-[#f0a830]">Profile</em></>,
-    body: 'Manage your crop profiles and gardens. This is also where you\'ll add new gardens.',
+    body: "Manage your crop profiles and gardens. This is also where you'll add new gardens.",
     placement: 'right',
   },
   {
@@ -93,7 +93,7 @@ const STEPS = [
   },
   {
     phase: 'onboard',
-    navigate: '/user/crop-profile',
+    navigate: '/user/crop-care',
     targetId: 'coach-add-garden-btn',
     title: <>Create your first <em className="text-[#f0a830]">Garden</em></>,
     body: 'Tap the button to create your first garden. Give it a name and location so SIBOL can track your crops.',
@@ -130,14 +130,15 @@ const CoachMark = ({ open, onClose, userId }) => {
   const storageKey = userId ? `sibol_toured_${userId}` : 'sibol_toured';
   const navigate   = useNavigate();
 
-  const [active,    setActive]    = useState(false);
-  const [step,      setStep]      = useState(0);
-  const [done,      setDone]      = useState(false);
-  const [navigating, setNavigating] = useState(false); // debounce while route changes
-  const [spotStyle, setSpotStyle] = useState({});
-  const [cardPos,   setCardPos]   = useState({ top: 0, left: 0, width: 272 });
-  const [arrowPos,  setArrowPos]  = useState({ side: 'top', offset: 0 });
-  const rafRef      = useRef(null);
+  const [active,     setActive]     = useState(false);
+  const [step,       setStep]       = useState(0);
+  const [done,       setDone]       = useState(false);
+  const [navigating, setNavigating] = useState(false);
+  const [spotStyle,  setSpotStyle]  = useState({});
+  const [cardPos,    setCardPos]    = useState({ top: 0, left: 0, width: 272 });
+  const [arrowPos,   setArrowPos]   = useState({ side: 'top', offset: 0 });
+  const rafRef     = useRef(null);
+  const pollRef    = useRef(null); // ref to hold the polling interval
 
   // ── Auto-launch (uncontrolled mode) ──────────────────────────────────────
   useEffect(() => {
@@ -155,6 +156,13 @@ const CoachMark = ({ open, onClose, userId }) => {
     if (open !== undefined) setActive(open);
   }, [open]);
 
+  // ── Cleanup poll on unmount ────────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
   // ── Position the spotlight & card ─────────────────────────────────────────
   const position = useCallback(() => {
     const s = STEPS[step];
@@ -163,7 +171,7 @@ const CoachMark = ({ open, onClose, userId }) => {
     if (!s.targetId || s.placement === 'center') {
       const CW = 320;
       const CH = 210;
-      setSpotStyle({ top: -999, left: -999, width: 0, height: 0 }); // hide spotlight
+      setSpotStyle({ top: -999, left: -999, width: 0, height: 0 });
       setCardPos({
         top:    window.innerHeight / 2 - CH / 2,
         left:   window.innerWidth  / 2 - CW / 2,
@@ -241,16 +249,43 @@ const CoachMark = ({ open, onClose, userId }) => {
     };
   }, [active, step, position, navigating]);
 
-  // ── Navigation helper: go to route then re-position after settle ───────────
+  // ── Navigation helper: poll for the target element after route change ──────
   const goToStep = useCallback((newStep) => {
     const s = STEPS[newStep];
     setStep(newStep);
 
+    // Clear any existing poll
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+
     if (s.navigate) {
       setNavigating(true);
       navigate(s.navigate);
-      // Give the page 600 ms to mount its DOM before spotlighting
-      setTimeout(() => setNavigating(false), 600);
+    }
+
+    if (s.targetId) {
+      // Poll every 100ms until the target element appears in the DOM (max 3s / 30 attempts)
+      let attempts = 0;
+      pollRef.current = setInterval(() => {
+        attempts++;
+        const el = document.getElementById(s.targetId);
+        if (el || attempts >= 30) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setNavigating(false);
+          // Re-run position after a single rAF to let React flush any pending renders
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setStep(prev => prev); // trigger position useEffect
+            });
+          });
+        }
+      }, 100);
+    } else {
+      // No target (center card) — short delay is fine
+      setTimeout(() => setNavigating(false), 300);
     }
   }, [navigate]);
 
@@ -264,6 +299,10 @@ const CoachMark = ({ open, onClose, userId }) => {
 
   const skip = () => {
     setActive(false);
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
     localStorage.setItem(storageKey, '1');
     onClose?.();
   };
@@ -291,13 +330,13 @@ const CoachMark = ({ open, onClose, userId }) => {
   };
 
   // ── Phase label helpers ────────────────────────────────────────────────────
-  const tourSteps    = STEPS.filter(s => s.phase === 'tour').length;
-  const currentStep  = STEPS[step];
-  const phaseLabel   = currentStep?.phase === 'onboard' ? 'Setup' : 'Tour';
-  const phaseStep    = currentStep?.phase === 'onboard'
+  const tourSteps   = STEPS.filter(s => s.phase === 'tour').length;
+  const currentStep = STEPS[step];
+  const phaseLabel  = currentStep?.phase === 'onboard' ? 'Setup' : 'Tour';
+  const phaseStep   = currentStep?.phase === 'onboard'
     ? step - tourSteps + 1
     : step + 1;
-  const phaseTotal   = currentStep?.phase === 'onboard'
+  const phaseTotal  = currentStep?.phase === 'onboard'
     ? STEPS.length - tourSteps
     : tourSteps;
 
