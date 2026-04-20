@@ -10,6 +10,7 @@ const UserLayout = () => {
   const [allowed, setAllowed] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
+  const userId = localStorage.getItem('userId') || localStorage.getItem('username');
 
   useEffect(() => {
     const role = localStorage.getItem("role");
@@ -109,7 +110,7 @@ const UserLayout = () => {
       </div>
 
       {/* ✅ CoachMark — auto-launches once on first login */}
-      <CoachMark autoLaunch={true} />
+      <CoachMark userId={userId} />
     </div>
   );
 };
