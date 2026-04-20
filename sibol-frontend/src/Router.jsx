@@ -41,7 +41,11 @@ const router = createBrowserRouter ([
         {
             path: "/guest/sign_up",
             element: <Register/>
-        }
+        },
+        {
+            path:"/guest/forgot-pass",
+            elementL: ""
+        },
      ]
     },
     {
