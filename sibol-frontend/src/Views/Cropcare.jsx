@@ -76,7 +76,11 @@ const Cropcare = () => {
     if (!form.garden_name || !form.location) { setError('All fields are required!'); return; }
     setLoading(true);
     try {
-      await axiosClient.post('/addGarden', form);
+      const res = await axiosClient.post('/addGarden', form);
+      const newId = res.data?.id || res.data?.garden_id;
+      if (newId) {
+        window.dispatchEvent(new CustomEvent('sibol:garden-created', { detail: { id: newId } }));
+      }
       setForm({ garden_name: '', location: '' });
       setModalOpen(false);
       fetchGarden();
@@ -84,6 +88,8 @@ const Cropcare = () => {
       const msg = err.response?.data?.message || err.message || 'Failed to add garden';
       setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally { setLoading(false); }
+
+
   };
 
   const deleteGarden = async () => {
