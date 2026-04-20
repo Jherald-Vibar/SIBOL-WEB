@@ -95,7 +95,7 @@ const STEPS = [
   },
   {
     phase: 'onboard',
-    navigate: '/user/crop-care/',
+    navigate: '/user/crop-profile',
     targetId: 'coach-add-crop-btn',
     title: <>Add your first <em className="text-[#f0a830]">Crop</em></>,
     body: 'Inside your garden, add a crop. Choose the plant type and planted date — SIBOL will start monitoring it right away.',
