@@ -10,7 +10,7 @@ import {
   Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
-import CoachMark from '../components/CoachMark';
+
 
 const SectionPill = ({ label }) => (
   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[#2e8b57]/20 bg-[#2e8b57]/[0.07] text-[10px] font-semibold tracking-[1.5px] uppercase text-[#2e8b57] mb-3.5">
@@ -152,8 +152,7 @@ const UserDashboard = () => {
         * { box-sizing: border-box; }
       `}</style>
 
-      {/* CoachMark — per-user key via userId */}
-      <CoachMark userId={userId} />
+
 
       {/* ── Page header ── */}
       <div className="w-full px-6 md:px-10 pt-9">
