@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // ─── Step definitions ──────────────────────────────────────────────────────────
 const STEPS = [
-  // ── Phase 1: Tour ─────────────────────────────────────────────────────────
   {
     phase: 'tour',
     navigate: '/user/dashboard',
@@ -100,7 +99,7 @@ const STEPS = [
     navigate: '/user/crop-care',
     targetId: 'coach-add-garden-btn',
     title: <>Create your first <em className="text-[#f0a830]">Garden</em></>,
-    body: 'Tap "Create Garden" below to open the form. Fill in a name and location, then save — we\'ll guide you right in!',
+    body: "Tap \"Create Garden\" below to open the form. Fill in a name and location, then save — we'll guide you right in!",
     placement: 'bottom',
     cta: 'Create Garden →',
   },
@@ -149,7 +148,7 @@ function resolveTargetId(step, gardenId) {
   return step.targetId || null;
 }
 
-function pollForElement(id, onFound, maxMs = 4000) {
+function pollForElement(id, onFound, maxMs = 5000) {
   const interval = 100;
   let elapsed = 0;
   const timer = setInterval(() => {
@@ -165,6 +164,7 @@ function pollForElement(id, onFound, maxMs = 4000) {
 const CoachMark = ({ open, onClose, userId }) => {
   const storageKey = userId ? `sibol_toured_${userId}` : 'sibol_toured';
   const navigate   = useNavigate();
+  const location   = useLocation(); // ← track current route
 
   const [active,           setActive]           = useState(false);
   const [step,             setStep]             = useState(0);
@@ -175,23 +175,22 @@ const CoachMark = ({ open, onClose, userId }) => {
   const [cardPos,          setCardPos]          = useState({ top: 0, left: 0, width: 272 });
   const [arrowPos,         setArrowPos]         = useState({ side: 'top', offset: 0 });
 
-  const createdGardenIdRef = useRef(null);
+  const createdGardenIdRef   = useRef(null);
   const [createdGardenId, _setCreatedGardenId] = useState(null);
-  const setCreatedGardenId = useCallback((id) => {
+  const setCreatedGardenId   = useCallback((id) => {
     createdGardenIdRef.current = id;
     _setCreatedGardenId(id);
   }, []);
 
-  const cancelPollRef        = useRef(null);
-  const rafRef               = useRef(null);
-  const waitingForGardenRef  = useRef(false);
+  const cancelPollRef       = useRef(null);
+  const rafRef              = useRef(null);
+  const waitingForGardenRef = useRef(false);
 
   // ── Auto-launch (first visit) ───────────────────────────────────────────────
   useEffect(() => {
     if (open === undefined && !localStorage.getItem(storageKey)) {
       const t = setTimeout(() => {
         setActive(true);
-        // Always start tour from dashboard so step 0 targets are present
         navigate('/user/dashboard');
       }, 1000);
       return () => clearTimeout(t);
@@ -308,32 +307,44 @@ const CoachMark = ({ open, onClose, userId }) => {
 
     const doPosition = () => {
       setNavigating(false);
-      requestAnimationFrame(() => requestAnimationFrame(() => position(gId)));
+      // Extra frames to let NavLink active-state styles settle before measuring
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => position(gId))
+        )
+      );
     };
 
-    if (s.navigate) {
+    // ── KEY FIX: only navigate if we're not already on the target route ──
+    const alreadyThere = s.navigate
+      ? location.pathname === s.navigate
+      : true;
+
+    if (s.navigate && !alreadyThere) {
       setNavigating(true);
       navigate(s.navigate);
     }
 
     if (targetId) {
-      cancelPollRef.current = pollForElement(
-        targetId,
-        (el) => {
-          if (el) doPosition();
-          else    setNavigating(false);
-        },
-        5000,
-      );
+      // If already on the right page, add a short delay so the DOM fully
+      // settles (NavLink active styles, layout shifts) before measuring.
+      const delay = alreadyThere ? 150 : 0;
+      setTimeout(() => {
+        cancelPollRef.current = pollForElement(
+          targetId,
+          (el) => {
+            if (el) doPosition();
+            else    setNavigating(false);
+          },
+          5000,
+        );
+      }, delay);
     } else {
-      setTimeout(doPosition, s.navigate ? 400 : 0);
+      setTimeout(doPosition, s.navigate && !alreadyThere ? 400 : 0);
     }
-  }, [navigate, position]);
+  }, [navigate, position, location.pathname]);
 
   // ── Garden-created event ─────────────────────────────────────────────────────
-  // Listener is mounted once. Uses a ref to gate whether it should act,
-  // eliminating the race condition where btn.click() fires before the
-  // effect would re-run with waitingForGarden=true.
   useEffect(() => {
     waitingForGardenRef.current = waitingForGarden;
   }, [waitingForGarden]);
@@ -373,12 +384,9 @@ const CoachMark = ({ open, onClose, userId }) => {
 
   // ── Next / prev ──────────────────────────────────────────────────────────────
   const next = useCallback(() => {
-    // Step 11 — click "New Garden" btn, then WAIT for sibol:garden-created
     if (step === GARDEN_STEP_IDX) {
       const btn = document.getElementById('coach-add-garden-btn');
       if (btn) {
-        // Set ref synchronously BEFORE btn.click() so the always-mounted
-        // listener sees it immediately without waiting for a state flush
         waitingForGardenRef.current = true;
         setWaitingForGarden(true);
         btn.click();
@@ -386,8 +394,6 @@ const CoachMark = ({ open, onClose, userId }) => {
       return;
     }
 
-    // Step 12 — click the open-garden button; goToStep handles navigation to
-    // crop-profile (step 13). Don't double-navigate.
     if (step === GARDEN_OPEN_STEP_IDX) {
       const targetId = createdGardenIdRef.current
         ? `coach-open-garden-${createdGardenIdRef.current}`
@@ -412,7 +418,7 @@ const CoachMark = ({ open, onClose, userId }) => {
   const arrowStyle = () => {
     if (arrowPos.side === 'none') return { display: 'none' };
     const base = { position: 'absolute', width: 0, height: 0, pointerEvents: 'none' };
-    const c = '#ffffff';
+    const c    = '#ffffff';
     switch (arrowPos.side) {
       case 'left':
         return { ...base, top: arrowPos.offset, left: -ARROW, borderTop: `${ARROW}px solid transparent`, borderBottom: `${ARROW}px solid transparent`, borderRight: `${ARROW}px solid ${c}` };
@@ -518,7 +524,6 @@ const CoachMark = ({ open, onClose, userId }) => {
 
               {/* Footer */}
               <div className="flex items-center justify-between">
-                {/* Dot progress */}
                 <div className="flex gap-1">
                   {STEPS.map((s, i) => (
                     <div
