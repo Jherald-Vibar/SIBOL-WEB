@@ -586,11 +586,11 @@ const CropCareConfig = () => {
   const [deleteModal,    setDeleteModal]    = useState(null);
   const [removeEspModal, setRemoveEspModal] = useState(null);
 
-  // ── Track whether this page was opened during onboarding ──────────────────
-  // We detect the CoachMark's "waiting for crop" state via a custom event.
+  // ── Track whether CoachMark is waiting for the crop to be saved ───────────
   const waitingForCropRef = useRef(false);
 
   useEffect(() => {
+    // CoachMark fires this when it clicks the Claim Device button on the user's behalf
     const onWait = () => { waitingForCropRef.current = true; };
     window.addEventListener('sibol:waiting-for-crop', onWait);
     return () => window.removeEventListener('sibol:waiting-for-crop', onWait);
@@ -642,16 +642,23 @@ const CropCareConfig = () => {
         });
         const newCrop = res.data.data;
 
-        // 2. Claim & link the device
-        await axiosClient.post(`/claimDevice/${garden_id}`, {
+        // 2. Claim & link the device; get back the ESP record so we have its serial_number
+        const claimRes = await axiosClient.post(`/claimDevice/${garden_id}`, {
           "esp-number": form.espId,
           "crop_id":    newCrop.id,
         });
 
-        // 3. Refresh list
+        // 3. Resolve the ESP serial — prefer the API response, fall back to what the user typed
+        const espSerial =
+          claimRes?.data?.data?.serial_number ||
+          claimRes?.data?.serial_number       ||
+          form.espId;
+
+        // 4. Refresh crop list
         await fetchCrops();
 
-        // ── FIX: notify CoachMark that a crop was added so it can advance ──
+        // 5. If CoachMark is waiting, fire sibol:crop-added with everything needed for the URL
+        //    URL shape: /user/crop-care/:garden_id/:crop_id/:esp_serial
         if (waitingForCropRef.current) {
           waitingForCropRef.current = false;
           window.dispatchEvent(
@@ -659,7 +666,7 @@ const CropCareConfig = () => {
               detail: {
                 cropId:   newCrop.id,
                 gardenId: garden_id,
-                espId:    form.espId,
+                espId:    espSerial,   // serial_number string, NOT the numeric DB id
               },
             })
           );
@@ -731,7 +738,6 @@ const CropCareConfig = () => {
             <p className="text-sm text-gray-500 mt-1">Each crop is paired with its own monitoring device.</p>
           </div>
 
-          {/* ── coach-add-crop-btn id added here ── */}
           <button
             id="coach-add-crop-btn"
             onClick={() => setCropModal({ mode: 'add', crop: null })}

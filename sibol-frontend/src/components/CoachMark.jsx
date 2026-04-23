@@ -117,7 +117,7 @@ const STEPS = [
     navigate: null,               // navigation is handled dynamically by goToStep
     targetId: 'coach-add-crop-btn',
     title: <>Claim your <em className="text-[#f0a830]">Device</em></>,
-    body: 'Tap "Claim Device" to link your IoT sensor and add your first crop. Fill in the device ID and crop details.',
+    body: 'Tap "Claim Device" to link your IoT sensor and add your first crop. Fill in the device ID and crop details, then save.',
     placement: 'bottom',
     cta: 'Claim Device →',
   },
@@ -134,6 +134,7 @@ const STEPS = [
 
 const GARDEN_STEP_IDX      = 11;
 const GARDEN_OPEN_STEP_IDX = 12;
+const CLAIM_DEVICE_STEP_IDX = 13; // the "Claim your Device" step
 const PAD   = 10;
 const GAP   = 16;
 const ARROW = 10;
@@ -181,6 +182,8 @@ const CoachMark = ({ open, onClose, userId }) => {
   const [done,             setDone]             = useState(false);
   const [navigating,       setNavigating]       = useState(false);
   const [waitingForGarden, setWaitingForGarden] = useState(false);
+  // NEW: waiting for the user to fill in and save the crop/device modal
+  const [waitingForCrop,   setWaitingForCrop]   = useState(false);
   const [spotStyle,        setSpotStyle]        = useState({});
   const [cardPos,          setCardPos]          = useState({ top: 0, left: 0, width: 272 });
   const [arrowPos,         setArrowPos]         = useState({ side: 'top', offset: 0 });
@@ -195,8 +198,7 @@ const CoachMark = ({ open, onClose, userId }) => {
   const cancelPollRef       = useRef(null);
   const rafRef              = useRef(null);
   const waitingForGardenRef = useRef(false);
-  // ─── FIX: track when goToStep's own rAF chain is running so the
-  //         resize/scroll effect doesn't race against it ───────────────────────
+  const waitingForCropRef   = useRef(false);
   const isPositioningRef    = useRef(false);
 
   // ── Auto-launch (first visit) ───────────────────────────────────────────────
@@ -221,17 +223,8 @@ const CoachMark = ({ open, onClose, userId }) => {
     cancelAnimationFrame(rafRef.current);
   }, []);
 
-  // ─── FIX: Accept explicit stepOverride so callers can pass the *new* step
-  //         index before React has re-rendered — eliminates the stale-closure
-  //         problem that caused the spotlight to jump back to the previous target.
   const position = useCallback((gardenIdOverride, stepOverride) => {
-    // Use the explicitly provided step index when available; fall back to the
-    // current state value for resize/scroll re-positioning calls.
     const stepIndex = stepOverride !== undefined ? stepOverride : null;
-
-    // We need the STEPS entry: use stepOverride if given, otherwise read
-    // the step state directly from the DOM-time closure.  Because `position`
-    // is only called synchronously (via rAF) we capture `step` as a ref below.
     const s        = STEPS[stepIndex !== null ? stepIndex : step];
     const gardenId = gardenIdOverride !== undefined ? gardenIdOverride : createdGardenIdRef.current;
     const targetId = resolveTargetId(s, gardenId);
@@ -253,8 +246,6 @@ const CoachMark = ({ open, onClose, userId }) => {
     if (!el) return;
 
     const tr = el.getBoundingClientRect();
-
-    // Guard: element not yet painted
     if (tr.width === 0 && tr.height === 0) return;
 
     setSpotStyle({
@@ -301,18 +292,14 @@ const CoachMark = ({ open, onClose, userId }) => {
     setArrowPos({ side, offset: arrowOffset });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
-  // NOTE: `step` stays in the dep array so the resize/scroll path (which does
-  // NOT pass stepOverride) still reads the correct current step.
 
   // ── Re-position on resize / scroll ──────────────────────────────────────────
   useEffect(() => {
-    if (!active || navigating || waitingForGarden) return;
+    if (!active || navigating || waitingForGarden || waitingForCrop) return;
 
-    // Initial position (no override needed — step state is already current)
     position();
 
     const onLayout = () => {
-      // ─── FIX: Don't race against goToStep's own rAF chain ────────────────
       if (isPositioningRef.current) return;
       cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => position());
@@ -324,7 +311,7 @@ const CoachMark = ({ open, onClose, userId }) => {
       window.removeEventListener('scroll', onLayout, true);
       cancelAnimationFrame(rafRef.current);
     };
-  }, [active, step, position, navigating, waitingForGarden]);
+  }, [active, step, position, navigating, waitingForGarden, waitingForCrop]);
 
   // ── Navigate then poll for target element ────────────────────────────────────
   const goToStep = useCallback((newStep, gardenIdOverride) => {
@@ -337,16 +324,11 @@ const CoachMark = ({ open, onClose, userId }) => {
     cancelPollRef.current?.();
     cancelPollRef.current = null;
 
-    // Update step state so the UI card renders immediately with the new content
     setStep(newStep);
 
-    // ─── FIX: pass newStep explicitly into position() so it uses the correct
-    //         STEPS entry before React has committed the setStep re-render ───
     const doPosition = () => {
       setNavigating(false);
       isPositioningRef.current = true;
-      // Three rAF frames: 1st lets React flush state, 2nd lets browser paint,
-      // 3rd lets CSS transitions (sidebar width, NavLink active styles) settle
       requestAnimationFrame(() =>
         requestAnimationFrame(() =>
           requestAnimationFrame(() => {
@@ -357,7 +339,6 @@ const CoachMark = ({ open, onClose, userId }) => {
       );
     };
 
-    // ─── Resolve destination: step 13 (Add Crop) goes into the actual garden ──
     let destinationPath = s.navigate ?? null;
     if (newStep === GARDEN_OPEN_STEP_IDX + 1 && gId) {
       destinationPath = `/user/crop-care/${encodeURIComponent(gId)}`;
@@ -395,25 +376,54 @@ const CoachMark = ({ open, onClose, userId }) => {
   }, [waitingForGarden]);
 
   useEffect(() => {
+    waitingForCropRef.current = waitingForCrop;
+  }, [waitingForCrop]);
+
+  useEffect(() => {
     const handler = (e) => {
       if (!waitingForGardenRef.current) return;
       const id = e.detail?.id ?? null;
       setCreatedGardenId(id);
       setWaitingForGarden(false);
       waitingForGardenRef.current = false;
-      // Give React time to re-render the garden card with the open button
       setTimeout(() => goToStep(GARDEN_OPEN_STEP_IDX, id), 800);
     };
     window.addEventListener('sibol:garden-created', handler);
     return () => window.removeEventListener('sibol:garden-created', handler);
   }, [goToStep, setCreatedGardenId]);
 
+  // ── NEW: Crop-added event — navigate to the sensor detail page ───────────────
+  useEffect(() => {
+    const handler = (e) => {
+      if (!waitingForCropRef.current) return;
+
+      const { cropId, gardenId, espId } = e.detail ?? {};
+      setWaitingForCrop(false);
+      waitingForCropRef.current = false;
+
+      // Build the sensor-detail URL and navigate there
+      if (gardenId && cropId && espId) {
+        const path = `/user/crop-care/${encodeURIComponent(gardenId)}/${encodeURIComponent(cropId)}/${encodeURIComponent(espId)}`;
+        navigate(path);
+        // After navigation settles, advance to the next coach step (Account Settings)
+        setTimeout(() => goToStep(CLAIM_DEVICE_STEP_IDX + 1), 600);
+      } else {
+        // Fallback: just advance
+        goToStep(CLAIM_DEVICE_STEP_IDX + 1);
+      }
+    };
+    window.addEventListener('sibol:crop-added', handler);
+    return () => window.removeEventListener('sibol:crop-added', handler);
+  }, [goToStep, navigate]);
+
   // ── Finish / skip ────────────────────────────────────────────────────────────
   const finish = useCallback(() => {
     setActive(false);
     setDone(true);
     setWaitingForGarden(false);
+    setWaitingForCrop(false);
     waitingForGardenRef.current = false;
+    waitingForCropRef.current   = false;
     cancelPollRef.current?.();
     localStorage.setItem(storageKey, '1');
     onClose?.();
@@ -422,7 +432,9 @@ const CoachMark = ({ open, onClose, userId }) => {
   const skip = useCallback(() => {
     setActive(false);
     setWaitingForGarden(false);
+    setWaitingForCrop(false);
     waitingForGardenRef.current = false;
+    waitingForCropRef.current   = false;
     cancelPollRef.current?.();
     localStorage.setItem(storageKey, '1');
     onClose?.();
@@ -430,6 +442,7 @@ const CoachMark = ({ open, onClose, userId }) => {
 
   // ── Next / prev ──────────────────────────────────────────────────────────────
   const next = useCallback(() => {
+    // Step 11: Create Garden — click the garden button and wait for sibol:garden-created
     if (step === GARDEN_STEP_IDX) {
       const btn = document.getElementById('coach-add-garden-btn');
       if (btn) {
@@ -440,13 +453,12 @@ const CoachMark = ({ open, onClose, userId }) => {
       return;
     }
 
+    // Step 12: Open Garden — navigate into the garden, then advance
     if (step === GARDEN_OPEN_STEP_IDX) {
       const gardenId = createdGardenIdRef.current;
       if (gardenId) {
-        // Navigate directly — same as clicking the open button
         navigate(`/user/crop-care/${encodeURIComponent(gardenId)}`);
       }
-      // Advance to the next coach step after navigation settles
       setTimeout(() => {
         if (step < STEPS.length - 1) goToStep(step + 1);
         else finish();
@@ -454,9 +466,21 @@ const CoachMark = ({ open, onClose, userId }) => {
       return;
     }
 
+    // Step 13: Claim Device — click the "Claim Device" button to open the modal,
+    // then wait for sibol:crop-added before advancing
+    if (step === CLAIM_DEVICE_STEP_IDX) {
+      const btn = document.getElementById('coach-add-crop-btn');
+      if (btn) {
+        waitingForCropRef.current = true;
+        setWaitingForCrop(true);
+        btn.click(); // opens the CropModal in CropCareConfig
+      }
+      return;
+    }
+
     if (step < STEPS.length - 1) goToStep(step + 1);
     else finish();
-  }, [step, goToStep, finish]);
+  }, [step, goToStep, finish, navigate]);
 
   const prev = useCallback(() => {
     if (step > 0) goToStep(step - 1);
@@ -488,13 +512,16 @@ const CoachMark = ({ open, onClose, userId }) => {
 
   if (!active && !done) return null;
 
+  // Whether to render the overlay as pointer-events-none (user needs to interact with the page)
+  const isWaiting = waitingForGarden || waitingForCrop;
+
   return (
     <>
       {active && (
-        <div className={`fixed inset-0 z-[10000] overflow-hidden${waitingForGarden ? ' pointer-events-none' : ''}`}>
+        <div className={`fixed inset-0 z-[10000] overflow-hidden${isWaiting ? ' pointer-events-none' : ''}`}>
 
           {/* ── Overlay + spotlight cutout ── */}
-          {!waitingForGarden && (
+          {!isWaiting && (
             <>
               {currentStep?.targetId && currentStep.placement !== 'center' ? (
                 <div
@@ -537,8 +564,19 @@ const CoachMark = ({ open, onClose, userId }) => {
             </div>
           )}
 
+          {/* ── "Waiting for crop" pill ── */}
+          {waitingForCrop && step === CLAIM_DEVICE_STEP_IDX && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[10002] flex items-center gap-3 bg-[#0b3d1e] text-white px-5 py-3 rounded-full shadow-2xl text-sm font-medium select-none pointer-events-none">
+              <svg className="animate-spin shrink-0" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              Enter your device ID and crop details, then tap{' '}
+              <strong className="text-[#f0a830]">Save Crop</strong> to continue…
+            </div>
+          )}
+
           {/* ── Tooltip card ── */}
-          {!waitingForGarden && (
+          {!isWaiting && (
             <div
               className="fixed bg-white rounded-2xl p-6 shadow-2xl transition-all duration-400"
               style={{
