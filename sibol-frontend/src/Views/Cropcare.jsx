@@ -44,9 +44,9 @@ const Cropcare = () => {
       },
       (err) => {
         const msgs = {
-          [err.PERMISSION_DENIED]:   'Location access denied.',
+          [err.PERMISSION_DENIED]:    'Location access denied.',
           [err.POSITION_UNAVAILABLE]: 'Location information unavailable.',
-          [err.TIMEOUT]:             'Location request timed out.',
+          [err.TIMEOUT]:              'Location request timed out.',
         };
         setError(msgs[err.code] || 'An unknown error occurred.');
         setLocationLoading(false);
@@ -77,10 +77,24 @@ const Cropcare = () => {
     setLoading(true);
     try {
       const res = await axiosClient.post('/addGarden', form);
-      const newId = res.data?.id || res.data?.garden_id;
-      if (newId) {
-        window.dispatchEvent(new CustomEvent('sibol:garden-created', { detail: { id: newId } }));
-      }
+
+      // ── FIX: exhaustively check every common shape your API might return ──
+      // Log the raw response so you can confirm the correct key in DevTools
+      console.log('[addGarden] API response:', res.data);
+
+      const newId =
+        res.data?.id          ||   // { id: 5 }
+        res.data?.garden_id   ||   // { garden_id: 5 }
+        res.data?.data?.id    ||   // { data: { id: 5 } }
+        res.data?.data?.garden_id || // { data: { garden_id: 5 } }
+        res.data?.garden?.id  ||   // { garden: { id: 5 } }
+        null;
+
+      // Always dispatch — CoachMark has a DOM fallback if newId is null
+      window.dispatchEvent(
+        new CustomEvent('sibol:garden-created', { detail: { id: newId } })
+      );
+
       setForm({ garden_name: '', location: '' });
       setModalOpen(false);
       fetchGarden();
@@ -88,8 +102,6 @@ const Cropcare = () => {
       const msg = err.response?.data?.message || err.message || 'Failed to add garden';
       setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally { setLoading(false); }
-
-
   };
 
   const deleteGarden = async () => {
