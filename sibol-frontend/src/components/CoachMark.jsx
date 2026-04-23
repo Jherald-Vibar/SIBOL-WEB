@@ -392,29 +392,40 @@ const CoachMark = ({ open, onClose, userId }) => {
     return () => window.removeEventListener('sibol:garden-created', handler);
   }, [goToStep, setCreatedGardenId]);
 
-  // ── NEW: Crop-added event — navigate to the sensor detail page ───────────────
+  // ── Crop-added event — navigate to sensor detail page then show done modal ──
   useEffect(() => {
     const handler = (e) => {
+      // Guard: only act when we triggered this flow
       if (!waitingForCropRef.current) return;
 
       const { cropId, gardenId, espId } = e.detail ?? {};
       setWaitingForCrop(false);
       waitingForCropRef.current = false;
 
-      // Build the sensor-detail URL and navigate there
       if (gardenId && cropId && espId) {
+        // Navigate to the sensor detail page first, THEN finish the tour
         const path = `/user/crop-care/${encodeURIComponent(gardenId)}/${encodeURIComponent(cropId)}/${encodeURIComponent(espId)}`;
         navigate(path);
-        // After navigation settles, advance to the next coach step (Account Settings)
-        setTimeout(() => goToStep(CLAIM_DEVICE_STEP_IDX + 1), 600);
+        // Small delay so the page renders before the done modal appears
+        setTimeout(() => {
+          setActive(false);
+          setDone(true);
+          cancelPollRef.current?.();
+          localStorage.setItem(storageKey, '1');
+          onClose?.();
+        }, 500);
       } else {
-        // Fallback: just advance
-        goToStep(CLAIM_DEVICE_STEP_IDX + 1);
+        // Fallback if detail IDs are missing — just finish in place
+        setActive(false);
+        setDone(true);
+        cancelPollRef.current?.();
+        localStorage.setItem(storageKey, '1');
+        onClose?.();
       }
     };
     window.addEventListener('sibol:crop-added', handler);
     return () => window.removeEventListener('sibol:crop-added', handler);
-  }, [goToStep, navigate]);
+  }, [navigate, storageKey, onClose]);
 
   // ── Finish / skip ────────────────────────────────────────────────────────────
   const finish = useCallback(() => {
