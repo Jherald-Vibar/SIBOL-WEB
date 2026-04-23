@@ -148,12 +148,25 @@ function resolveTargetId(step, gardenId) {
   return step.targetId || null;
 }
 
+/**
+ * Poll until an element with `id` exists AND has a non-zero bounding rect
+ * (guards against elements that are in the DOM but not yet painted/laid out).
+ */
 function pollForElement(id, onFound, maxMs = 5000) {
   const interval = 100;
   let elapsed = 0;
   const timer = setInterval(() => {
     const el = document.getElementById(id);
-    if (el) { clearInterval(timer); onFound(el); return; }
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      // Only accept if the element has real dimensions — zero rect means
+      // it's in the DOM but not yet painted (e.g. hidden md:flex not resolved)
+      if (rect.width > 0 && rect.height > 0) {
+        clearInterval(timer);
+        onFound(el);
+        return;
+      }
+    }
     elapsed += interval;
     if (elapsed >= maxMs) { clearInterval(timer); onFound(null); }
   }, interval);
@@ -164,7 +177,7 @@ function pollForElement(id, onFound, maxMs = 5000) {
 const CoachMark = ({ open, onClose, userId }) => {
   const storageKey = userId ? `sibol_toured_${userId}` : 'sibol_toured';
   const navigate   = useNavigate();
-  const location   = useLocation(); // ← track current route
+  const location   = useLocation();
 
   const [active,           setActive]           = useState(false);
   const [step,             setStep]             = useState(0);
@@ -175,9 +188,9 @@ const CoachMark = ({ open, onClose, userId }) => {
   const [cardPos,          setCardPos]          = useState({ top: 0, left: 0, width: 272 });
   const [arrowPos,         setArrowPos]         = useState({ side: 'top', offset: 0 });
 
-  const createdGardenIdRef   = useRef(null);
+  const createdGardenIdRef  = useRef(null);
   const [createdGardenId, _setCreatedGardenId] = useState(null);
-  const setCreatedGardenId   = useCallback((id) => {
+  const setCreatedGardenId  = useCallback((id) => {
     createdGardenIdRef.current = id;
     _setCreatedGardenId(id);
   }, []);
@@ -231,6 +244,11 @@ const CoachMark = ({ open, onClose, userId }) => {
     if (!el) return;
 
     const tr = el.getBoundingClientRect();
+
+    // Guard: if rect is still zero the element hasn't painted yet — bail and
+    // let the resize/scroll effect retry on the next animation frame
+    if (tr.width === 0 && tr.height === 0) return;
+
     setSpotStyle({
       top:    tr.top  - PAD,
       left:   tr.left - PAD,
@@ -307,7 +325,8 @@ const CoachMark = ({ open, onClose, userId }) => {
 
     const doPosition = () => {
       setNavigating(false);
-      // Extra frames to let NavLink active-state styles settle before measuring
+      // Three rAF frames: 1st lets React flush state, 2nd lets browser paint,
+      // 3rd lets CSS transitions (sidebar width, NavLink active styles) settle
       requestAnimationFrame(() =>
         requestAnimationFrame(() =>
           requestAnimationFrame(() => position(gId))
@@ -315,7 +334,6 @@ const CoachMark = ({ open, onClose, userId }) => {
       );
     };
 
-    // ── KEY FIX: only navigate if we're not already on the target route ──
     const alreadyThere = s.navigate
       ? location.pathname === s.navigate
       : true;
@@ -326,9 +344,10 @@ const CoachMark = ({ open, onClose, userId }) => {
     }
 
     if (targetId) {
-      // If already on the right page, add a short delay so the DOM fully
-      // settles (NavLink active styles, layout shifts) before measuring.
-      const delay = alreadyThere ? 150 : 0;
+      // When already on the right page: wait 200ms for any CSS transitions
+      // to finish, THEN start polling — this prevents grabbing a zero rect
+      // from an element that's mid-transition or not yet painted
+      const delay = alreadyThere ? 200 : 0;
       setTimeout(() => {
         cancelPollRef.current = pollForElement(
           targetId,
