@@ -121,30 +121,49 @@ const STEPS = [
     placement: 'bottom',
     cta: 'Claim Device →',
   },
+  // step 14 — spotlight the new crop card after claiming
   {
     phase: 'onboard',
-    navigate: '/user/account-settings',
-    targetId: 'coach-claim-device-btn',
-    title: <>Account <em className="text-[#f0a830]">Settings</em></>,
-    body: 'Finally, update your profile and manage your account settings here.',
-    placement: 'bottom',
-    cta: 'Finish Setup →',
+    navigate: null,
+    targetId: '__CROP_CARD__',          // resolved dynamically to coach-crop-card-{cropId}
+    title: <>Your Crop is <em className="text-[#f0a830]">Ready!</em></>,
+    body: "Your device is linked and your crop is now being monitored. This is your crop card — it shows the device status and quick actions.",
+    placement: 'top',
+    cta: 'Next →',
+  },
+  // step 15 — spotlight the View (sensor detail) button
+  {
+    phase: 'onboard',
+    navigate: null,
+    targetId: '__CROP_VIEW_BTN__',      // resolved dynamically to coach-view-btn-{cropId}
+    title: <>View <em className="text-[#f0a830]">Sensor Data</em></>,
+    body: 'Tap the view button to open the live sensor dashboard for this crop. You can monitor soil, air, and nutrient readings in real time.',
+    placement: 'top',
+    cta: 'Go to Sensor Data →',
   },
 ];
 
-const GARDEN_STEP_IDX      = 11;
-const GARDEN_OPEN_STEP_IDX = 12;
-const CLAIM_DEVICE_STEP_IDX = 13; // the "Claim your Device" step
+const GARDEN_STEP_IDX        = 11;
+const GARDEN_OPEN_STEP_IDX   = 12;
+const CLAIM_DEVICE_STEP_IDX  = 13; // "Claim your Device"
+const CROP_CARD_STEP_IDX     = 14; // spotlight crop card
+const CROP_VIEW_BTN_STEP_IDX = 15; // spotlight view button → navigate on next
 const PAD   = 10;
 const GAP   = 16;
 const ARROW = 10;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function resolveTargetId(step, gardenId) {
+function resolveTargetId(step, gardenId, cropId) {
   if (!step) return null;
   if (step.targetId === '__GARDEN_OPEN__') {
     return gardenId ? `coach-open-garden-${gardenId}` : null;
+  }
+  if (step.targetId === '__CROP_CARD__') {
+    return cropId ? `coach-crop-card-${cropId}` : null;
+  }
+  if (step.targetId === '__CROP_VIEW_BTN__') {
+    return cropId ? `coach-view-btn-${cropId}` : null;
   }
   return step.targetId || null;
 }
@@ -195,6 +214,10 @@ const CoachMark = ({ open, onClose, userId }) => {
     _setCreatedGardenId(id);
   }, []);
 
+  // Track newly created crop + ESP so we can spotlight the card and navigate
+  const createdCropIdRef    = useRef(null);
+  const createdEspSerialRef = useRef(null);
+
   const cancelPollRef       = useRef(null);
   const rafRef              = useRef(null);
   const waitingForGardenRef = useRef(false);
@@ -227,7 +250,8 @@ const CoachMark = ({ open, onClose, userId }) => {
     const stepIndex = stepOverride !== undefined ? stepOverride : null;
     const s        = STEPS[stepIndex !== null ? stepIndex : step];
     const gardenId = gardenIdOverride !== undefined ? gardenIdOverride : createdGardenIdRef.current;
-    const targetId = resolveTargetId(s, gardenId);
+    const cropId   = createdCropIdRef.current;
+    const targetId = resolveTargetId(s, gardenId, cropId);
 
     if (!targetId || s.placement === 'center') {
       const CW = 320, CH = 210;
@@ -319,7 +343,8 @@ const CoachMark = ({ open, onClose, userId }) => {
     if (!s) return;
 
     const gId      = gardenIdOverride !== undefined ? gardenIdOverride : createdGardenIdRef.current;
-    const targetId = resolveTargetId(s, gId);
+    const cropId   = createdCropIdRef.current;
+    const targetId = resolveTargetId(s, gId, cropId);
 
     cancelPollRef.current?.();
     cancelPollRef.current = null;
@@ -392,40 +417,27 @@ const CoachMark = ({ open, onClose, userId }) => {
     return () => window.removeEventListener('sibol:garden-created', handler);
   }, [goToStep, setCreatedGardenId]);
 
-  // ── Crop-added event — navigate to sensor detail page then show done modal ──
+  // ── Crop-added event — spotlight the new crop card (step 14) ───────────────
   useEffect(() => {
     const handler = (e) => {
-      // Guard: only act when we triggered this flow
       if (!waitingForCropRef.current) return;
 
       const { cropId, gardenId, espId } = e.detail ?? {};
       setWaitingForCrop(false);
       waitingForCropRef.current = false;
 
-      if (gardenId && cropId && espId) {
-        // Navigate to the sensor detail page first, THEN finish the tour
-        const path = `/user/crop-care/${encodeURIComponent(gardenId)}/${encodeURIComponent(cropId)}/${encodeURIComponent(espId)}`;
-        navigate(path);
-        // Small delay so the page renders before the done modal appears
-        setTimeout(() => {
-          setActive(false);
-          setDone(true);
-          cancelPollRef.current?.();
-          localStorage.setItem(storageKey, '1');
-          onClose?.();
-        }, 500);
-      } else {
-        // Fallback if detail IDs are missing — just finish in place
-        setActive(false);
-        setDone(true);
-        cancelPollRef.current?.();
-        localStorage.setItem(storageKey, '1');
-        onClose?.();
-      }
+      // Store for use by position() and the final navigate
+      createdCropIdRef.current    = cropId  ?? null;
+      createdEspSerialRef.current = espId   ?? null;
+      // Also make sure gardenId ref is current
+      if (gardenId) createdGardenIdRef.current = gardenId;
+
+      // Advance to step 14 — spotlight the crop card that just appeared
+      setTimeout(() => goToStep(CROP_CARD_STEP_IDX), 600);
     };
     window.addEventListener('sibol:crop-added', handler);
     return () => window.removeEventListener('sibol:crop-added', handler);
-  }, [navigate, storageKey, onClose]);
+  }, [goToStep]);
 
   // ── Finish / skip ────────────────────────────────────────────────────────────
   const finish = useCallback(() => {
@@ -490,9 +502,36 @@ const CoachMark = ({ open, onClose, userId }) => {
       return;
     }
 
+    // Step 14: Crop card spotlight — just advance to view button spotlight
+    if (step === CROP_CARD_STEP_IDX) {
+      goToStep(CROP_VIEW_BTN_STEP_IDX);
+      return;
+    }
+
+    // Step 15: View button spotlight — click it to navigate to sensor detail, then finish
+    if (step === CROP_VIEW_BTN_STEP_IDX) {
+      const gardenId = createdGardenIdRef.current;
+      const cropId   = createdCropIdRef.current;
+      const espSerial = createdEspSerialRef.current;
+      if (gardenId && cropId && espSerial) {
+        const path = `/user/crop-care/${encodeURIComponent(gardenId)}/${encodeURIComponent(cropId)}/${encodeURIComponent(espSerial)}`;
+        navigate(path);
+        setTimeout(() => {
+          setActive(false);
+          setDone(true);
+          cancelPollRef.current?.();
+          localStorage.setItem(storageKey, '1');
+          onClose?.();
+        }, 500);
+      } else {
+        finish();
+      }
+      return;
+    }
+
     if (step < STEPS.length - 1) goToStep(step + 1);
     else finish();
-  }, [step, goToStep, finish, navigate]);
+  }, [step, goToStep, finish, navigate, storageKey, onClose]);
 
   const prev = useCallback(() => {
     if (step > 0) goToStep(step - 1);

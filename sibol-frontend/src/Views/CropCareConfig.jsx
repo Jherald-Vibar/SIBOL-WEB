@@ -503,7 +503,7 @@ const CropCard = ({ crop, onEdit, onDelete, onRemoveEsp, onView }) => {
   const esp = crop.esp;
 
   return (
-    <div className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(11,61,30,0.10)] group">
+    <div id={`coach-crop-card-${crop.id}`} className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(11,61,30,0.10)] group">
       <div className="relative h-44 overflow-hidden bg-[#f7f4ee]">
         {crop.image
           ? <img src={crop.image} alt={crop.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"/>
@@ -541,6 +541,7 @@ const CropCard = ({ crop, onEdit, onDelete, onRemoveEsp, onView }) => {
 
         <div className="flex gap-1.5 mt-3">
           <button
+            id={`coach-view-btn-${crop.id}`}
             onClick={() => onView(crop)}
             disabled={!esp}
             title={esp ? "View data" : "Add a device to view data"}
