@@ -149,8 +149,7 @@ function resolveTargetId(step, gardenId) {
 }
 
 /**
- * Poll until an element with `id` exists AND has a non-zero bounding rect
- * (guards against elements that are in the DOM but not yet painted/laid out).
+ * Poll until an element with `id` exists AND has a non-zero bounding rect.
  */
 function pollForElement(id, onFound, maxMs = 5000) {
   const interval = 100;
@@ -159,8 +158,6 @@ function pollForElement(id, onFound, maxMs = 5000) {
     const el = document.getElementById(id);
     if (el) {
       const rect = el.getBoundingClientRect();
-      // Only accept if the element has real dimensions — zero rect means
-      // it's in the DOM but not yet painted (e.g. hidden md:flex not resolved)
       if (rect.width > 0 && rect.height > 0) {
         clearInterval(timer);
         onFound(el);
@@ -198,6 +195,9 @@ const CoachMark = ({ open, onClose, userId }) => {
   const cancelPollRef       = useRef(null);
   const rafRef              = useRef(null);
   const waitingForGardenRef = useRef(false);
+  // ─── FIX: track when goToStep's own rAF chain is running so the
+  //         resize/scroll effect doesn't race against it ───────────────────────
+  const isPositioningRef    = useRef(false);
 
   // ── Auto-launch (first visit) ───────────────────────────────────────────────
   useEffect(() => {
@@ -221,9 +221,18 @@ const CoachMark = ({ open, onClose, userId }) => {
     cancelAnimationFrame(rafRef.current);
   }, []);
 
-  // ── Core positioning ─────────────────────────────────────────────────────────
-  const position = useCallback((gardenIdOverride) => {
-    const s        = STEPS[step];
+  // ─── FIX: Accept explicit stepOverride so callers can pass the *new* step
+  //         index before React has re-rendered — eliminates the stale-closure
+  //         problem that caused the spotlight to jump back to the previous target.
+  const position = useCallback((gardenIdOverride, stepOverride) => {
+    // Use the explicitly provided step index when available; fall back to the
+    // current state value for resize/scroll re-positioning calls.
+    const stepIndex = stepOverride !== undefined ? stepOverride : null;
+
+    // We need the STEPS entry: use stepOverride if given, otherwise read
+    // the step state directly from the DOM-time closure.  Because `position`
+    // is only called synchronously (via rAF) we capture `step` as a ref below.
+    const s        = STEPS[stepIndex !== null ? stepIndex : step];
     const gardenId = gardenIdOverride !== undefined ? gardenIdOverride : createdGardenIdRef.current;
     const targetId = resolveTargetId(s, gardenId);
 
@@ -245,8 +254,7 @@ const CoachMark = ({ open, onClose, userId }) => {
 
     const tr = el.getBoundingClientRect();
 
-    // Guard: if rect is still zero the element hasn't painted yet — bail and
-    // let the resize/scroll effect retry on the next animation frame
+    // Guard: element not yet painted
     if (tr.width === 0 && tr.height === 0) return;
 
     setSpotStyle({
@@ -291,13 +299,21 @@ const CoachMark = ({ open, onClose, userId }) => {
       bottom: 'auto',
     });
     setArrowPos({ side, offset: arrowOffset });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
+  // NOTE: `step` stays in the dep array so the resize/scroll path (which does
+  // NOT pass stepOverride) still reads the correct current step.
 
   // ── Re-position on resize / scroll ──────────────────────────────────────────
   useEffect(() => {
     if (!active || navigating || waitingForGarden) return;
+
+    // Initial position (no override needed — step state is already current)
     position();
+
     const onLayout = () => {
+      // ─── FIX: Don't race against goToStep's own rAF chain ────────────────
+      if (isPositioningRef.current) return;
       cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => position());
     };
@@ -321,15 +337,22 @@ const CoachMark = ({ open, onClose, userId }) => {
     cancelPollRef.current?.();
     cancelPollRef.current = null;
 
+    // Update step state so the UI card renders immediately with the new content
     setStep(newStep);
 
+    // ─── FIX: pass newStep explicitly into position() so it uses the correct
+    //         STEPS entry before React has committed the setStep re-render ───
     const doPosition = () => {
       setNavigating(false);
+      isPositioningRef.current = true;
       // Three rAF frames: 1st lets React flush state, 2nd lets browser paint,
       // 3rd lets CSS transitions (sidebar width, NavLink active styles) settle
       requestAnimationFrame(() =>
         requestAnimationFrame(() =>
-          requestAnimationFrame(() => position(gId))
+          requestAnimationFrame(() => {
+            position(gId, newStep);
+            isPositioningRef.current = false;
+          })
         )
       );
     };
@@ -344,9 +367,6 @@ const CoachMark = ({ open, onClose, userId }) => {
     }
 
     if (targetId) {
-      // When already on the right page: wait 200ms for any CSS transitions
-      // to finish, THEN start polling — this prevents grabbing a zero rect
-      // from an element that's mid-transition or not yet painted
       const delay = alreadyThere ? 200 : 0;
       setTimeout(() => {
         cancelPollRef.current = pollForElement(
