@@ -357,13 +357,19 @@ const CoachMark = ({ open, onClose, userId }) => {
       );
     };
 
-    const alreadyThere = s.navigate
-      ? location.pathname === s.navigate
+    // ─── Resolve destination: step 13 (Add Crop) goes into the actual garden ──
+    let destinationPath = s.navigate ?? null;
+    if (newStep === GARDEN_OPEN_STEP_IDX + 1 && gId) {
+      destinationPath = `/user/crop-care/${encodeURIComponent(gId)}`;
+    }
+
+    const alreadyThere = destinationPath
+      ? location.pathname === destinationPath
       : true;
 
-    if (s.navigate && !alreadyThere) {
+    if (destinationPath && !alreadyThere) {
       setNavigating(true);
-      navigate(s.navigate);
+      navigate(destinationPath);
     }
 
     if (targetId) {
@@ -379,7 +385,7 @@ const CoachMark = ({ open, onClose, userId }) => {
         );
       }, delay);
     } else {
-      setTimeout(doPosition, s.navigate && !alreadyThere ? 400 : 0);
+      setTimeout(doPosition, destinationPath && !alreadyThere ? 400 : 0);
     }
   }, [navigate, position, location.pathname]);
 
@@ -435,14 +441,16 @@ const CoachMark = ({ open, onClose, userId }) => {
     }
 
     if (step === GARDEN_OPEN_STEP_IDX) {
-      const targetId = createdGardenIdRef.current
-        ? `coach-open-garden-${createdGardenIdRef.current}`
-        : null;
-      if (targetId) {
-        document.getElementById(targetId)?.click();
+      const gardenId = createdGardenIdRef.current;
+      if (gardenId) {
+        // Navigate directly — same as clicking the open button
+        navigate(`/user/crop-care/${encodeURIComponent(gardenId)}`);
       }
-      if (step < STEPS.length - 1) goToStep(step + 1);
-      else finish();
+      // Advance to the next coach step after navigation settles
+      setTimeout(() => {
+        if (step < STEPS.length - 1) goToStep(step + 1);
+        else finish();
+      }, 400);
       return;
     }
 
