@@ -482,7 +482,7 @@ const CoachMark = ({ open, onClose, userId }) => {
   return (
     <>
       {active && (
-        <div className="fixed inset-0 z-[10000] overflow-hidden">
+        <div className={`fixed inset-0 z-[10000] overflow-hidden${waitingForGarden ? ' pointer-events-none' : ''}`}>
 
           {/* ── Overlay + spotlight cutout ── */}
           {!waitingForGarden && (
