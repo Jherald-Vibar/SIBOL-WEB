@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+// ─── Step definitions ──────────────────────────────────────────────────────────
 const STEPS = [
   // ── Phase 1: Tour ─────────────────────────────────────────────────────────
   {
     phase: 'tour',
-    navigate: '/user/dashboard', // FIX: ensure we're on dashboard for sidebar
+    navigate: '/user/dashboard',
     targetId: 'coach-sidebar',
     title: <>Your <em className="text-[#f0a830]">Sidebar</em></>,
     body: 'This is your main navigation panel. Use it to move between Dashboard, Crop Care, Reports, and Settings.',
@@ -13,7 +14,7 @@ const STEPS = [
   },
   {
     phase: 'tour',
-    navigate: '/user/dashboard', // sidebar lives on every page but start clean
+    navigate: '/user/dashboard',
     targetId: 'coach-nav-dashboard',
     title: <><em className="text-[#f0a830]">Dashboard</em> Home</>,
     body: 'Your central hub — weather, sensor readings, and crop status at a glance.',
@@ -53,7 +54,7 @@ const STEPS = [
   },
   {
     phase: 'tour',
-    navigate: '/user/dashboard', // FIX: coach-weather only exists on dashboard
+    navigate: '/user/dashboard',
     targetId: 'coach-weather',
     title: <>Live <em className="text-[#f0a830]">Weather</em></>,
     body: 'Current conditions at your farm. Tap the C / F toggle to switch units.',
@@ -61,7 +62,7 @@ const STEPS = [
   },
   {
     phase: 'tour',
-    navigate: '/user/dashboard', // FIX: coach-advisory only exists on dashboard
+    navigate: '/user/dashboard',
     targetId: 'coach-advisory',
     title: <>Crop <em className="text-[#f0a830]">Alerts</em></>,
     body: 'System-generated advisories based on detected crop health. Act early to protect your harvest!',
@@ -69,7 +70,7 @@ const STEPS = [
   },
   {
     phase: 'tour',
-    navigate: '/user/dashboard', // FIX: coach-sensors only exists on dashboard
+    navigate: '/user/dashboard',
     targetId: 'coach-sensors',
     title: <>Sensor <em className="text-[#f0a830]">Trends</em></>,
     body: 'Real-time readings from your IoT sensors, plotted over time.',
@@ -77,7 +78,7 @@ const STEPS = [
   },
   {
     phase: 'tour',
-    navigate: '/user/dashboard', // FIX: coach-crops only exists on dashboard
+    navigate: '/user/dashboard',
     targetId: 'coach-crops',
     title: <>Your <em className="text-[#f0a830]">Crops</em></>,
     body: 'Browse planted crops and check their health status here.',
@@ -138,6 +139,8 @@ const PAD   = 10;
 const GAP   = 16;
 const ARROW = 10;
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function resolveTargetId(step, gardenId) {
   if (!step) return null;
   if (step.targetId === '__GARDEN_OPEN__') {
@@ -158,6 +161,7 @@ function pollForElement(id, onFound, maxMs = 4000) {
   return () => clearInterval(timer);
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
 const CoachMark = ({ open, onClose, userId }) => {
   const storageKey = userId ? `sibol_toured_${userId}` : 'sibol_toured';
   const navigate   = useNavigate();
@@ -178,25 +182,34 @@ const CoachMark = ({ open, onClose, userId }) => {
     _setCreatedGardenId(id);
   }, []);
 
-  const cancelPollRef = useRef(null);
-  const rafRef        = useRef(null);
+  const cancelPollRef        = useRef(null);
+  const rafRef               = useRef(null);
+  const waitingForGardenRef  = useRef(false);
 
+  // ── Auto-launch (first visit) ───────────────────────────────────────────────
   useEffect(() => {
     if (open === undefined && !localStorage.getItem(storageKey)) {
-      const t = setTimeout(() => setActive(true), 1000);
+      const t = setTimeout(() => {
+        setActive(true);
+        // Always start tour from dashboard so step 0 targets are present
+        navigate('/user/dashboard');
+      }, 1000);
       return () => clearTimeout(t);
     }
-  }, [storageKey, open]);
+  }, [storageKey, open, navigate]);
 
+  // ── Controlled open prop ────────────────────────────────────────────────────
   useEffect(() => {
     if (open !== undefined) setActive(open);
   }, [open]);
 
+  // ── Cleanup on unmount ───────────────────────────────────────────────────────
   useEffect(() => () => {
     cancelPollRef.current?.();
     cancelAnimationFrame(rafRef.current);
   }, []);
 
+  // ── Core positioning ─────────────────────────────────────────────────────────
   const position = useCallback((gardenIdOverride) => {
     const s        = STEPS[step];
     const gardenId = gardenIdOverride !== undefined ? gardenIdOverride : createdGardenIdRef.current;
@@ -245,7 +258,6 @@ const CoachMark = ({ open, onClose, userId }) => {
         left = tr.left + tr.width / 2 - CW / 2;
         side = 'top'; arrowOffset = CW / 2 - ARROW; break;
       case 'top':
-      // FIX: explicit 'top' case instead of relying on switch default fall-through
         top  = tr.top - PAD - GAP - CH;
         left = tr.left + tr.width / 2 - CW / 2;
         side = 'bottom'; arrowOffset = CW / 2 - ARROW; break;
@@ -264,6 +276,7 @@ const CoachMark = ({ open, onClose, userId }) => {
     setArrowPos({ side, offset: arrowOffset });
   }, [step]);
 
+  // ── Re-position on resize / scroll ──────────────────────────────────────────
   useEffect(() => {
     if (!active || navigating || waitingForGarden) return;
     position();
@@ -280,8 +293,9 @@ const CoachMark = ({ open, onClose, userId }) => {
     };
   }, [active, step, position, navigating, waitingForGarden]);
 
+  // ── Navigate then poll for target element ────────────────────────────────────
   const goToStep = useCallback((newStep, gardenIdOverride) => {
-    const s        = STEPS[newStep];
+    const s = STEPS[newStep];
     if (!s) return;
 
     const gId      = gardenIdOverride !== undefined ? gardenIdOverride : createdGardenIdRef.current;
@@ -316,34 +330,28 @@ const CoachMark = ({ open, onClose, userId }) => {
     }
   }, [navigate, position]);
 
-  // FIX: Register listener unconditionally on mount, use a ref flag to gate
-  // whether we should actually handle the event. This eliminates the race
-  // condition where btn.click() fires before the effect re-runs with
-  // waitingForGarden=true.
-  const waitingForGardenRef = useRef(false);
+  // ── Garden-created event ─────────────────────────────────────────────────────
+  // Listener is mounted once. Uses a ref to gate whether it should act,
+  // eliminating the race condition where btn.click() fires before the
+  // effect would re-run with waitingForGarden=true.
   useEffect(() => {
     waitingForGardenRef.current = waitingForGarden;
   }, [waitingForGarden]);
 
   useEffect(() => {
     const handler = (e) => {
-      // Only handle if we're actually waiting
       if (!waitingForGardenRef.current) return;
-
       const id = e.detail?.id ?? null;
       setCreatedGardenId(id);
       setWaitingForGarden(false);
       waitingForGardenRef.current = false;
-
       setTimeout(() => goToStep(GARDEN_OPEN_STEP_IDX, id), 800);
     };
-
     window.addEventListener('sibol:garden-created', handler);
     return () => window.removeEventListener('sibol:garden-created', handler);
-  // FIX: goToStep and setCreatedGardenId are stable; this effect now only
-  // runs once on mount, so the listener is never torn down/re-added mid-flow.
   }, [goToStep, setCreatedGardenId]);
 
+  // ── Finish / skip ────────────────────────────────────────────────────────────
   const finish = useCallback(() => {
     setActive(false);
     setDone(true);
@@ -363,12 +371,14 @@ const CoachMark = ({ open, onClose, userId }) => {
     onClose?.();
   }, [storageKey, onClose]);
 
+  // ── Next / prev ──────────────────────────────────────────────────────────────
   const next = useCallback(() => {
+    // Step 11 — click "New Garden" btn, then WAIT for sibol:garden-created
     if (step === GARDEN_STEP_IDX) {
       const btn = document.getElementById('coach-add-garden-btn');
       if (btn) {
-        // FIX: Set the ref synchronously BEFORE btn.click() so the always-mounted
-        // listener can see it immediately, even if React hasn't flushed state yet.
+        // Set ref synchronously BEFORE btn.click() so the always-mounted
+        // listener sees it immediately without waiting for a state flush
         waitingForGardenRef.current = true;
         setWaitingForGarden(true);
         btn.click();
@@ -376,11 +386,8 @@ const CoachMark = ({ open, onClose, userId }) => {
       return;
     }
 
-    // FIX: Step 12 — click the open button but do NOT also call goToStep.
-    // The open button's onClick (goGarden) already navigates into the garden.
-    // goToStep(13) would navigate to /user/crop-profile at the same time,
-    // causing a double navigation race. Instead, just click and advance the
-    // coach step without re-navigating — the user is already going to the garden.
+    // Step 12 — click the open-garden button; goToStep handles navigation to
+    // crop-profile (step 13). Don't double-navigate.
     if (step === GARDEN_OPEN_STEP_IDX) {
       const targetId = createdGardenIdRef.current
         ? `coach-open-garden-${createdGardenIdRef.current}`
@@ -388,10 +395,6 @@ const CoachMark = ({ open, onClose, userId }) => {
       if (targetId) {
         document.getElementById(targetId)?.click();
       }
-      // Advance to step 13 but suppress its navigate (the garden click already
-      // handled navigation). We do this by calling goToStep which will navigate
-      // to /user/crop-profile — that's actually correct here because step 13
-      // is the crop-profile page, not inside the garden. Keep original behavior.
       if (step < STEPS.length - 1) goToStep(step + 1);
       else finish();
       return;
@@ -405,6 +408,7 @@ const CoachMark = ({ open, onClose, userId }) => {
     if (step > 0) goToStep(step - 1);
   }, [step, goToStep]);
 
+  // ── Arrow style ──────────────────────────────────────────────────────────────
   const arrowStyle = () => {
     if (arrowPos.side === 'none') return { display: 'none' };
     const base = { position: 'absolute', width: 0, height: 0, pointerEvents: 'none' };
@@ -420,27 +424,22 @@ const CoachMark = ({ open, onClose, userId }) => {
     }
   };
 
+  // ── Phase labels ─────────────────────────────────────────────────────────────
   const tourSteps   = STEPS.filter(s => s.phase === 'tour').length;
   const currentStep = STEPS[step];
-
-  // FIX: Cleaner phase label — welcome card (step 10) is onboard phase 1,
-  // no longer shows a redundant "Tour" badge alongside "Setup".
-  const isOnboard  = currentStep?.phase === 'onboard';
-  const phaseLabel = isOnboard ? 'Setup' : 'Tour';
-  const phaseStep  = isOnboard ? step - tourSteps + 1 : step + 1;
-  const phaseTotal = isOnboard ? STEPS.length - tourSteps : tourSteps;
+  const isOnboard   = currentStep?.phase === 'onboard';
+  const phaseLabel  = isOnboard ? 'Setup' : 'Tour';
+  const phaseStep   = isOnboard ? step - tourSteps + 1 : step + 1;
+  const phaseTotal  = isOnboard ? STEPS.length - tourSteps : tourSteps;
 
   if (!active && !done) return null;
 
   return (
     <>
       {active && (
-        <div
-          className="fixed inset-0 z-[10000] overflow-hidden"
-          // FIX: Removed the blanket pointerEvents:'none' when waitingForGarden.
-          // That was blocking the user from interacting with the garden form modal.
-          // We only need to suppress the coachmark overlay itself, not the whole screen.
-        >
+        <div className="fixed inset-0 z-[10000] overflow-hidden">
+
+          {/* ── Overlay + spotlight cutout ── */}
           {!waitingForGarden && (
             <>
               {currentStep?.targetId && currentStep.placement !== 'center' ? (
@@ -473,12 +472,9 @@ const CoachMark = ({ open, onClose, userId }) => {
             </>
           )}
 
-          {/* FIX: Waiting pill — pointerEvents:'none' only on the pill itself,
-              so the garden form modal underneath stays fully interactive. */}
+          {/* ── "Waiting for garden" pill ── */}
           {waitingForGarden && step === GARDEN_STEP_IDX && (
-            <div
-              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[10002] flex items-center gap-3 bg-[#0b3d1e] text-white px-5 py-3 rounded-full shadow-2xl text-sm font-medium select-none pointer-events-none"
-            >
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[10002] flex items-center gap-3 bg-[#0b3d1e] text-white px-5 py-3 rounded-full shadow-2xl text-sm font-medium select-none pointer-events-none">
               <svg className="animate-spin shrink-0" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
                 <path d="M21 12a9 9 0 1 1-6.219-8.56" />
               </svg>
@@ -487,6 +483,7 @@ const CoachMark = ({ open, onClose, userId }) => {
             </div>
           )}
 
+          {/* ── Tooltip card ── */}
           {!waitingForGarden && (
             <div
               className="fixed bg-white rounded-2xl p-6 shadow-2xl transition-all duration-400"
@@ -500,14 +497,13 @@ const CoachMark = ({ open, onClose, userId }) => {
             >
               <div style={arrowStyle()} />
 
+              {/* Badge */}
               <div className="flex items-center gap-2 mb-3">
                 <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider ${
                   isOnboard
                     ? 'bg-[#0b3d1e]/10 text-[#0b3d1e]'
                     : 'bg-[#d4840a]/10 text-[#d4840a]'
                 }`}>
-                  {/* FIX: Single badge — removed the duplicate "Setup" badge.
-                      phaseLabel already says "Setup" when isOnboard is true. */}
                   {phaseLabel} {phaseStep} / {phaseTotal}
                 </span>
               </div>
@@ -520,7 +516,9 @@ const CoachMark = ({ open, onClose, userId }) => {
               </h3>
               <p className="text-sm text-gray-500 mb-5 leading-relaxed">{currentStep?.body}</p>
 
+              {/* Footer */}
               <div className="flex items-center justify-between">
+                {/* Dot progress */}
                 <div className="flex gap-1">
                   {STEPS.map((s, i) => (
                     <div
@@ -560,6 +558,7 @@ const CoachMark = ({ open, onClose, userId }) => {
         </div>
       )}
 
+      {/* ── Done modal ── */}
       {done && (
         <div className="fixed inset-0 z-[10002] flex items-center justify-center p-6 bg-black/60">
           <div className="bg-white rounded-3xl p-8 text-center max-w-sm w-full shadow-2xl">
