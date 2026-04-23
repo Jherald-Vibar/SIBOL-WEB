@@ -391,41 +391,12 @@ const CoachMark = ({ open, onClose, userId }) => {
   useEffect(() => {
     const handler = (e) => {
       if (!waitingForGardenRef.current) return;
-
-      let id = e.detail?.id ?? null;
-
-      const proceed = (resolvedId) => {
-        console.log('[CoachMark] sibol:garden-created — resolved id:', resolvedId);
-        setCreatedGardenId(resolvedId);
-        setWaitingForGarden(false);
-        waitingForGardenRef.current = false;
-        setTimeout(() => goToStep(GARDEN_OPEN_STEP_IDX, resolvedId), 800);
-      };
-
-      if (id) {
-        // Happy path: id came from the API response
-        proceed(id);
-      } else {
-        // Fallback: poll the DOM until a coach-open-garden-* button appears
-        // (this happens after fetchGarden re-renders the garden list)
-        console.warn('[CoachMark] garden id missing from event — polling DOM for fallback…');
-        let elapsed = 0;
-        const timer = setInterval(() => {
-          const el = document.querySelector('[id^="coach-open-garden-"]');
-          if (el) {
-            clearInterval(timer);
-            const fallbackId = el.id.replace('coach-open-garden-', '') || null;
-            proceed(fallbackId);
-            return;
-          }
-          elapsed += 100;
-          if (elapsed >= 5000) {
-            clearInterval(timer);
-            // Last resort: advance without an id (tooltip will show but spotlight won't lock)
-            proceed(null);
-          }
-        }, 100);
-      }
+      const id = e.detail?.id ?? null;
+      setCreatedGardenId(id);
+      setWaitingForGarden(false);
+      waitingForGardenRef.current = false;
+      // Give React time to re-render the garden card with the open button
+      setTimeout(() => goToStep(GARDEN_OPEN_STEP_IDX, id), 800);
     };
     window.addEventListener('sibol:garden-created', handler);
     return () => window.removeEventListener('sibol:garden-created', handler);

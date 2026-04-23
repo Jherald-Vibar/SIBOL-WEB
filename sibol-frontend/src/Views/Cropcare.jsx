@@ -78,19 +78,9 @@ const Cropcare = () => {
     try {
       const res = await axiosClient.post('/addGarden', form);
 
-      // ── FIX: exhaustively check every common shape your API might return ──
-      // Log the raw response so you can confirm the correct key in DevTools
-      console.log('[addGarden] API response:', res.data);
+      // Laravel returns { message, status, garden: { id, name, location, ... } }
+      const newId = res.data?.garden?.id ?? null;
 
-      const newId =
-        res.data?.id          ||   // { id: 5 }
-        res.data?.garden_id   ||   // { garden_id: 5 }
-        res.data?.data?.id    ||   // { data: { id: 5 } }
-        res.data?.data?.garden_id || // { data: { garden_id: 5 } }
-        res.data?.garden?.id  ||   // { garden: { id: 5 } }
-        null;
-
-      // Always dispatch — CoachMark has a DOM fallback if newId is null
       window.dispatchEvent(
         new CustomEvent('sibol:garden-created', { detail: { id: newId } })
       );
