@@ -587,13 +587,15 @@ const CropCareConfig = () => {
   const [removeEspModal, setRemoveEspModal] = useState(null);
 
   // ── Track whether CoachMark is waiting for the crop to be saved ───────────
-  const waitingForCropRef = useRef(false);
-
+  // Using window flag avoids ref-timing races across component boundaries.
   useEffect(() => {
-    // CoachMark fires this when it clicks the Claim Device button on the user's behalf
-    const onWait = () => { waitingForCropRef.current = true; };
+    window.__sibolWaitingForCrop = false;
+    const onWait = () => { window.__sibolWaitingForCrop = true; };
     window.addEventListener('sibol:waiting-for-crop', onWait);
-    return () => window.removeEventListener('sibol:waiting-for-crop', onWait);
+    return () => {
+      window.removeEventListener('sibol:waiting-for-crop', onWait);
+      window.__sibolWaitingForCrop = false;
+    };
   }, []);
 
   const { toasts, addToast, dismissToast } = useToasts();
@@ -648,19 +650,22 @@ const CropCareConfig = () => {
           "crop_id":    newCrop.id,
         });
 
-        // 3. Resolve the ESP serial — prefer the API response, fall back to what the user typed
+        // 3. Resolve the ESP serial.
+        //    Controller returns: { success, message, data: { serial_number, ... } }
+        //    Always fall back to the user-typed espId (which IS the serial_number).
+        const espRecord = claimRes?.data?.data;
         const espSerial =
-          claimRes?.data?.data?.serial_number ||
-          claimRes?.data?.serial_number       ||
-          form.espId;
+          espRecord?.serial_number ||   // from claimEspDevice response
+          claimRes?.data?.serial_number ||
+          form.espId;                    // what the user typed — same value stored in DB
 
         // 4. Refresh crop list
         await fetchCrops();
 
         // 5. If CoachMark is waiting, fire sibol:crop-added with everything needed for the URL
         //    URL shape: /user/crop-care/:garden_id/:crop_id/:esp_serial
-        if (waitingForCropRef.current) {
-          waitingForCropRef.current = false;
+        if (window.__sibolWaitingForCrop) {
+          window.__sibolWaitingForCrop = false;
           window.dispatchEvent(
             new CustomEvent('sibol:crop-added', {
               detail: {

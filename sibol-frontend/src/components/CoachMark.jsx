@@ -466,13 +466,14 @@ const CoachMark = ({ open, onClose, userId }) => {
       return;
     }
 
-    // Step 13: Claim Device — click the "Claim Device" button to open the modal,
-    // then wait for sibol:crop-added before advancing
+    // Step 13: Claim Device — signal CropCareConfig we're waiting, then open the modal
     if (step === CLAIM_DEVICE_STEP_IDX) {
       const btn = document.getElementById('coach-add-crop-btn');
       if (btn) {
         waitingForCropRef.current = true;
         setWaitingForCrop(true);
+        // Dispatch BEFORE clicking so CropCareConfig's listener is ready
+        window.dispatchEvent(new CustomEvent('sibol:waiting-for-crop'));
         btn.click(); // opens the CropModal in CropCareConfig
       }
       return;
