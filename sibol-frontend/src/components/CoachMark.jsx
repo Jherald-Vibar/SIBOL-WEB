@@ -716,10 +716,10 @@ const CoachMark = ({ open, onClose, userId }) => {
               You've toured SIBOL and set up your farm. Head to your dashboard to watch your crops thrive.
             </p>
             <button
-              onClick={() => { setDone(false); navigate('/user/dashboard'); }}
+              onClick={() => { setDone(false); }}
               className="w-full bg-[#0b3d1e] text-white py-4 rounded-2xl font-bold hover:bg-[#1a6636] transition-colors"
             >
-              Go to Dashboard
+              FINISH
             </button>
           </div>
         </div>
