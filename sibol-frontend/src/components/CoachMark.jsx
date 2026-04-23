@@ -114,21 +114,21 @@ const STEPS = [
   },
   {
     phase: 'onboard',
-    navigate: '/user/crop-profile',
+    navigate: null,               // navigation is handled dynamically by goToStep
     targetId: 'coach-add-crop-btn',
-    title: <>Add your first <em className="text-[#f0a830]">Crop</em></>,
-    body: "Inside your garden, add a crop. Choose the plant type and planted date — SIBOL will start monitoring it right away.",
+    title: <>Claim your <em className="text-[#f0a830]">Device</em></>,
+    body: 'Tap "Claim Device" to link your IoT sensor and add your first crop. Fill in the device ID and crop details.',
     placement: 'bottom',
-    cta: 'Add Crop →',
+    cta: 'Claim Device →',
   },
   {
     phase: 'onboard',
     navigate: '/user/account-settings',
     targetId: 'coach-claim-device-btn',
-    title: <>Claim your <em className="text-[#f0a830]">Device</em></>,
-    body: 'Enter your device ID to link your IoT sensor to your garden. Once claimed, live sensor data will appear on your dashboard.',
+    title: <>Account <em className="text-[#f0a830]">Settings</em></>,
+    body: 'Finally, update your profile and manage your account settings here.',
     placement: 'bottom',
-    cta: 'Claim Device →',
+    cta: 'Finish Setup →',
   },
 ];
 

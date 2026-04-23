@@ -113,16 +113,11 @@ const DeviceToast = ({ toasts, onDismiss }) => {
           style={{ fontFamily: "'DM Sans', sans-serif" }}
         >
           <div className="relative bg-white rounded-2xl border border-green-200 shadow-[0_8px_32px_rgba(11,61,30,0.18)] overflow-hidden w-[320px]">
-            {/* top accent bar */}
             <div className="h-1 bg-gradient-to-r from-green-400 via-green-600 to-green-800"/>
-
             <div className="flex items-start gap-3 px-4 pt-3.5 pb-4">
-              {/* icon */}
               <div className="w-9 h-9 rounded-xl bg-green-950 flex items-center justify-center flex-shrink-0 text-white wifi-pulse">
                 <WifiIcon/>
               </div>
-
-              {/* content */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <LeafIcon style={{ color: '#3B6D11', width: 13, height: 13 }}/>
@@ -138,8 +133,6 @@ const DeviceToast = ({ toasts, onDismiss }) => {
                   </p>
                 )}
               </div>
-
-              {/* dismiss */}
               <button
                 onClick={() => onDismiss(t.id)}
                 className="w-6 h-6 rounded-full border border-black/10 flex items-center justify-center text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors cursor-pointer flex-shrink-0 mt-0.5 bg-transparent"
@@ -147,8 +140,6 @@ const DeviceToast = ({ toasts, onDismiss }) => {
                 <XIcon/>
               </button>
             </div>
-
-            {/* progress bar */}
             <div className="h-[3px] bg-green-50">
               <div
                 className="h-full bg-green-400 rounded-full"
@@ -163,14 +154,6 @@ const DeviceToast = ({ toasts, onDismiss }) => {
 };
 
 /* ── WEBSOCKET HOOK ── */
-/*
-  Connects to your Laravel Echo / Pusher websocket.
-  Listens on channel: `esp.{serial_number}` for event `SensorDataReceived`
-  (or whatever your backend broadcasts).
-
-  Replace WS_URL with your actual websocket server URL.
-  This example uses a raw WebSocket — swap for Laravel Echo if preferred.
-*/
 const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:6001";
 
 const useDeviceWebSocket = (crops, onDeviceConnected) => {
@@ -179,24 +162,19 @@ const useDeviceWebSocket = (crops, onDeviceConnected) => {
   cropsRef.current = crops;
 
   const connectToDevice = useCallback((serial) => {
-    if (socketsRef.current[serial]) return; // already connected
-
+    if (socketsRef.current[serial]) return;
     const ws = new WebSocket(`${WS_URL}/app/sibol?protocol=7&client=js&version=8.4.0&flash=false`);
-
     ws.onopen = () => {
-      // Subscribe to a private/presence channel for this device
       ws.send(JSON.stringify({
         event: "pusher:subscribe",
         data: { channel: `esp.${serial}` },
       }));
     };
-
     ws.onmessage = (e) => {
       try {
         const payload = JSON.parse(e.data);
-        // Pusher protocol: event name is in payload.event
         if (
-          payload.event === "sensor.data" ||          // adjust to your event name
+          payload.event === "sensor.data" ||
           payload.event === "App\\Events\\SensorDataReceived"
         ) {
           const crop = cropsRef.current.find(c => c.esp?.serial_number === serial);
@@ -204,24 +182,15 @@ const useDeviceWebSocket = (crops, onDeviceConnected) => {
         }
       } catch (error) {}
     };
-
     ws.onerror = () => {};
-    ws.onclose = () => {
-      delete socketsRef.current[serial];
-    };
-
+    ws.onclose = () => { delete socketsRef.current[serial]; };
     socketsRef.current[serial] = ws;
   }, [onDeviceConnected]);
 
   useEffect(() => {
-    // Open a socket for every crop that has an active device
     crops.forEach(crop => {
-      if (crop.esp?.serial_number) {
-        connectToDevice(crop.esp.serial_number);
-      }
+      if (crop.esp?.serial_number) connectToDevice(crop.esp.serial_number);
     });
-
-    // Cleanup sockets for devices no longer in the list
     const activeSerials = new Set(
       crops.filter(c => c.esp?.serial_number).map(c => c.esp.serial_number)
     );
@@ -233,7 +202,6 @@ const useDeviceWebSocket = (crops, onDeviceConnected) => {
     });
   }, [crops, connectToDevice]);
 
-  // Close all on unmount
   useEffect(() => {
     return () => {
       Object.values(socketsRef.current).forEach(ws => ws?.close());
@@ -243,7 +211,7 @@ const useDeviceWebSocket = (crops, onDeviceConnected) => {
 };
 
 /* ── TOAST MANAGER HOOK ── */
-const TOAST_DURATION = 5000; // ms
+const TOAST_DURATION = 5000;
 
 const useToasts = () => {
   const [toasts, setToasts] = useState([]);
@@ -252,13 +220,11 @@ const useToasts = () => {
   const addToast = useCallback((serial, crop) => {
     const id = `${serial}-${Date.now()}`;
     setToasts(prev => [...prev, { id, serial, crop, exiting: false, duration: TOAST_DURATION }]);
-
     timersRef.current[id] = setTimeout(() => dismissToast(id), TOAST_DURATION);
   }, []);
 
   const dismissToast = useCallback((id) => {
     clearTimeout(timersRef.current[id]);
-    // Mark as exiting for exit animation
     setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
@@ -337,7 +303,6 @@ const CropModal = ({ crop, onClose, onSave, loading }) => {
         onClose={onClose}
       />
 
-      {/* Step indicator */}
       {!isEdit && (
         <div className="flex items-center gap-2 px-6 pt-4 pb-0">
           {[1, 2].map(s => (
@@ -354,7 +319,6 @@ const CropModal = ({ crop, onClose, onSave, loading }) => {
         </div>
       )}
 
-      {/* ── STEP 1: Device ID ── */}
       {step === 1 && (
         <div className="px-6 py-5 flex flex-col gap-4">
           {espError && (
@@ -387,7 +351,6 @@ const CropModal = ({ crop, onClose, onSave, loading }) => {
         </div>
       )}
 
-      {/* ── STEP 2: Crop details ── */}
       {step === 2 && (
         <div className="px-6 py-5 flex flex-col gap-4">
           {formError && (
@@ -436,7 +399,6 @@ const CropModal = ({ crop, onClose, onSave, loading }) => {
         </div>
       )}
 
-      {/* Footer */}
       <div className="flex justify-end gap-2 px-6 py-4 border-t border-black/[0.06] sticky bottom-0 bg-white">
         {step === 1 && (
           <button onClick={onClose} className="px-5 py-2 rounded-full border border-black/10 bg-transparent text-gray-400 text-sm font-medium cursor-pointer hover:bg-gray-50 transition-colors">
@@ -555,7 +517,6 @@ const CropCard = ({ crop, onEdit, onDelete, onRemoveEsp, onView }) => {
         <div className="text-xs text-gray-400 mb-3">{crop.variety} · Planted {planted}</div>
         <div className="h-px bg-black/[0.05] mb-3"/>
 
-        {/* Device row */}
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
             <EspIcon color={esp ? "#3B6D11" : "#9ca3af"}/>
@@ -578,7 +539,6 @@ const CropCard = ({ crop, onEdit, onDelete, onRemoveEsp, onView }) => {
           )}
         </div>
 
-        {/* Action buttons */}
         <div className="flex gap-1.5 mt-3">
           <button
             onClick={() => onView(crop)}
@@ -626,10 +586,18 @@ const CropCareConfig = () => {
   const [deleteModal,    setDeleteModal]    = useState(null);
   const [removeEspModal, setRemoveEspModal] = useState(null);
 
-  /* ── Toasts ── */
+  // ── Track whether this page was opened during onboarding ──────────────────
+  // We detect the CoachMark's "waiting for crop" state via a custom event.
+  const waitingForCropRef = useRef(false);
+
+  useEffect(() => {
+    const onWait = () => { waitingForCropRef.current = true; };
+    window.addEventListener('sibol:waiting-for-crop', onWait);
+    return () => window.removeEventListener('sibol:waiting-for-crop', onWait);
+  }, []);
+
   const { toasts, addToast, dismissToast } = useToasts();
 
-  /* ── WebSocket ── */
   const handleDeviceConnected = useCallback((serial, cropName) => {
     addToast(serial, cropName);
   }, [addToast]);
@@ -650,7 +618,7 @@ const CropCareConfig = () => {
 
   useEffect(() => { fetchCrops(); }, [garden_id]);
 
-  /* ── Save crop (add = 2-step: create + claim) ── */
+  /* ── Save crop ── */
   const handleSaveCrop = async (form) => {
     setActionLoading(true);
     try {
@@ -680,8 +648,22 @@ const CropCareConfig = () => {
           "crop_id":    newCrop.id,
         });
 
-        // 3. Refresh to get esp object attached
-        fetchCrops();
+        // 3. Refresh list
+        await fetchCrops();
+
+        // ── FIX: notify CoachMark that a crop was added so it can advance ──
+        if (waitingForCropRef.current) {
+          waitingForCropRef.current = false;
+          window.dispatchEvent(
+            new CustomEvent('sibol:crop-added', {
+              detail: {
+                cropId:   newCrop.id,
+                gardenId: garden_id,
+                espId:    form.espId,
+              },
+            })
+          );
+        }
       }
       setCropModal(null);
     } catch (err) {
@@ -725,7 +707,6 @@ const CropCareConfig = () => {
     }
   };
 
-  /* ── Render ── */
   return (
     <div className="bg-[#f7f4ee] min-h-screen" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`
@@ -749,7 +730,10 @@ const CropCareConfig = () => {
             </h1>
             <p className="text-sm text-gray-500 mt-1">Each crop is paired with its own monitoring device.</p>
           </div>
+
+          {/* ── coach-add-crop-btn id added here ── */}
           <button
+            id="coach-add-crop-btn"
             onClick={() => setCropModal({ mode: 'add', crop: null })}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-950 text-white border-none rounded-full text-sm font-medium cursor-pointer hover:bg-green-800 transition-all"
           >
@@ -827,7 +811,6 @@ const CropCareConfig = () => {
         />
       )}
 
-      {/* 🔔 Device connected toasts */}
       <DeviceToast toasts={toasts} onDismiss={dismissToast}/>
     </div>
   );
