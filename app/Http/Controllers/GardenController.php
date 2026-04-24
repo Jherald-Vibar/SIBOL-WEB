@@ -859,7 +859,7 @@ class GardenController extends Controller
             $profile = $crop->cropProfile;
 
             return [
-                'name'        => $profile->name ?? $crop->name ?? 'Unknown',
+                'name'        => $crop->name ?? 'Unknown',
                 'moisture' => $profile->soil_moisture_min && $profile->soil_moisture_max ? "{$profile->soil_moisture_min}-{$profile->soil_moisture_max}" : 'N/A',
                 'soil_temp' => $profile->soil_temp_min && $profile->soil_temp_max ? "{$profile->soil_temp_min}-{$profile->soil_temp_max}" : 'N/A',
                 'temperature' => $profile->air_temperature_min && $profile->air_temperature_max ? "{$profile->air_temperature_min}-{$profile->air_temperature_max}°C" : 'N/A',
