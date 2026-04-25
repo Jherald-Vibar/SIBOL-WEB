@@ -262,6 +262,78 @@ const ModalHeader = ({ title, onClose, danger }) => (
   </div>
 );
 
+/* ── ADD DEVICE TO EXISTING CROP MODAL ── */
+const AddDeviceModal = ({ crop, onClose, onSave, loading }) => {
+  const [espId, setEspId]     = useState("");
+  const [espError, setEspError] = useState("");
+  const espInputRef = useRef(null);
+
+  useEffect(() => {
+    setTimeout(() => espInputRef.current?.focus(), 100);
+  }, []);
+
+  const handleSubmit = () => {
+    if (!espId.trim()) { setEspError("Please enter a Device ID."); return; }
+    setEspError("");
+    onSave({ espId: espId.trim() });
+  };
+
+  return (
+    <Modal onClose={onClose}>
+      <ModalHeader title="Add Device" onClose={onClose} />
+
+      <div className="px-6 py-5 flex flex-col gap-4">
+        <div className="bg-green-50 border border-green-200 rounded-xl px-3.5 py-3 text-sm text-green-800">
+          Linking a new device to <span className="font-semibold">{crop.name}</span>.
+        </div>
+
+        {espError && (
+          <div className="flex items-center gap-2 px-3.5 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+            {espError}
+          </div>
+        )}
+
+        <div>
+          <label className="block text-[11px] text-gray-400 uppercase tracking-wider mb-1.5 font-medium">ESP Device ID</label>
+          <input
+            ref={espInputRef}
+            type="text"
+            value={espId}
+            onChange={e => { setEspId(e.target.value); setEspError(""); }}
+            placeholder="e.g. AA:BB:CC:DD:EE:FF"
+            className="w-full px-3.5 py-2.5 border border-black/10 rounded-xl font-mono text-sm text-green-950 bg-[#f7f4ee] outline-none transition-all focus:border-green-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(46,139,87,0.1)]"
+          />
+        </div>
+
+        <div className="bg-[#f7f4ee] rounded-xl px-3.5 py-3">
+          <p className="text-xs font-semibold text-gray-600 mb-1.5">Where to find your Device ID</p>
+          <ul className="text-xs text-gray-500 leading-relaxed space-y-0.5 list-disc pl-4">
+            <li>Printed on a sticker on your ESP32 board</li>
+            <li>Inside your device packaging</li>
+            <li>In the SIBOL setup sheet included in the box</li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 px-6 py-4 border-t border-black/[0.06] sticky bottom-0 bg-white">
+        <button
+          onClick={onClose}
+          className="px-5 py-2 rounded-full border border-black/10 bg-transparent text-gray-400 text-sm font-medium cursor-pointer hover:bg-gray-50 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={loading || !espId.trim()}
+          className="flex items-center gap-1.5 px-6 py-2 rounded-full bg-green-950 border-none text-white text-sm font-medium cursor-pointer hover:bg-green-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {loading ? <><SpinIcon/> Linking…</> : 'Link Device'}
+        </button>
+      </div>
+    </Modal>
+  );
+};
+
 /* ── ADD / EDIT CROP MODAL (2-step) ── */
 const CropModal = ({ crop, onClose, onSave, loading }) => {
   const isEdit = !!crop;
@@ -496,7 +568,7 @@ const RemoveEspModal = ({ esp, onClose, onConfirm, loading }) => (
 );
 
 /* ── CROP CARD ── */
-const CropCard = ({ crop, onEdit, onDelete, onRemoveEsp, onView }) => {
+const CropCard = ({ crop, onEdit, onDelete, onRemoveEsp, onAddEsp, onView }) => {
   const planted = new Date(crop.planted_at).toLocaleDateString('en-US', {
     year: 'numeric', month: 'short', day: 'numeric',
   });
@@ -528,13 +600,21 @@ const CropCard = ({ crop, onEdit, onDelete, onRemoveEsp, onView }) => {
               : <div className="text-xs text-gray-400 italic">No device assigned</div>
             }
           </div>
-          {esp && (
+          {esp ? (
             <button
               onClick={() => onRemoveEsp(crop)}
               title="Remove device"
               className="w-8 h-8 rounded-lg border border-black/[0.08] bg-transparent flex items-center justify-center cursor-pointer hover:bg-red-50 hover:border-red-300 transition-all flex-shrink-0"
             >
               <TrashIcon color="#E24B4A"/>
+            </button>
+          ) : (
+            <button
+              onClick={() => onAddEsp(crop)}
+              title="Add device"
+              className="w-8 h-8 rounded-lg border border-dashed border-green-300 bg-transparent flex items-center justify-center cursor-pointer hover:bg-green-50 hover:border-green-500 transition-all flex-shrink-0 text-green-600"
+            >
+              <PlusIcon/>
             </button>
           )}
         </div>
@@ -583,12 +663,12 @@ const CropCareConfig = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [globalError, setGlobalError]   = useState("");
 
-  const [cropModal,      setCropModal]      = useState(null);
-  const [deleteModal,    setDeleteModal]    = useState(null);
-  const [removeEspModal, setRemoveEspModal] = useState(null);
+  const [cropModal,        setCropModal]        = useState(null);
+  const [addDeviceModal,   setAddDeviceModal]   = useState(null); // { crop }
+  const [deleteModal,      setDeleteModal]      = useState(null);
+  const [removeEspModal,   setRemoveEspModal]   = useState(null);
 
   // ── Track whether CoachMark is waiting for the crop to be saved ───────────
-  // Using window flag avoids ref-timing races across component boundaries.
   useEffect(() => {
     window.__sibolWaitingForCrop = false;
     const onWait = () => { window.__sibolWaitingForCrop = true; };
@@ -621,7 +701,7 @@ const CropCareConfig = () => {
 
   useEffect(() => { fetchCrops(); }, [garden_id]);
 
-  /* ── Save crop ── */
+  /* ── Save crop (add / edit) ── */
   const handleSaveCrop = async (form) => {
     setActionLoading(true);
     try {
@@ -645,26 +725,22 @@ const CropCareConfig = () => {
         });
         const newCrop = res.data.data;
 
-        // 2. Claim & link the device; get back the ESP record so we have its serial_number
+        // 2. Claim & link the device
         const claimRes = await axiosClient.post(`/claimDevice/${garden_id}`, {
           "esp-number": form.espId,
           "crop_id":    newCrop.id,
         });
 
-        // 3. Resolve the ESP serial.
-        //    Controller returns: { success, message, data: { serial_number, ... } }
-        //    Always fall back to the user-typed espId (which IS the serial_number).
         const espRecord = claimRes?.data?.data;
         const espSerial =
-          espRecord?.serial_number ||   // from claimEspDevice response
+          espRecord?.serial_number ||
           claimRes?.data?.serial_number ||
-          form.espId;                    // what the user typed — same value stored in DB
+          form.espId;
 
-        // 4. Refresh crop list
+        // 3. Refresh crop list
         await fetchCrops();
 
-        // 5. If CoachMark is waiting, fire sibol:crop-added with everything needed for the URL
-        //    URL shape: /user/crop-care/:garden_id/:crop_id/:esp_serial
+        // 4. Notify CoachMark if waiting
         if (window.__sibolWaitingForCrop) {
           window.__sibolWaitingForCrop = false;
           window.dispatchEvent(
@@ -672,7 +748,7 @@ const CropCareConfig = () => {
               detail: {
                 cropId:   newCrop.id,
                 gardenId: garden_id,
-                espId:    espSerial,   // serial_number string, NOT the numeric DB id
+                espId:    espSerial,
               },
             })
           );
@@ -684,6 +760,27 @@ const CropCareConfig = () => {
         err.response?.data?.errors
           ? Object.values(err.response.data.errors).flat().join(", ")
           : err.response?.data?.message || "Something went wrong."
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  /* ── Add device to existing crop ── */
+  const handleAddDevice = async ({ espId }) => {
+    setActionLoading(true);
+    try {
+      await axiosClient.post(`/claimDevice/${garden_id}`, {
+        "esp-number": espId,
+        "crop_id":    addDeviceModal.crop.id,
+      });
+      await fetchCrops();
+      setAddDeviceModal(null);
+    } catch (err) {
+      setGlobalError(
+        err.response?.data?.errors
+          ? Object.values(err.response.data.errors).flat().join(", ")
+          : err.response?.data?.message || "Failed to link device."
       );
     } finally {
       setActionLoading(false);
@@ -788,6 +885,7 @@ const CropCareConfig = () => {
                 onEdit={c => setCropModal({ mode: 'edit', crop: c })}
                 onDelete={c => setDeleteModal(c)}
                 onRemoveEsp={c => setRemoveEspModal(c)}
+                onAddEsp={c => setAddDeviceModal({ crop: c })}
                 onView={c => {
                   if (c.esp) navigate(`/user/crop-care/${garden_id}/${c.id}/${c.esp.serial_number}`);
                 }}
@@ -803,6 +901,14 @@ const CropCareConfig = () => {
           crop={cropModal.mode === 'edit' ? cropModal.crop : null}
           onClose={() => setCropModal(null)}
           onSave={handleSaveCrop}
+          loading={actionLoading}
+        />
+      )}
+      {addDeviceModal && (
+        <AddDeviceModal
+          crop={addDeviceModal.crop}
+          onClose={() => setAddDeviceModal(null)}
+          onSave={handleAddDevice}
           loading={actionLoading}
         />
       )}
