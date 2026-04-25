@@ -25,4 +25,9 @@ class SensorData extends Model
         return $this->belongsTo(Crop::class);
     }
 
+    public function esp()
+    {
+        return $this->belongsTo(Esp::class, 'esp_id');
+    }
+
 }
