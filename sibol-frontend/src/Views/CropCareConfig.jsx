@@ -270,16 +270,14 @@ const AddDeviceModal = ({ crop, onClose, onSave, loading }) => {
             type="text"
             value={espId}
             onChange={e => { setEspId(e.target.value); setEspError(""); }}
-            placeholder="e.g. AA:BB:CC:DD:EE:FF"
+            placeholder="ESP-XXXXXXXX"
             className="w-full px-3.5 py-2.5 border border-black/10 rounded-xl font-mono text-sm text-green-950 bg-[#f7f4ee] outline-none transition-all focus:border-green-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(46,139,87,0.1)]"
           />
         </div>
         <div className="bg-[#f7f4ee] rounded-xl px-3.5 py-3">
           <p className="text-xs font-semibold text-gray-600 mb-1.5">Where to find your Device ID</p>
           <ul className="text-xs text-gray-500 leading-relaxed space-y-0.5 list-disc pl-4">
-            <li>Printed on a sticker on your ESP32 board</li>
-            <li>Inside your device packaging</li>
-            <li>In the SIBOL setup sheet included in the box</li>
+            <li>Printed on the LCD of your SIBOL Hardware</li>
           </ul>
         </div>
       </div>
