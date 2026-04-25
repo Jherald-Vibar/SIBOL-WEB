@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axiosClient from "./axios";
+import echo from "./echo"; // ← your existing Echo instance
 
 /* ── ICONS ── */
 const XIcon = () => (
@@ -65,17 +66,17 @@ const LeafIcon = () => (
 );
 
 /* ── STATUS PILL ── */
-const StatusPill = ({ esp }) => {
+const StatusPill = ({ esp, liveActive }) => {
   if (!esp) return (
     <span className="absolute top-2.5 right-2.5 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800">
       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"/>no device
     </span>
   );
-  const active = esp.status === 'active';
+  const isActive = liveActive || esp.status === 'active';
   return (
-    <span className={`absolute top-2.5 right-2.5 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium ${active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
-      <span className={`w-1.5 h-1.5 rounded-full inline-block ${active ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}/>
-      {esp.status}
+    <span className={`absolute top-2.5 right-2.5 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all duration-500 ${isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
+      <span className={`w-1.5 h-1.5 rounded-full inline-block ${isActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}/>
+      {isActive ? 'active' : esp.status}
     </span>
   );
 };
@@ -124,7 +125,7 @@ const DeviceToast = ({ toasts, onDismiss }) => {
                   <p className="text-[11px] font-semibold text-green-700 uppercase tracking-wider">Device Connected</p>
                 </div>
                 <p className="font-['Lora',serif] text-sm font-semibold text-green-950 leading-snug">
-                  Your device is connected!
+                  Live data is arriving!
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5 font-mono truncate">{t.serial}</p>
                 {t.crop && (
@@ -153,59 +154,56 @@ const DeviceToast = ({ toasts, onDismiss }) => {
   );
 };
 
-/* ── WEBSOCKET HOOK ── */
-const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:6001";
+/* ══════════════════════════════════════════════
+   ECHO / PUSHER HOOK
+   Replaces raw WebSocket. Uses your existing echo instance.
 
-const useDeviceWebSocket = (crops, onDeviceConnected) => {
-  const socketsRef = useRef({});
-  const cropsRef   = useRef(crops);
-  cropsRef.current = crops;
+   Channel name:  esp.{serial_number}
+   Event names tried (dot-prefixed = Echo strips the leading backslash):
+     · .sensor.data
+     · .App\Events\SensorDataReceived   (Laravel default broadcast name)
 
-  const connectToDevice = useCallback((serial) => {
-    if (socketsRef.current[serial]) return;
-    const ws = new WebSocket(`${WS_URL}/app/sibol?protocol=7&client=js&version=8.4.0&flash=false`);
-    ws.onopen = () => {
-      ws.send(JSON.stringify({
-        event: "pusher:subscribe",
-        data: { channel: `esp.${serial}` },
-      }));
-    };
-    ws.onmessage = (e) => {
-      try {
-        const payload = JSON.parse(e.data);
-        if (
-          payload.event === "sensor.data" ||
-          payload.event === "App\\Events\\SensorDataReceived"
-        ) {
-          const crop = cropsRef.current.find(c => c.esp?.serial_number === serial);
-          onDeviceConnected(serial, crop?.name || null);
-        }
-      } catch (error) {}
-    };
-    ws.onerror = () => {};
-    ws.onclose = () => { delete socketsRef.current[serial]; };
-    socketsRef.current[serial] = ws;
-  }, [onDeviceConnected]);
+   If your backend broadcasts a different event, add another .listen() below.
+═══════════════════════════════════════════════ */
+const useDeviceEcho = (crops, onDeviceConnected) => {
+  const subscribedRef = useRef(new Set());
+  const cropsRef      = useRef(crops);
+  cropsRef.current    = crops;
 
   useEffect(() => {
-    crops.forEach(crop => {
-      if (crop.esp?.serial_number) connectToDevice(crop.esp.serial_number);
+    const serials = crops.map(c => c.esp?.serial_number).filter(Boolean);
+
+    // Subscribe to channels for new serials
+    serials.forEach(serial => {
+      if (subscribedRef.current.has(serial)) return;
+      subscribedRef.current.add(serial);
+
+      const fire = () => {
+        const crop = cropsRef.current.find(c => c.esp?.serial_number === serial);
+        onDeviceConnected(serial, crop?.name ?? null);
+      };
+
+      echo
+        .channel(`esp.${serial}`)
+        // Try both common event names — whichever your backend broadcasts will match
+        .listen('.sensor.data', fire)
+        .listen('.App\\Events\\SensorDataReceived', fire);
     });
-    const activeSerials = new Set(
-      crops.filter(c => c.esp?.serial_number).map(c => c.esp.serial_number)
-    );
-    Object.keys(socketsRef.current).forEach(serial => {
-      if (!activeSerials.has(serial)) {
-        socketsRef.current[serial]?.close();
-        delete socketsRef.current[serial];
+
+    // Leave channels whose crop/device was removed
+    subscribedRef.current.forEach(serial => {
+      if (!serials.includes(serial)) {
+        echo.leaveChannel(`esp.${serial}`);
+        subscribedRef.current.delete(serial);
       }
     });
-  }, [crops, connectToDevice]);
+  }, [crops, onDeviceConnected]);
 
+  // Leave all channels on unmount
   useEffect(() => {
     return () => {
-      Object.values(socketsRef.current).forEach(ws => ws?.close());
-      socketsRef.current = {};
+      subscribedRef.current.forEach(serial => echo.leaveChannel(`esp.${serial}`));
+      subscribedRef.current.clear();
     };
   }, []);
 };
@@ -217,23 +215,19 @@ const useToasts = () => {
   const [toasts, setToasts] = useState([]);
   const timersRef = useRef({});
 
+  const dismissToast = useCallback((id) => {
+    clearTimeout(timersRef.current[id]);
+    setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 300);
+  }, []);
+
   const addToast = useCallback((serial, crop) => {
     const id = `${serial}-${Date.now()}`;
     setToasts(prev => [...prev, { id, serial, crop, exiting: false, duration: TOAST_DURATION }]);
     timersRef.current[id] = setTimeout(() => dismissToast(id), TOAST_DURATION);
-  }, []);
+  }, [dismissToast]);
 
-  const dismissToast = useCallback((id) => {
-    clearTimeout(timersRef.current[id]);
-    setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 300);
-  }, []);
-
-  useEffect(() => {
-    return () => Object.values(timersRef.current).forEach(clearTimeout);
-  }, []);
+  useEffect(() => () => Object.values(timersRef.current).forEach(clearTimeout), []);
 
   return { toasts, addToast, dismissToast };
 };
@@ -264,13 +258,11 @@ const ModalHeader = ({ title, onClose, danger }) => (
 
 /* ── ADD DEVICE TO EXISTING CROP MODAL ── */
 const AddDeviceModal = ({ crop, onClose, onSave, loading }) => {
-  const [espId, setEspId]     = useState("");
+  const [espId, setEspId]       = useState("");
   const [espError, setEspError] = useState("");
   const espInputRef = useRef(null);
 
-  useEffect(() => {
-    setTimeout(() => espInputRef.current?.focus(), 100);
-  }, []);
+  useEffect(() => { setTimeout(() => espInputRef.current?.focus(), 100); }, []);
 
   const handleSubmit = () => {
     if (!espId.trim()) { setEspError("Please enter a Device ID."); return; }
@@ -280,19 +272,16 @@ const AddDeviceModal = ({ crop, onClose, onSave, loading }) => {
 
   return (
     <Modal onClose={onClose}>
-      <ModalHeader title="Add Device" onClose={onClose} />
-
+      <ModalHeader title="Add Device" onClose={onClose}/>
       <div className="px-6 py-5 flex flex-col gap-4">
         <div className="bg-green-50 border border-green-200 rounded-xl px-3.5 py-3 text-sm text-green-800">
           Linking a new device to <span className="font-semibold">{crop.name}</span>.
         </div>
-
         {espError && (
           <div className="flex items-center gap-2 px-3.5 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
             {espError}
           </div>
         )}
-
         <div>
           <label className="block text-[11px] text-gray-400 uppercase tracking-wider mb-1.5 font-medium">ESP Device ID</label>
           <input
@@ -300,24 +289,21 @@ const AddDeviceModal = ({ crop, onClose, onSave, loading }) => {
             type="text"
             value={espId}
             onChange={e => { setEspId(e.target.value); setEspError(""); }}
-            placeholder="ESP-123456789"
+            placeholder="e.g. AA:BB:CC:DD:EE:FF"
             className="w-full px-3.5 py-2.5 border border-black/10 rounded-xl font-mono text-sm text-green-950 bg-[#f7f4ee] outline-none transition-all focus:border-green-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(46,139,87,0.1)]"
           />
         </div>
-
         <div className="bg-[#f7f4ee] rounded-xl px-3.5 py-3">
           <p className="text-xs font-semibold text-gray-600 mb-1.5">Where to find your Device ID</p>
           <ul className="text-xs text-gray-500 leading-relaxed space-y-0.5 list-disc pl-4">
-            <li>Printed on the LCD of your SIBOL <Hardware></Hardware></li>
+            <li>Printed on a sticker on your ESP32 board</li>
+            <li>Inside your device packaging</li>
+            <li>In the SIBOL setup sheet included in the box</li>
           </ul>
         </div>
       </div>
-
       <div className="flex justify-end gap-2 px-6 py-4 border-t border-black/[0.06] sticky bottom-0 bg-white">
-        <button
-          onClick={onClose}
-          className="px-5 py-2 rounded-full border border-black/10 bg-transparent text-gray-400 text-sm font-medium cursor-pointer hover:bg-gray-50 transition-colors"
-        >
+        <button onClick={onClose} className="px-5 py-2 rounded-full border border-black/10 bg-transparent text-gray-400 text-sm font-medium cursor-pointer hover:bg-gray-50 transition-colors">
           Cancel
         </button>
         <button
@@ -335,10 +321,10 @@ const AddDeviceModal = ({ crop, onClose, onSave, loading }) => {
 /* ── ADD / EDIT CROP MODAL (2-step) ── */
 const CropModal = ({ crop, onClose, onSave, loading }) => {
   const isEdit = !!crop;
-  const [step, setStep]     = useState(isEdit ? 2 : 1);
-  const [espId, setEspId]   = useState("");
+  const [step, setStep]         = useState(isEdit ? 2 : 1);
+  const [espId, setEspId]       = useState("");
   const [espError, setEspError] = useState("");
-  const [form, setForm]     = useState({
+  const [form, setForm]         = useState({
     name:         crop?.name    || "",
     variety:      crop?.variety || "Vegetable",
     planted_date: crop?.planted_at
@@ -488,7 +474,6 @@ const CropModal = ({ crop, onClose, onSave, loading }) => {
             )}
           </>
         )}
-
         {step === 1 ? (
           <button
             onClick={handleNext}
@@ -566,11 +551,12 @@ const RemoveEspModal = ({ esp, onClose, onConfirm, loading }) => (
 );
 
 /* ── CROP CARD ── */
-const CropCard = ({ crop, onEdit, onDelete, onRemoveEsp, onAddEsp, onView }) => {
-  const planted = new Date(crop.planted_at).toLocaleDateString('en-US', {
+const CropCard = ({ crop, liveSerials, onEdit, onDelete, onRemoveEsp, onAddEsp, onView }) => {
+  const planted    = new Date(crop.planted_at).toLocaleDateString('en-US', {
     year: 'numeric', month: 'short', day: 'numeric',
   });
-  const esp = crop.esp;
+  const esp        = crop.esp;
+  const liveActive = esp ? liveSerials.has(esp.serial_number) : false;
 
   return (
     <div id={`coach-crop-card-${crop.id}`} className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(11,61,30,0.10)] group">
@@ -579,7 +565,7 @@ const CropCard = ({ crop, onEdit, onDelete, onRemoveEsp, onAddEsp, onView }) => 
           ? <img src={crop.image} alt={crop.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"/>
           : <div className="w-full h-full flex items-center justify-center text-4xl">🌱</div>
         }
-        <StatusPill esp={esp}/>
+        <StatusPill esp={esp} liveActive={liveActive}/>
       </div>
 
       <div className="p-4">
@@ -588,8 +574,8 @@ const CropCard = ({ crop, onEdit, onDelete, onRemoveEsp, onAddEsp, onView }) => 
         <div className="h-px bg-black/[0.05] mb-3"/>
 
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
-            <EspIcon color={esp ? "#3B6D11" : "#9ca3af"}/>
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${liveActive ? 'bg-green-100' : 'bg-green-50'}`}>
+            <EspIcon color={esp ? (liveActive ? "#16a34a" : "#3B6D11") : "#9ca3af"}/>
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Monitoring device</div>
@@ -656,17 +642,20 @@ const CropCareConfig = () => {
   const { garden_id } = useParams();
   const navigate = useNavigate();
 
-  const [crops, setCrops]               = useState([]);
-  const [pageLoading, setPageLoading]   = useState(true);
+  const [crops, setCrops]                 = useState([]);
+  const [pageLoading, setPageLoading]     = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [globalError, setGlobalError]   = useState("");
+  const [globalError, setGlobalError]     = useState("");
 
-  const [cropModal,        setCropModal]        = useState(null);
-  const [addDeviceModal,   setAddDeviceModal]   = useState(null); // { crop }
-  const [deleteModal,      setDeleteModal]      = useState(null);
-  const [removeEspModal,   setRemoveEspModal]   = useState(null);
+  // Tracks which serial_numbers have live data (lights up the card + pill)
+  const [liveSerials, setLiveSerials] = useState(new Set());
 
-  // ── Track whether CoachMark is waiting for the crop to be saved ───────────
+  const [cropModal,      setCropModal]      = useState(null);
+  const [addDeviceModal, setAddDeviceModal] = useState(null);
+  const [deleteModal,    setDeleteModal]    = useState(null);
+  const [removeEspModal, setRemoveEspModal] = useState(null);
+
+  // ── CoachMark flag ──────────────────────────────────────────────────────
   useEffect(() => {
     window.__sibolWaitingForCrop = false;
     const onWait = () => { window.__sibolWaitingForCrop = true; };
@@ -679,11 +668,13 @@ const CropCareConfig = () => {
 
   const { toasts, addToast, dismissToast } = useToasts();
 
+  // Fires every time Pusher delivers a sensor event for any subscribed device
   const handleDeviceConnected = useCallback((serial, cropName) => {
+    setLiveSerials(prev => new Set([...prev, serial]));
     addToast(serial, cropName);
   }, [addToast]);
 
-  useDeviceWebSocket(crops, handleDeviceConnected);
+  useDeviceEcho(crops, handleDeviceConnected);
 
   /* ── Data fetching ── */
   const fetchCrops = async () => {
@@ -717,39 +708,26 @@ const CropCareConfig = () => {
           prev.map(c => c.id === cropModal.crop.id ? { ...res.data.data, esp: c.esp } : c)
         );
       } else {
-        // 1. Create the crop
         const res = await axiosClient.post(`/addCrop/${garden_id}`, fd, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         const newCrop = res.data.data;
 
-        // 2. Claim & link the device
         const claimRes = await axiosClient.post(`/claimDevice/${garden_id}`, {
           "esp-number": form.espId,
           "crop_id":    newCrop.id,
         });
 
         const espRecord = claimRes?.data?.data;
-        const espSerial =
-          espRecord?.serial_number ||
-          claimRes?.data?.serial_number ||
-          form.espId;
+        const espSerial = espRecord?.serial_number || claimRes?.data?.serial_number || form.espId;
 
-        // 3. Refresh crop list
         await fetchCrops();
 
-        // 4. Notify CoachMark if waiting
         if (window.__sibolWaitingForCrop) {
           window.__sibolWaitingForCrop = false;
-          window.dispatchEvent(
-            new CustomEvent('sibol:crop-added', {
-              detail: {
-                cropId:   newCrop.id,
-                gardenId: garden_id,
-                espId:    espSerial,
-              },
-            })
-          );
+          window.dispatchEvent(new CustomEvent('sibol:crop-added', {
+            detail: { cropId: newCrop.id, gardenId: garden_id, espId: espSerial },
+          }));
         }
       }
       setCropModal(null);
@@ -804,6 +782,11 @@ const CropCareConfig = () => {
     setActionLoading(true);
     try {
       await axiosClient.delete(`/deleteEsp/${removeEspModal.esp.id}`);
+      setLiveSerials(prev => {
+        const next = new Set(prev);
+        next.delete(removeEspModal.esp.serial_number);
+        return next;
+      });
       setCrops(prev =>
         prev.map(c => c.id === removeEspModal.id ? { ...c, esp: null } : c)
       );
@@ -880,6 +863,7 @@ const CropCareConfig = () => {
               <CropCard
                 key={crop.id}
                 crop={crop}
+                liveSerials={liveSerials}
                 onEdit={c => setCropModal({ mode: 'edit', crop: c })}
                 onDelete={c => setDeleteModal(c)}
                 onRemoveEsp={c => setRemoveEspModal(c)}
