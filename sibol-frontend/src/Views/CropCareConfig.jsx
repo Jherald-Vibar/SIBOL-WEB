@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axiosClient from "./axios";
-import echo from "./echo"; // ← your existing Echo instance
+import echo from "./echo";
 
 /* ── ICONS ── */
 const XIcon = () => (
@@ -155,57 +155,38 @@ const DeviceToast = ({ toasts, onDismiss }) => {
 };
 
 /* ══════════════════════════════════════════════
-   ECHO / PUSHER HOOK
-   Replaces raw WebSocket. Uses your existing echo instance.
+   ECHO HOOK
 
-   Channel name:  esp.{serial_number}
-   Event names tried (dot-prefixed = Echo strips the leading backslash):
-     · .sensor.data
-     · .App\Events\SensorDataReceived   (Laravel default broadcast name)
+   Channel : garden.{gardenId}         ← matches broadcastOn()
+   Event   : .sensor.updated           ← matches broadcastAs() with dot prefix
 
-   If your backend broadcasts a different event, add another .listen() below.
+   Expects broadcastWith() to include serial_number:
+     'serial_number' => $this->sensorData->esp->serial_number
 ═══════════════════════════════════════════════ */
-const useDeviceEcho = (crops, onDeviceConnected) => {
-  const subscribedRef = useRef(new Set());
-  const cropsRef      = useRef(crops);
-  cropsRef.current    = crops;
+const useGardenEcho = (gardenId, onSensorData) => {
+  const hasSubscribed = useRef(false);
+  const onSensorDataRef = useRef(onSensorData);
+  onSensorDataRef.current = onSensorData; // always fresh, no re-subscribe
 
   useEffect(() => {
-    const serials = crops.map(c => c.esp?.serial_number).filter(Boolean);
+    if (!gardenId || hasSubscribed.current) return;
+    hasSubscribed.current = true;
 
-    // Subscribe to channels for new serials
-    serials.forEach(serial => {
-      if (subscribedRef.current.has(serial)) return;
-      subscribedRef.current.add(serial);
+    console.log(`[Echo] Subscribing to garden.${gardenId}`);
 
-      const fire = () => {
-        const crop = cropsRef.current.find(c => c.esp?.serial_number === serial);
-        onDeviceConnected(serial, crop?.name ?? null);
-      };
+    echo
+      .channel(`garden.${gardenId}`)
+      .listen('.sensor.updated', (data) => {
+        console.log('[Echo] sensor.updated received:', data);
+        onSensorDataRef.current(data);
+      });
 
-      echo
-        .channel(`esp.${serial}`)
-        // Try both common event names — whichever your backend broadcasts will match
-        .listen('.sensor.data', fire)
-        .listen('.App\\Events\\SensorDataReceived', fire);
-    });
-
-    // Leave channels whose crop/device was removed
-    subscribedRef.current.forEach(serial => {
-      if (!serials.includes(serial)) {
-        echo.leaveChannel(`esp.${serial}`);
-        subscribedRef.current.delete(serial);
-      }
-    });
-  }, [crops, onDeviceConnected]);
-
-  // Leave all channels on unmount
-  useEffect(() => {
     return () => {
-      subscribedRef.current.forEach(serial => echo.leaveChannel(`esp.${serial}`));
-      subscribedRef.current.clear();
+      console.log(`[Echo] Leaving garden.${gardenId}`);
+      echo.leaveChannel(`garden.${gardenId}`);
+      hasSubscribed.current = false;
     };
-  }, []);
+  }, [gardenId]);
 };
 
 /* ── TOAST MANAGER HOOK ── */
@@ -647,7 +628,7 @@ const CropCareConfig = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [globalError, setGlobalError]     = useState("");
 
-  // Tracks which serial_numbers have live data (lights up the card + pill)
+  // Tracks which serial_numbers have received live data (lights up the card + pill)
   const [liveSerials, setLiveSerials] = useState(new Set());
 
   const [cropModal,      setCropModal]      = useState(null);
@@ -668,13 +649,43 @@ const CropCareConfig = () => {
 
   const { toasts, addToast, dismissToast } = useToasts();
 
-  // Fires every time Pusher delivers a sensor event for any subscribed device
-  const handleDeviceConnected = useCallback((serial, cropName) => {
-    setLiveSerials(prev => new Set([...prev, serial]));
-    addToast(serial, cropName);
+  // Keep a ref to crops so the echo callback always sees current list
+  const cropsRef = useRef(crops);
+  cropsRef.current = crops;
+
+  /*
+   * Called whenever Echo fires sensor.updated on garden.{garden_id}.
+   *
+   * Expects the broadcast payload to include serial_number:
+   *   broadcastWith() → ['serial_number' => $this->sensorData->esp->serial_number, ...]
+   *
+   * If your broadcastWith() doesn't yet include serial_number,
+   * add it in SensorDataReceived.php (see comment below).
+   */
+  const handleSensorData = useCallback((data) => {
+    const serial = data.serial_number;
+
+    if (!serial) {
+      // Fallback: if serial_number is missing in the payload, log a warning.
+      // Fix: add 'serial_number' => $this->sensorData->esp->serial_number
+      // to broadcastWith() in SensorDataReceived.php
+      console.warn('[Echo] sensor.updated received but serial_number is missing in payload:', data);
+      return;
+    }
+
+    // Only show toast on first activation (not on every sensor reading)
+    setLiveSerials(prev => {
+      if (prev.has(serial)) return prev; // already active, no toast
+      const next = new Set(prev);
+      next.add(serial);
+      const crop = cropsRef.current.find(c => c.esp?.serial_number === serial);
+      addToast(serial, crop?.name ?? null);
+      return next;
+    });
   }, [addToast]);
 
-  useDeviceEcho(crops, handleDeviceConnected);
+  // ── Subscribe to garden channel ─────────────────────────────────────────
+  useGardenEcho(garden_id, handleSensorData);
 
   /* ── Data fetching ── */
   const fetchCrops = async () => {
