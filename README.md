@@ -1,61 +1,148 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 🌱 SIBOL
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+**An IoT-powered smart gardening platform** that connects ESP32 sensor nodes, AI-based crop health detection, and a real-time web dashboard — built for community and barangay/city hall gardening programs.
 
-## About Laravel
+SIBOL monitors soil and environmental conditions in real time, automates irrigation, detects crop pests/diseases from images using a YOLO model, and keeps growers informed through live notifications, SMS, and email alerts.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## ✨ Features
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- **Real-time sensor monitoring** — soil moisture, and other environmental readings streamed from ESP32 nodes over MQTT and pushed live to the dashboard via WebSockets (Laravel Reverb / Pusher).
+- **Smart irrigation** — automated and manual irrigation control tied to live sensor data.
+- **AI crop health detection** — a YOLO11 (Ultralytics) computer vision model, served by a standalone Flask microservice, detects crop pests/diseases from uploaded or captured images.
+- **Crop care management** — per-garden crop profiles, care configurations, and health tracking.
+- **Notifications** — real-time in-app alerts, plus SMS (Twilio / Infobip) and email notifications for critical events (e.g. low soil moisture, detected crop issues).
+- **Reports** — daily and monthly garden reports, exportable as PDF (DomPDF).
+- **Admin & user roles** — separate admin and user dashboards, account settings, and activity logging (Spatie Activitylog) for auditability.
+- **Authentication** — standard login/register plus social login (Laravel Socialite) and API auth via Sanctum.
+- **Media storage** — garden/crop images and detection snapshots stored via Cloudinary.
 
-## Learning Laravel
+## 🏗️ Architecture
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+SIBOL is split into three services:
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+| Service | Stack | Responsibility |
+|---|---|---|
+| **Backend** (`/app`, `/routes`, `/database`, etc.) | Laravel 12 (PHP 8.2) | REST API, auth, MQTT ingestion, WebSocket broadcasting, notifications, reports |
+| **Frontend** (`/sibol-frontend`) | React + Vite + Tailwind CSS 4 | User & admin dashboards, live sensor charts, crop care UI |
+| **Detection service** (`/python-yolo`) | Flask + Ultralytics YOLO11 + OpenCV | Image-based crop pest/disease detection, served as a separate API |
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+ESP32 sensor nodes publish readings over **MQTT**, which the Laravel backend consumes (`php-mqtt/laravel-client`) and stores, then broadcasts to the frontend in real time over WebSockets (Laravel Reverb / Pusher + Laravel Echo).
 
-## Laravel Sponsors
+## 🧰 Tech Stack
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+**Backend:** Laravel 12, PHP 8.2+, Laravel Sanctum, Laravel Socialite, Laravel Reverb, Spatie Activitylog, DomPDF, Twilio SDK, php-mqtt/laravel-client, Cloudinary
 
-### Premium Partners
+**Frontend:** React, Vite, Tailwind CSS 4, Axios, MQTT.js, Laravel Echo, Pusher JS
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+**AI/Detection service:** Python, Flask, Ultralytics YOLO11, OpenCV, PyTorch (CPU), Cloudinary
 
-## Contributing
+**Infra:** Docker, Nixpacks, Procfile (Railway/Render-style deployment)
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## 📁 Project Structure
 
-## Code of Conduct
+```
+SIBOL-WEB/
+├── app/                    # Laravel application code (Controllers, Models, Events, Services)
+├── routes/                 # api.php, web.php, channels.php
+├── database/                # Migrations, seeders, factories
+├── config/                  # Laravel config (mail, broadcasting, cors, cloudinary, etc.)
+├── docker/                  # nginx config, container start script
+├── python-yolo/             # Flask + YOLO11 crop detection microservice
+│   ├── app.py
+│   ├── models/               # Trained .pt model weights
+│   └── requirements.txt
+├── sibol-frontend/          # React + Vite dashboard
+│   └── src/
+│       ├── Views/             # Login, Register, Dashboards, Crop Care, Reports, etc.
+│       ├── components/        # Layouts (Admin, Guest, User)
+│       └── hooks/             # useSensorData, etc.
+├── dockerfile
+├── nixpacks.toml
+├── Procfile
+└── composer.json / package.json
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## 🚀 Getting Started
 
-## Security Vulnerabilities
+### Prerequisites
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- PHP 8.2+
+- Composer
+- Node.js 18+ and npm
+- Python 3.10+ (for the detection service)
+- A database (SQLite by default, MySQL/PostgreSQL supported)
+- An MQTT broker (for ESP32 sensor data)
 
-## License
+### 1. Backend (Laravel)
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+git clone https://github.com/Jherald-Vibar/SIBOL-WEB.git
+cd SIBOL-WEB
+
+composer install
+cp .env.example .env
+php artisan key:generate
+
+# configure DB, MQTT broker, Cloudinary, Twilio/Infobip, Pusher/Reverb in .env
+
+php artisan migrate --seed
+php artisan serve
+```
+
+To run the queue worker, log watcher, and Vite dev server alongside the app in one command:
+
+```bash
+composer run dev
+```
+
+### 2. Frontend (React)
+
+```bash
+cd sibol-frontend
+npm install
+npm run dev
+```
+
+### 3. Detection service (Python/YOLO)
+
+```bash
+cd python-yolo
+pip install -r requirements.txt
+python app.py
+```
+
+### Environment Variables
+
+Key variables to set in `.env` (see `.env.example` for the full list):
+
+- `DB_*` — database connection
+- `BROADCAST_CONNECTION`, `REVERB_*` / `PUSHER_*` — real-time broadcasting
+- `MQTT_*` — broker host/credentials for ESP32 sensor ingestion
+- `CLOUDINARY_*` — media storage
+- `TWILIO_*` / Infobip credentials — SMS notifications
+- `MAIL_*` — email notifications
+
+## 🌾 Data Model Overview
+
+- **Garden** — a monitored garden/plot
+- **Crop** / **CropProfile** — crops planted and their care profiles (ideal moisture range, watering schedule, etc.)
+- **Esp** — registered ESP32 sensor devices
+- **SensorData** — time-series sensor readings
+- **DetectionResults** — YOLO detection outputs (pest/disease findings)
+- **Notification** — in-app/SMS/email alerts
+- **User** / **Admin** — accounts and roles
+
+## 📦 Deployment
+
+The repo includes a `dockerfile`, `docker/nginx.conf`, `docker/start.sh`, `nixpacks.toml`, and `Procfile`, ready for containerized deployment (e.g. Railway, Render, or any Docker host). The Python detection service is deployed as a separate container/process from the Laravel app.
+
+## 📄 License
+
+No license has been specified for this repository yet. All rights reserved by the author unless a license is added.
+
+## 👤 Author
+
+**Jherald D. Vibar**
+[GitHub](https://github.com/Jherald-Vibar)
